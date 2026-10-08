@@ -122,19 +122,23 @@ function lireMesRoches(gj) {
 // =====================================================================
 // Détection
 // =====================================================================
-// opts : { seuil, smooth, useL3d, inclTest, antic, roches, affichage }
-// Renvoie la menace principale (pour le son) et, si affichage, les cellules dangereuses autour de la position.
+// opts : { seuil, smooth, useL3d, inclTest, antic, roches, affichage, preAlerte }
+// Renvoie la menace principale (alerte : cône ±50°, distance d'alerte), la pré-alerte (cône ±10°, jusqu'à 2× la distance
+// d'alerte) et, si affichage, les cellules dangereuses autour de la position.
+const CONE_ALERTE = 50, CONE_PRE = 10;
 function analyser(pos, course, speed, W, opts) {
-  const { seuil, smooth, useL3d, inclTest, antic, roches = [], affichage = true } = opts;
+  const { seuil, smooth, useL3d, inclTest, antic, roches = [], affichage = true, preAlerte = false } = opts;
   const horizon = Math.max(40, speed * antic);                                   // distance d'alerte (m)
-  const R = affichage ? Math.min(250, Math.max(120, horizon * 1.6)) : horizon;  // rayon de lecture
+  const preH = preAlerte ? 2 * horizon : 0;                                      // distance de pré-alerte (m)
+  const R = affichage ? Math.min(300, Math.max(120, horizon * 1.6, preH * 1.1)) : Math.max(horizon, preH); // rayon de lecture
   const mpp = mPerPx(pos.lat), [px, py] = toPx(pos.lat, pos.lon);
   const rp = Math.ceil(R / mpp);
   const cells = [];                                                              // [dx, dy, niveau] en mètres, est/sud positifs
-  let best = null;
+  let best = null, pre = null;
   const consider = (dx, dy, lvl, d) => {
     let rel = Math.atan2(dx, -dy) * 180 / Math.PI - course; rel = ((rel + 540) % 360) - 180;
-    const inCone = Math.abs(rel) <= 50 || d < 20;
+    if (preH && d > horizon && d <= preH && Math.abs(rel) <= CONE_PRE && (!pre || d < pre.d)) pre = { d, rel, lvl };
+    const inCone = Math.abs(rel) <= CONE_ALERTE || d < 20;
     if (!inCone || d > horizon) return;
     const score = d / Math.max(0.35, Math.cos(Math.min(Math.abs(rel), 80) * Math.PI / 180)) - lvl * 3;
     if (!best || score < best.score) best = { d, rel, lvl, score };
@@ -182,7 +186,7 @@ function analyser(pos, course, speed, W, opts) {
       if (lvl >= 2) consider(n.x, n.y, lvl, n.d);
     }
   }
-  return { cells, zones, best, horizon, R };
+  return { cells, zones, best, pre, horizon, preH, R };
 }
 function nearestOnPoly(pts) { // point du polygone le plus proche de l'origine (0 si dedans)
   let inside = false, bd = Infinity, bx = 0, by = 0;
@@ -195,6 +199,7 @@ function nearestOnPoly(pts) { // point du polygone le plus proche de l'origine (
   }
   return inside ? { d: 0, x: 0, y: -1 } : { d: bd, x: bx, y: by };
 }
+function textePre(p) { return `Danger droit devant à ${Math.round(p.d)} m (pré-alerte)`; }
 function texteMenace(b) {
   return `${b.lvl === 3 ? 'Roche émergée' : 'Haut-fond'} à ${Math.round(b.d)} m ${Math.abs(b.rel) < 15 ? 'devant' : b.rel > 0 ? 'à tribord' : 'à bâbord'}`;
 }
@@ -204,9 +209,9 @@ function texteMenace(b) {
 // =====================================================================
 let ac = null, muted = false, nextBeep = 0, contOsc = null;
 function audio() { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); return ac; }
-function tone(f0, f1, t, dur, vol = 0.9) {
+function tone(f0, f1, t, dur, vol = 0.9, type = 'square') {
   const a = audio(), o = a.createOscillator(), g = a.createGain();
-  o.type = 'square'; o.frequency.setValueAtTime(f0, t); o.frequency.linearRampToValueAtTime(f1, t + dur);
+  o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.linearRampToValueAtTime(f1, t + dur);
   g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.01); g.gain.setValueAtTime(vol, t + dur - 0.02); g.gain.linearRampToValueAtTime(0, t + dur);
   o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + 0.02);
 }
@@ -223,20 +228,25 @@ function continu(on, f = 1100) {
     contOsc = { o, g };
   } else if (!on && contOsc) { contOsc.o.stop(); contOsc = null; }
 }
+function tintement(t) { tone(1760, 1760, t, 0.22, 0.8, 'triangle'); tone(1320, 1320, t + 0.24, 0.30, 0.8, 'triangle'); } // pré-alerte : doux, aigu, descendant
 function gpsPerdu(t) { [0, 0.25, 0.5].forEach(s => tone(260, 260, t + s, 0.15)); }
 function demoSons() {
   const t = audio().currentTime + 0.1;
-  motif(0, 2, t); motif(40, 2, t + 0.8); motif(-40, 2, t + 1.6); motif(0, 3, t + 2.4); gpsPerdu(t + 3.2);
+  tintement(t); motif(0, 2, t + 1.0); motif(40, 2, t + 1.8); motif(-40, 2, t + 2.6); motif(0, 3, t + 3.4); gpsPerdu(t + 4.2);
 }
-// Joue l'alerte correspondant à la menace b (appelé à chaque pas) ; armed = vitesse suffisante
-function sonnerMenace(b, horizon, armed) {
+// Joue l'alerte correspondant à la menace b, sinon la pré-alerte pre (appelé à chaque pas) ; armed = vitesse suffisante
+let nextPre = 0;
+function sonnerMenace(b, horizon, armed, pre) {
   const at = audio().currentTime;
   if (b && armed && !muted) {
     if (b.d < 10) { continu(true, b.lvl === 3 ? 1400 : 1100); return; }
     continu(false);
     const period = 0.18 + 1.1 * Math.min(1, b.d / horizon);
     if (at > nextBeep) { motif(b.rel, b.lvl, at); nextBeep = at + period; }
-  } else continu(false);
+    return;
+  }
+  continu(false);
+  if (pre && armed && !muted && at > nextPre) { tintement(at); nextPre = at + 3; } // rappel toutes les 3 s tant que le danger reste devant
 }
 // Niveau d'alerte pour la frise : 0 rien, 1 bips, 2 son continu (< 10 m), 3 contact (< 3 m)
 function niveauAlerte(b, armed) {
@@ -266,8 +276,17 @@ function drawRadar(cv, analysis, fix) {
   ctx.setTransform(1, 0, 0, 1, cx, cy);
   ctx.strokeStyle = '#2a3441'; ctx.lineWidth = k; ctx.fillStyle = '#8a96a6'; ctx.font = `${11 * k}px system-ui`;
   for (const r of [50, 100, 200]) if (r <= R) { ctx.beginPath(); ctx.arc(0, 0, r * sc, 0, 2 * Math.PI); ctx.stroke(); ctx.fillText(r + ' m', 4 * k, -r * sc - 3 * k); }
-  const h = analysis.horizon * sc;
-  ctx.fillStyle = 'rgba(61,155,240,0.10)'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, h, -Math.PI / 2 - 50 * Math.PI / 180, -Math.PI / 2 + 50 * Math.PI / 180); ctx.closePath(); ctx.fill();
+  const cone = (r, deg, fill, stroke) => {
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, r, -Math.PI / 2 - deg * Math.PI / 180, -Math.PI / 2 + deg * Math.PI / 180); ctx.closePath();
+    ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = stroke; ctx.lineWidth = 1.5 * k; ctx.stroke();
+  };
+  const h = analysis.horizon * sc, a = CONE_ALERTE * Math.PI / 180;
+  if (analysis.preH) cone(analysis.preH * sc, CONE_PRE, 'rgba(255,214,10,0.10)', 'rgba(255,214,10,0.75)');
+  cone(h, CONE_ALERTE, 'rgba(61,155,240,0.12)', 'rgba(61,155,240,0.6)');
+  ctx.font = `bold ${12 * k}px system-ui`; ctx.textAlign = 'center';
+  ctx.fillStyle = '#3d9bf0'; ctx.fillText(Math.round(analysis.horizon) + ' m', Math.sin(a) * h + 20 * k, -Math.cos(a) * h);
+  if (analysis.preH) { ctx.fillStyle = '#ffd60a'; ctx.fillText(Math.round(analysis.preH) + ' m', 0, -analysis.preH * sc - 6 * k); }
+  ctx.textAlign = 'left';
   const nr = -fix.course * Math.PI / 180, rr = Math.min(Wd / 2, Hd * 0.6) - 14 * k;
   ctx.fillStyle = '#e8edf3'; ctx.font = `bold ${14 * k}px system-ui`; ctx.textAlign = 'center'; ctx.fillText('N', Math.sin(nr) * rr, -Math.cos(nr) * rr + 5 * k); ctx.textAlign = 'left';
   ctx.fillStyle = '#3d9bf0'; ctx.beginPath(); ctx.moveTo(0, -14 * k); ctx.lineTo(8 * k, 10 * k); ctx.lineTo(0, 5 * k); ctx.lineTo(-8 * k, 10 * k); ctx.closePath(); ctx.fill();

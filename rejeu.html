@@ -86,6 +86,7 @@
         <div class="r"><span>Eau minimale (m)</span><input type="number" id="seuil" step="0.1" min="0.5" value="2.0"></div>
         <div class="r"><span>Alertes dès (km/h)</span><input type="number" id="vmin" step="1" min="0" value="8"></div>
         <div class="r"><span>Anticipation (s)</span><input type="number" id="antic" step="1" min="3" value="7"></div>
+        <div class="r"><label><input type="checkbox" id="preAlerte" checked> Pré-alerte (±10°, 2× la distance)</label></div>
         <div class="r"><label><input type="checkbox" id="smooth"> Fonds lisses aussi</label></div>
         <div class="r"><label><input type="checkbox" id="sound" checked> Sons pendant la lecture (×1 à ×5)</label></div>
         <h3 style="font-size:12px;text-transform:uppercase;color:var(--muted);margin:14px 0 4px">Alertes de la session <span id="evCount"></span></h3>
@@ -100,7 +101,7 @@
       <span id="clock">–</span>
       <label class="sub"><input type="checkbox" id="follow" checked> Suivre sur la carte</label>
       <span style="flex:1"></span>
-      <span class="legend"><span><i class="dot" style="background:var(--a1)"></i>bips</span><span><i class="dot" style="background:var(--a2)"></i>&lt; 10 m</span><span><i class="dot" style="background:var(--a3)"></i>contact</span><span><i class="dot" style="background:#5ac8fa"></i>hauteur d'eau</span></span>
+      <span class="legend"><span><i class="dot" style="background:#ffd60a"></i>pré-alerte</span><span><i class="dot" style="background:var(--a1)"></i>bips</span><span><i class="dot" style="background:var(--a2)"></i>&lt; 10 m</span><span><i class="dot" style="background:var(--a3)"></i>contact</span><span><i class="dot" style="background:#5ac8fa"></i>hauteur d'eau</span></span>
     </div>
     <canvas id="tl"></canvas>
   </footer>
@@ -292,7 +293,7 @@ async function chargerMaree() {
 }
 
 function opts(affichage) {
-  return { seuil: +$('seuil').value, smooth: $('smooth').checked, antic: +$('antic').value, roches: mesRoches, affichage,
+  return { seuil: +$('seuil').value, smooth: $('smooth').checked, antic: +$('antic').value, roches: mesRoches, affichage, preAlerte: $('preAlerte').checked,
     useL3d: true, inclTest: false };
 }
 
@@ -315,8 +316,10 @@ async function calculer() {
     if (token !== calcToken) return;
     const p = pts[i];
     p.W = hauteurAt(p);
-    p.best = analyser(p, p.cap, p.v, p.W, o).best;
+    const an = analyser(p, p.cap, p.v, p.W, o);
+    p.best = an.best;
     p.lvl = niveauAlerte(p.best, p.v >= vmin);
+    p.pre = !p.lvl && !!an.pre && p.v >= vmin;
     if (i % 1500 === 0) { busy(`Analyse ${Math.round(100 * i / pts.length)} %…`); await new Promise(r => setTimeout(r, 0)); }
   }
   busy(null);
@@ -326,11 +329,12 @@ function busy(txt) { $('busy').hidden = !txt; if (txt) $('busy').textContent = t
 
 function dessinerTrace() {
   trackLayer.clearLayers();
-  let run = [pts[0]], lvl = pts[0].lvl;
-  const flush = () => run.length > 1 && L.polyline(run.map(p => [p.lat, p.lon]), { color: COLS[lvl] || '#5ac8fa', weight: lvl ? 5 : 3, opacity: 0.95 }).addTo(trackLayer);
+  const cls = p => p.lvl || (p.pre ? 'pre' : 0);
+  let run = [pts[0]], lvl = cls(pts[0]);
+  const flush = () => run.length > 1 && L.polyline(run.map(p => [p.lat, p.lon]), { color: lvl === 'pre' ? '#ffd60a' : COLS[lvl] || '#5ac8fa', weight: lvl ? 5 : 3, opacity: 0.95 }).addTo(trackLayer);
   for (let i = 1; i < pts.length; i++) {
     run.push(pts[i]);
-    if (pts[i].lvl !== lvl) { flush(); run = [pts[i]]; lvl = pts[i].lvl; }
+    if (cls(pts[i]) !== lvl) { flush(); run = [pts[i]]; lvl = cls(pts[i]); }
   }
   flush();
   boat.addTo(trackLayer);
@@ -346,7 +350,8 @@ function listerEvenements() {
       e.fin = i; e.max = Math.max(e.max, p.lvl); e.dmin = Math.min(e.dmin, p.best.d);
     }
   });
-  $('evCount').textContent = `(${events.length})`;
+  let nPre = 0; pts.forEach((p, i) => { if (p.pre && (i === 0 || !pts[i - 1].pre)) nPre++; });
+  $('evCount').textContent = `(${events.length}${$('preAlerte').checked ? ` · ${nPre} pré-alerte(s)` : ''})`;
   const ul = $('events'); ul.innerHTML = '';
   events.forEach(ev => {
     const p = pts[ev.debut], li = document.createElement('li');
@@ -368,7 +373,9 @@ function dessinerFrise() {
   g.fillStyle = '#151b23'; g.fillRect(0, 0, W, H);
   if (!pts.length) return;
   const t0 = pts[0].t, t1 = pts[pts.length - 1].t, x = t => (t - t0) / (t1 - t0) * W;
-  // bandes d'alerte
+  // bandes de pré-alerte (jaune, basses) puis d'alerte
+  g.fillStyle = '#ffd60a';
+  for (let i = 0; i < pts.length - 1; i++) if (pts[i].pre) { const xa = x(pts[i].t); g.fillRect(xa, H * 0.72, Math.max(1, x(pts[i + 1].t) - xa), H); }
   for (let i = 0; i < pts.length - 1; i++) if (pts[i].lvl) {
     g.fillStyle = COLS[pts[i].lvl]; const xa = x(pts[i].t), xb = Math.max(xa + 1, x(pts[i + 1].t));
     g.fillRect(xa, H * (pts[i].lvl === 1 ? 0.45 : pts[i].lvl === 2 ? 0.25 : 0.05), xb - xa, H);
@@ -412,9 +419,10 @@ function rendre(sonner = false) {
   if (Wmap == null || Math.abs(W - Wmap) > 0.1) { Wmap = W; danger.redraw(); }
   analysis = analyser(fix, fix.course, fix.speed, W, opts(true));
   const armed = fix.speed >= +$('vmin').value / 3.6, b = analysis.best;
-  $('msg').textContent = b ? texteMenace(b) + (armed ? '' : ' (sous la vitesse d\'alerte)') : '';
+  const pr = analysis.pre;
+  $('msg').textContent = b ? texteMenace(b) + (armed ? '' : ' (sous la vitesse d\'alerte)') : pr ? textePre(pr) : '';
   $('msg').classList.toggle('alert', !!(b && armed));
-  if (sonner) sonnerMenace(b, analysis.horizon, armed); else continu(false);
+  if (sonner) sonnerMenace(b, analysis.horizon, armed, pr); else continu(false);
   $('sH').textContent = W.toFixed(1); $('sV').textContent = (fix.speed * 3.6).toFixed(0); $('sCap').textContent = Math.round(fix.course) + '°';
   $('clock').textContent = `${heure(cur)}  (+${fmtDuree(cur - pts[0].t)})`;
   boat.setLatLng([fix.lat, fix.lon]);
@@ -453,7 +461,7 @@ function resizeRadar() { const c = $('radar'), r = c.getBoundingClientRect(), k 
 // =====================================================================
 let recalcTimer = null;
 const recalc = () => { clearTimeout(recalcTimer); recalcTimer = setTimeout(calculer, 300); };
-['seuil', 'vmin', 'antic', 'smooth', 'tideMode'].forEach(k => $(k).onchange = recalc);
+['seuil', 'vmin', 'antic', 'preAlerte', 'smooth', 'tideMode'].forEach(k => $(k).onchange = recalc);
 $('forceH').oninput = () => { $('forceTxt').textContent = (+$('forceH').value).toFixed(1) + ' m'; };
 $('forceH').onchange = recalc;
 $('vSupp').onchange = () => dernierGPX && ouvrirTrace(...dernierGPX);
