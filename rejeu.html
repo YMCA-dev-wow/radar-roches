@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rejeu de session</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root { --bg: #0b0f14; --panel: #151b23; --text: #e8edf3; --muted: #8a96a6; --line: #2a3441;
+    --accent: #3d9bf0; --a1: #ff9f0a; --a2: #ff3b30; --a3: #d81b60; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  button, select, input { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.on { outline: 2px solid var(--accent); }
+  input[type=number] { width: 70px; }
+  label { display: inline-flex; gap: 6px; align-items: center; }
+  #app { display: grid; grid-template-rows: auto 1fr auto; height: 100%; }
+  header { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 16px; margin: 0 8px 0 0; }
+  .sub { color: var(--muted); font-size: 12px; }
+  main { display: grid; grid-template-columns: 1fr 340px; min-height: 0; }
+  #map { min-height: 0; }
+  #side { display: flex; flex-direction: column; border-left: 1px solid var(--line); min-height: 0; }
+  #radar { width: 100%; height: 320px; display: block; }
+  #msg { text-align: center; min-height: 22px; padding: 2px 8px; color: var(--muted); }
+  #msg.alert { color: var(--a1); font-weight: 600; }
+  #stats { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; padding: 4px; }
+  #stats b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+  #stats span { font-size: 11px; color: var(--muted); text-transform: uppercase; }
+  #settings { padding: 8px 12px; overflow-y: auto; border-top: 1px solid var(--line); }
+  #settings .r { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin: 6px 0; flex-wrap: wrap; }
+  #events { list-style: none; margin: 0; padding: 0; }
+  #events li { display: flex; gap: 8px; padding: 4px 2px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  #events li:hover { background: var(--panel); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; margin-top: 4px; }
+  footer { padding: 8px 12px 10px; border-top: 1px solid var(--line); }
+  #ctrl { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+  #play { width: 64px; font-size: 18px; }
+  #clock { font-variant-numeric: tabular-nums; font-size: 16px; min-width: 150px; }
+  #tl { width: 100%; height: 56px; display: block; cursor: pointer; touch-action: none; }
+  .legend span { display: inline-flex; gap: 4px; align-items: center; margin-right: 10px; font-size: 12px; color: var(--muted); }
+  #busy { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 2000; font-size: 16px; }
+  @media (max-width: 800px) {
+    #app { display: block; height: auto; }
+    main { display: block; }
+    #map { height: 45vh; }
+    #side { border-left: none; }
+    #radar { height: 260px; }
+    footer { position: sticky; bottom: 0; background: var(--bg); z-index: 1000; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Rejeu de session</h1>
+    <button class="primary" id="gpxBtn">Ouvrir une trace (FIT ou GPX)…</button>
+    <input type="file" id="gpxFile" accept=".gpx,.fit,application/gpx+xml" hidden>
+    <span class="sub" id="info">Charge une ancienne session (FIT de préférence : heures et vitesse exactes) pour rejouer les alertes du radar.</span>
+    <span style="flex:1"></span>
+    <a href="radar.html" class="sub" style="color:var(--accent)">Radar →</a>
+  </header>
+  <main>
+    <div id="map"></div>
+    <div id="side">
+      <canvas id="radar"></canvas>
+      <div id="msg"></div>
+      <div id="stats">
+        <div><b id="sH">–</b><span>eau (m)</span></div>
+        <div><b id="sV">–</b><span>km/h</span></div>
+        <div><b id="sCap">–</b><span>cap</span></div>
+      </div>
+      <div id="settings">
+        <div class="r" id="vRow" hidden><span>Trace sans heures : vitesse supposée (km/h)</span><input type="number" id="vSupp" step="1" min="3" value="22"></div>
+        <div class="r"><span>Marée</span>
+          <select id="tideMode">
+            <option value="mesure">Mesurée (marégraphe)</option>
+            <option value="prevue">Prédite (modèle)</option>
+            <option value="forcee">Forcée</option>
+          </select>
+        </div>
+        <div class="r" id="forceRow" hidden><input type="range" id="forceH" min="0" max="14" step="0.1" value="6" style="flex:1"><b id="forceTxt">6.0 m</b></div>
+        <div class="sub" id="tideInfo"></div>
+        <div class="r"><span>Eau minimale (m)</span><input type="number" id="seuil" step="0.1" min="0.5" value="2.0"></div>
+        <div class="r"><span>Alertes dès (km/h)</span><input type="number" id="vmin" step="1" min="0" value="8"></div>
+        <div class="r"><span>Anticipation (s)</span><input type="number" id="antic" step="1" min="3" value="7"></div>
+        <div class="r"><label><input type="checkbox" id="smooth"> Fonds lisses aussi</label></div>
+        <div class="r"><label><input type="checkbox" id="sound" checked> Sons pendant la lecture (×1 à ×5)</label></div>
+        <h3 style="font-size:12px;text-transform:uppercase;color:var(--muted);margin:14px 0 4px">Alertes de la session <span id="evCount"></span></h3>
+        <ul id="events"></ul>
+      </div>
+    </div>
+  </main>
+  <footer>
+    <div id="ctrl">
+      <button id="play" disabled>▶</button>
+      <select id="speed"><option>1</option><option>2</option><option selected>5</option><option>10</option><option>30</option><option>60</option></select><span class="sub">× vitesse</span>
+      <span id="clock">–</span>
+      <label class="sub"><input type="checkbox" id="follow" checked> Suivre sur la carte</label>
+      <span style="flex:1"></span>
+      <span class="legend"><span><i class="dot" style="background:var(--a1)"></i>bips</span><span><i class="dot" style="background:var(--a2)"></i>&lt; 10 m</span><span><i class="dot" style="background:var(--a3)"></i>contact</span><span><i class="dot" style="background:#5ac8fa"></i>hauteur d'eau</span></span>
+    </div>
+    <canvas id="tl"></canvas>
+  </footer>
+</div>
+<div id="busy" hidden></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="noyau.js"></script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const COLS = [null, '#ff9f0a', '#ff3b30', '#d81b60'];
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('radar.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('radar.' + k, JSON.stringify(v)); } catch {} },
+};
+const mesRoches = store.get('roches', []); // partagées avec le radar (même site)
+
+// =====================================================================
+// Carte
+// =====================================================================
+const map = L.map('map', { maxZoom: 20 }).setView([48.656, -2.02], 13);
+const geopf = (layer, fmt, maxNative) => L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=' + layer +
+  '&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=' + fmt, { maxZoom: 20, maxNativeZoom: maxNative, attribution: '© IGN / SHOM' });
+geopf('ORTHOIMAGERY.ORTHOPHOTOS', 'image/jpeg', 19).addTo(map);
+const shom = geopf('GEOGRAPHICALGRIDSYSTEMS.COASTALMAPS', 'image/png', 16).setOpacity(0.55).addTo(map);
+L.control.layers(null, { 'Carte SHOM': shom }).addTo(map);
+L.control.scale({ imperial: false }).addTo(map);
+
+// Dangers Litto3D à la hauteur d'eau courante (zoom ≥ 15)
+let Wmap = null;
+const DangerLayer = L.GridLayer.extend({
+  createTile(coords, done) {
+    const tile = document.createElement('canvas'); tile.width = tile.height = 256;
+    const Z = 16, z = coords.z;
+    if (z < 15 || Wmap == null || !meta) { setTimeout(() => done(null, tile), 0); return tile; }
+    const f = 2 ** (z - Z), seuil = +$('seuil').value, smooth = $('smooth').checked;
+    const list = [];
+    const srcs = z >= Z ? [[Math.floor(coords.x / f), Math.floor(coords.y / f)]] : [[coords.x * 2, coords.y * 2], [coords.x * 2 + 1, coords.y * 2], [coords.x * 2, coords.y * 2 + 1], [coords.x * 2 + 1, coords.y * 2 + 1]];
+    Promise.all(srcs.map(([x, y]) => loadTile(x, y))).then(() => {
+      const g = tile.getContext('2d'), img = g.createImageData(256, 256), o = img.data;
+      const lvlOf = (d, i) => {
+        const Rc = d[i]; if (Rc === 0 || Rc === 255) return 0;
+        if (!(Rc === 254 || d[i + 1] * meta.pas_relief >= 0.30) && !smooth) return 0;
+        const eau = Wmap - (Rc === 254 ? 99 : meta.cote_min + (Rc - 1) * meta.pas_cote);
+        return eau < 0 ? 3 : eau < seuil ? 2 : eau < seuil + 1 ? 1 : 0;
+      };
+      const RGB = [null, [255, 159, 10], [255, 59, 48], [176, 48, 42]];
+      for (let v = 0; v < 256; v++) for (let u = 0; u < 256; u++) {
+        let lvl = 0;
+        if (z >= Z) {
+          const d = tiles.get(srcs[0][0] + '/' + srcs[0][1]); if (!d) continue;
+          const ox = (coords.x % f) * 256 / f, oy = (coords.y % f) * 256 / f;
+          lvl = lvlOf(d, (Math.floor(oy + v / f) * 256 + Math.floor(ox + u / f)) * 4);
+        } else {
+          const k = (v >> 7) * 2 + (u >> 7), d = tiles.get(srcs[k][0] + '/' + srcs[k][1]); if (!d) continue;
+          const su = (u % 128) * 2, sv = (v % 128) * 2;
+          for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) lvl = Math.max(lvl, lvlOf(d, ((sv + a) * 256 + su + b) * 4));
+        }
+        if (!lvl) continue;
+        const q = (v * 256 + u) * 4; [o[q], o[q + 1], o[q + 2]] = RGB[lvl]; o[q + 3] = 170;
+      }
+      g.putImageData(img, 0, 0); done(null, tile);
+    });
+    return tile;
+  },
+});
+const danger = new DangerLayer({ zIndex: 5, minZoom: 15 }).addTo(map);
+let trackLayer = L.layerGroup().addTo(map);
+const boat = L.circleMarker([0, 0], { radius: 7, color: '#fff', weight: 2, fillColor: '#3d9bf0', fillOpacity: 1 });
+
+// =====================================================================
+// Trace
+// =====================================================================
+let pts = [], dernierGPX = null;       // { t, lat, lon, v (m/s), cap (°), W, lvl, best }
+let tMeasured = null; // fonction hauteur mesurée à Saint-Malo, si disponible
+
+let sansHeure = false;
+function lireGPX(txt, nom) {
+  const doc = new DOMParser().parseFromString(txt, 'application/xml');
+  let out = [];
+  const tous = [...doc.getElementsByTagName('trkpt'), ...doc.getElementsByTagName('rtept')];
+  for (const p of tous) {
+    const tm = p.getElementsByTagName('time')[0];
+    const t = tm ? Date.parse(tm.textContent) : NaN, lat = +p.getAttribute('lat'), lon = +p.getAttribute('lon');
+    if (!isFinite(lat) || !isFinite(lon)) continue;
+    out.push({ t, lat, lon });
+  }
+  sansHeure = out.length > 0 && out.filter(p => isFinite(p.t)).length < out.length / 2;
+  if (sansHeure) {
+    // heure de départ : métadonnées, sinon nom du fichier (…2026-10-04T14-06-35Z…), sinon maintenant
+    const mt = doc.querySelector('metadata > time');
+    const m = (doc.querySelector('metadata > name')?.textContent + ' ' + nom).match(/(\d{4}-\d\d-\d\d)T(\d\d)[-:](\d\d)[-:](\d\d)Z/);
+    let t = mt ? Date.parse(mt.textContent) : m ? Date.parse(`${m[1]}T${m[2]}:${m[3]}:${m[4]}Z`) : Date.now();
+    const v = Math.max(1, +$('vSupp').value) / 3.6;
+    out = out.map((p, i) => {
+      if (i) { const q = out[i - 1]; t += 1000 * Math.hypot((p.lon - q.lon) * 111320 * Math.cos(p.lat * Math.PI / 180), (p.lat - q.lat) * 110540) / v; }
+      return { t, lat: p.lat, lon: p.lon };
+    });
+  }
+  return completer(out);
+}
+// Fichier FIT (format natif des montres) : messages « record » = heure, position, vitesse mesurée
+function lireFIT(buf) {
+  const dv = new DataView(buf), hs = dv.getUint8(0), fin = hs + dv.getUint32(4, true);
+  if (String.fromCharCode(dv.getUint8(8), dv.getUint8(9), dv.getUint8(10), dv.getUint8(11)) !== '.FIT') throw new Error('fichier FIT invalide');
+  const defs = {}, out = [], EPOCH = 631065600000, SEMI = 180 / 2 ** 31;
+  let pos = hs, lastTs = 0;
+  while (pos < fin) {
+    const h = dv.getUint8(pos++);
+    let local, compTs = null;
+    if (h & 0x80) { local = (h >> 5) & 3; compTs = h & 0x1f; }
+    else if (h & 0x40) { // définition
+      local = h & 0x0f;
+      const le = dv.getUint8(pos + 1) === 0, glob = dv.getUint16(pos + 2, le), n = dv.getUint8(pos + 4);
+      pos += 5;
+      const fields = [];
+      for (let i = 0; i < n; i++, pos += 3) fields.push({ num: dv.getUint8(pos), size: dv.getUint8(pos + 1) });
+      let devSize = 0;
+      if (h & 0x20) { const nd = dv.getUint8(pos++); for (let i = 0; i < nd; i++, pos += 3) devSize += dv.getUint8(pos + 1); }
+      defs[local] = { le, glob, fields, devSize };
+      continue;
+    } else local = h & 0x0f;
+    const d = defs[local];
+    if (!d) throw new Error('FIT : message sans définition');
+    const rec = {};
+    for (const f of d.fields) {
+      if (d.glob === 20 || d.glob === 0) {
+        if (f.size === 4) rec[f.num] = f.num === 0 || f.num === 1 ? dv.getInt32(pos, d.le) : dv.getUint32(pos, d.le);
+        else if (f.size === 2) rec[f.num] = dv.getUint16(pos, d.le);
+      }
+      pos += f.size;
+    }
+    pos += d.devSize;
+    if (rec[253] != null) lastTs = rec[253];
+    else if (compTs != null) lastTs = (compTs >= (lastTs & 0x1f) ? lastTs - (lastTs & 0x1f) + compTs : lastTs - (lastTs & 0x1f) + 32 + compTs);
+    if (d.glob !== 20 || rec[0] == null || rec[1] == null || rec[0] === 0x7fffffff || rec[1] === 0x7fffffff) continue;
+    const v = rec[73] != null && rec[73] !== 0xffffffff ? rec[73] / 1000 : rec[6] != null && rec[6] !== 0xffff ? rec[6] / 1000 : null;
+    out.push({ t: EPOCH + lastTs * 1000, lat: rec[0] * SEMI, lon: rec[1] * SEMI, vDev: v });
+  }
+  sansHeure = false;
+  return completer(out);
+}
+// Vitesse (mesurée par la montre si disponible) et cap sur une fenêtre de ±2 s (lisse le bruit GPS)
+function completer(out) {
+  out = out.filter((p, i, a) => isFinite(p.t) && (i === 0 || p.t > a[i - 1].t));
+  for (let i = 0; i < out.length; i++) {
+    let a = i, b = i;
+    while (a > 0 && out[i].t - out[a - 1].t <= 2000) a--;
+    while (b < out.length - 1 && out[b + 1].t - out[i].t <= 2000) b++;
+    if (a === b) { a = Math.max(0, i - 1); b = Math.min(out.length - 1, i + 1); }
+    const p = out[a], q = out[b], kx = 111320 * Math.cos(p.lat * Math.PI / 180);
+    const dx = (q.lon - p.lon) * kx, dy = (q.lat - p.lat) * 110540, dt = (q.t - p.t) / 1000 || 1;
+    out[i].v = out[i].vDev != null ? out[i].vDev : Math.hypot(dx, dy) / dt;
+    out[i].cap = Math.hypot(dx, dy) > 1 ? (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360 : (i ? out[i - 1].cap : 0);
+  }
+  return out;
+}
+
+function hauteurAt(p) {
+  const mode = $('tideMode').value;
+  if (mode === 'forcee') return +$('forceH').value;
+  if (mode === 'mesure' && tMeasured) return niveauEau(p.lon, p.t, tMeasured);
+  return niveauEau(p.lon, p.t);
+}
+
+async function chargerMaree() {
+  tMeasured = null;
+  if (!pts.length) return;
+  const a = pts[0].t - 3600e3, b = pts[pts.length - 1].t + 3600e3;
+  const mode = $('tideMode').value;
+  $('forceRow').hidden = mode !== 'forcee';
+  if (mode === 'mesure') {
+    try {
+      const m = await lireMaregraphe(a, b, 10);
+      if (m.length < 6) throw new Error('pas de mesures');
+      tMeasured = t => { // interpolation linéaire
+        let lo = 0, hi = m.length - 1;
+        if (t <= m[0].t) return m[0].h; if (t >= m[hi].t) return m[hi].h;
+        while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (m[mid].t <= t) lo = mid; else hi = mid; }
+        return m[lo].h + (t - m[lo].t) / (m[hi].t - m[lo].t) * (m[hi].h - m[lo].h);
+      };
+      const ecart = m.reduce((s, x) => s + x.h - hMaloModel(x.t), 0) / m.length;
+      $('tideInfo').textContent = `Hauteurs mesurées au marégraphe de Saint-Malo (${m.length} mesures). Écart moyen avec la prédiction : ${ecart >= 0 ? '+' : ''}${ecart.toFixed(2)} m.`;
+    } catch (err) {
+      $('tideInfo').textContent = 'Marégraphe injoignable : prédiction utilisée.';
+    }
+  } else $('tideInfo').textContent = mode === 'prevue' ? 'Prédiction du modèle (sans effet météo).' : '';
+}
+
+function opts(affichage) {
+  return { seuil: +$('seuil').value, smooth: $('smooth').checked, antic: +$('antic').value, roches: mesRoches, affichage,
+    useL3d: true, inclTest: false };
+}
+
+let calcToken = 0;
+async function calculer() {
+  if (!pts.length) return;
+  const token = ++calcToken;
+  busy('Préparation…');
+  await chargerMaree();
+  // tuiles nécessaires (trace + 300 m)
+  const need = new Set();
+  for (const p of pts) {
+    const [px, py] = toPx(p.lat, p.lon), r = 300 / mPerPx(p.lat);
+    for (const dx of [-r, 0, r]) for (const dy of [-r, 0, r]) need.add(Math.floor((px + dx) / 256) + '/' + Math.floor((py + dy) / 256));
+  }
+  busy(`Chargement du relevé (${need.size} tuiles)…`);
+  await Promise.all([...need].map(k => { const [x, y] = k.split('/').map(Number); return loadTile(x, y); }));
+  const vmin = +$('vmin').value / 3.6, o = opts(false);
+  for (let i = 0; i < pts.length; i++) {
+    if (token !== calcToken) return;
+    const p = pts[i];
+    p.W = hauteurAt(p);
+    p.best = analyser(p, p.cap, p.v, p.W, o).best;
+    p.lvl = niveauAlerte(p.best, p.v >= vmin);
+    if (i % 1500 === 0) { busy(`Analyse ${Math.round(100 * i / pts.length)} %…`); await new Promise(r => setTimeout(r, 0)); }
+  }
+  busy(null);
+  dessinerTrace(); listerEvenements(); dessinerFrise(); seek(cur);
+}
+function busy(txt) { $('busy').hidden = !txt; if (txt) $('busy').textContent = txt; }
+
+function dessinerTrace() {
+  trackLayer.clearLayers();
+  let run = [pts[0]], lvl = pts[0].lvl;
+  const flush = () => run.length > 1 && L.polyline(run.map(p => [p.lat, p.lon]), { color: COLS[lvl] || '#5ac8fa', weight: lvl ? 5 : 3, opacity: 0.95 }).addTo(trackLayer);
+  for (let i = 1; i < pts.length; i++) {
+    run.push(pts[i]);
+    if (pts[i].lvl !== lvl) { flush(); run = [pts[i]]; lvl = pts[i].lvl; }
+  }
+  flush();
+  boat.addTo(trackLayer);
+}
+
+let events = [];
+function listerEvenements() {
+  events = [];
+  let e = null;
+  pts.forEach((p, i) => {
+    if (p.lvl) {
+      if (!e || p.t - pts[e.fin].t > 15000) { e = { debut: i, fin: i, max: p.lvl, dmin: p.best.d }; events.push(e); }
+      e.fin = i; e.max = Math.max(e.max, p.lvl); e.dmin = Math.min(e.dmin, p.best.d);
+    }
+  });
+  $('evCount').textContent = `(${events.length})`;
+  const ul = $('events'); ul.innerHTML = '';
+  events.forEach(ev => {
+    const p = pts[ev.debut], li = document.createElement('li');
+    li.innerHTML = `<i class="dot" style="background:${COLS[ev.max]}"></i><span>${heure(p.t)} · ${ev.max === 3 ? 'contact' : ev.max === 2 ? 'moins de 10 m' : 'bips'} · ${Math.round(ev.dmin)} m mini · ${Math.round((pts[ev.fin].t - p.t) / 1000)} s · eau ${p.W.toFixed(1)} m</span>`;
+    li.onclick = () => { seek(p.t - 10000); map.setView([p.lat, p.lon], Math.max(map.getZoom(), 17)); };
+    ul.appendChild(li);
+  });
+}
+const heure = t => new Date(t).toLocaleTimeString('fr-FR');
+
+// =====================================================================
+// Frise chronologique
+// =====================================================================
+const tl = $('tl');
+function dessinerFrise() {
+  const k = devicePixelRatio || 1, r = tl.getBoundingClientRect();
+  tl.width = r.width * k; tl.height = r.height * k;
+  const g = tl.getContext('2d'), W = tl.width, H = tl.height;
+  g.fillStyle = '#151b23'; g.fillRect(0, 0, W, H);
+  if (!pts.length) return;
+  const t0 = pts[0].t, t1 = pts[pts.length - 1].t, x = t => (t - t0) / (t1 - t0) * W;
+  // bandes d'alerte
+  for (let i = 0; i < pts.length - 1; i++) if (pts[i].lvl) {
+    g.fillStyle = COLS[pts[i].lvl]; const xa = x(pts[i].t), xb = Math.max(xa + 1, x(pts[i + 1].t));
+    g.fillRect(xa, H * (pts[i].lvl === 1 ? 0.45 : pts[i].lvl === 2 ? 0.25 : 0.05), xb - xa, H);
+  }
+  // hauteur d'eau
+  const ws = pts.map(p => p.W), wmin = Math.min(...ws), wmax = Math.max(...ws), sp = Math.max(1, wmax - wmin);
+  g.strokeStyle = '#5ac8fa'; g.lineWidth = 1.5 * k; g.beginPath();
+  pts.forEach((p, i) => { const y = H - 4 * k - (p.W - wmin) / sp * (H - 8 * k); i ? g.lineTo(x(p.t), y) : g.moveTo(x(p.t), y); });
+  g.stroke();
+  g.fillStyle = '#8a96a6'; g.font = `${10 * k}px system-ui`;
+  g.fillText(wmax.toFixed(1) + ' m', 3 * k, 11 * k); g.fillText(wmin.toFixed(1) + ' m', 3 * k, H - 3 * k);
+  // curseur
+  g.fillStyle = '#fff'; g.fillRect(x(cur) - k, 0, 2 * k, H);
+}
+let dragging = false;
+const seekFromEvent = e => { const r = tl.getBoundingClientRect(); seek(pts[0].t + (e.clientX - r.left) / r.width * (pts[pts.length - 1].t - pts[0].t)); };
+tl.addEventListener('pointerdown', e => { if (!pts.length) return; dragging = true; tl.setPointerCapture(e.pointerId); seekFromEvent(e); });
+tl.addEventListener('pointermove', e => { if (dragging) seekFromEvent(e); });
+tl.addEventListener('pointerup', () => { dragging = false; });
+addEventListener('resize', () => { dessinerFrise(); resizeRadar(); });
+
+// =====================================================================
+// Lecture
+// =====================================================================
+let cur = 0, playing = false, lastTick = null, idx = 0;
+function etatA(t) { // position interpolée
+  while (idx > 0 && pts[idx].t > t) idx--;
+  while (idx < pts.length - 2 && pts[idx + 1].t <= t) idx++;
+  const a = pts[idx], b = pts[Math.min(idx + 1, pts.length - 1)], f = b.t > a.t ? Math.max(0, Math.min(1, (t - a.t) / (b.t - a.t))) : 0;
+  return { lat: a.lat + f * (b.lat - a.lat), lon: a.lon + f * (b.lon - a.lon), course: a.cap, speed: a.v, t, i: idx };
+}
+let analysis = null, fix = null;
+function seek(t) {
+  if (!pts.length) return;
+  cur = Math.max(pts[0].t, Math.min(pts[pts.length - 1].t, t));
+  rendre();
+}
+function rendre(sonner = false) {
+  fix = etatA(cur);
+  const W = hauteurAt(fix);
+  if (Wmap == null || Math.abs(W - Wmap) > 0.1) { Wmap = W; danger.redraw(); }
+  analysis = analyser(fix, fix.course, fix.speed, W, opts(true));
+  const armed = fix.speed >= +$('vmin').value / 3.6, b = analysis.best;
+  $('msg').textContent = b ? texteMenace(b) + (armed ? '' : ' (sous la vitesse d\'alerte)') : '';
+  $('msg').classList.toggle('alert', !!(b && armed));
+  if (sonner) sonnerMenace(b, analysis.horizon, armed); else continu(false);
+  $('sH').textContent = W.toFixed(1); $('sV').textContent = (fix.speed * 3.6).toFixed(0); $('sCap').textContent = Math.round(fix.course) + '°';
+  $('clock').textContent = `${heure(cur)}  (+${fmtDuree(cur - pts[0].t)})`;
+  boat.setLatLng([fix.lat, fix.lon]);
+  if ($('follow').checked && !map.getBounds().pad(-0.2).contains(boat.getLatLng())) map.panTo(boat.getLatLng(), { animate: false });
+  drawRadar($('radar'), analysis, fix);
+  dessinerFrise();
+}
+const fmtDuree = ms => { const s = Math.round(ms / 1000); return `${Math.floor(s / 3600)}h${String(Math.floor(s / 60) % 60).padStart(2, '0')}m${String(s % 60).padStart(2, '0')}s`; };
+function tickLecture() {
+  if (!playing) return;
+  const now = performance.now(), dt = lastTick ? now - lastTick : 0; lastTick = now;
+  const sp = +$('speed').value;
+  cur += dt * sp;
+  if (cur >= pts[pts.length - 1].t) { cur = pts[pts.length - 1].t; togglePlay(false); }
+  rendre($('sound').checked && sp <= 5);
+}
+let playTimer = null;
+function togglePlay(on = !playing) {
+  playing = on; $('play').textContent = on ? '⏸' : '▶';
+  clearInterval(playTimer); lastTick = null;
+  if (on) { audio(); if (cur >= pts[pts.length - 1].t) cur = pts[0].t; playTimer = setInterval(tickLecture, 100); }
+  else continu(false);
+}
+$('play').onclick = () => togglePlay();
+document.addEventListener('keydown', e => {
+  if (!pts.length || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+  if (e.key === 'ArrowLeft') seek(cur - 10000);
+  if (e.key === 'ArrowRight') seek(cur + 10000);
+});
+
+function resizeRadar() { const c = $('radar'), r = c.getBoundingClientRect(), k = devicePixelRatio || 1; c.width = r.width * k; c.height = r.height * k; if (fix) drawRadar(c, analysis, fix); }
+
+// =====================================================================
+// Réglages et import
+// =====================================================================
+let recalcTimer = null;
+const recalc = () => { clearTimeout(recalcTimer); recalcTimer = setTimeout(calculer, 300); };
+['seuil', 'vmin', 'antic', 'smooth', 'tideMode'].forEach(k => $(k).onchange = recalc);
+$('forceH').oninput = () => { $('forceTxt').textContent = (+$('forceH').value).toFixed(1) + ' m'; };
+$('forceH').onchange = recalc;
+$('vSupp').onchange = () => dernierGPX && ouvrirTrace(...dernierGPX);
+
+$('gpxBtn').onclick = () => $('gpxFile').click();
+$('gpxFile').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try { ouvrirTrace(/\.fit$/i.test(f.name) ? await f.arrayBuffer() : await f.text(), f.name); } catch (err) { alert('Trace illisible : ' + err.message); }
+};
+async function ouvrirTrace(txt, nom) {
+  togglePlay(false);
+  pts = typeof txt === 'string' ? lireGPX(txt, nom) : lireFIT(txt);
+  $('vRow').hidden = !sansHeure;
+  dernierGPX = [txt, nom];
+  if (pts.length < 10) throw new Error('trop peu de points');
+  const dist = pts.reduce((s, p, i) => i ? s + Math.hypot((p.lon - pts[i - 1].lon) * 111320 * Math.cos(p.lat * Math.PI / 180), (p.lat - pts[i - 1].lat) * 110540) : 0, 0);
+  $('info').textContent = (sansHeure ? '⚠ trace sans heures, vitesse supposée constante · ' : '') + `${nom} · ${new Date(pts[0].t).toLocaleDateString('fr-FR')} ${heure(pts[0].t)} · ${fmtDuree(pts[pts.length - 1].t - pts[0].t)} · ${(dist / 1000).toFixed(1)} km · ${pts.length} points`;
+  map.fitBounds(L.latLngBounds(pts.map(p => [p.lat, p.lon])), { padding: [30, 30] });
+  cur = pts[0].t; idx = 0; Wmap = null;
+  $('play').disabled = false;
+  await calculer();
+}
+
+(async () => {
+  resizeRadar(); dessinerFrise();
+  try { await chargerDonnees(); }
+  catch (err) {
+    $('info').textContent = location.protocol === 'file:'
+      ? 'Ouvert par double-clic : le navigateur bloque la lecture des données. Lance lancer_outils.bat (ou utilise l’adresse en ligne).'
+      : 'Données introuvables : ' + err.message;
+    $('gpxBtn').disabled = true;
+  }
+})();
+</script>
+</body>
+</html>

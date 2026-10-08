@@ -1,0 +1,13 @@
+{
+ "port": "Saint-Malo",
+ "debut_utc": "2016-01-01T00:00:00Z",
+ "pas_min": 10,
+ "n": 736416,
+ "unite": "cm au-dessus du zero hydrographique",
+ "source": "Analyse harmonique UTide des observations REFMAR (Shom) 2017-2025",
+ "validation_2026": {
+  "ecart_type_m": 0.184,
+  "biais_m": 0.036,
+  "ecart_type_pm_bm_m": 0.176
+ }
+}

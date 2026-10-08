@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#000000">
+<title>Radar roches</title>
+<style>
+  :root { --bg: #0b0f14; --panel: #151b23; --text: #e8edf3; --muted: #8a96a6; --line: #2a3441;
+    --accent: #3d9bf0; --danger: #ff3b30; --warn: #ff9f0a; --emerge: #b0302a; --ok: #30d158; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+  button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  input, select { font: inherit; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+  input[type=number] { width: 84px; }
+  input[type=range] { width: 100%; }
+  label { display: flex; gap: 8px; align-items: center; }
+
+  /* ---------- Réglages ---------- */
+  #setup { position: fixed; inset: 0; overflow-y: auto; padding: 16px 16px 120px; }
+  #setup h1 { font-size: 22px; margin: 0 0 4px; }
+  #setup h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 22px 0 8px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+  .row { display: flex; gap: 10px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .grow { flex: 1; }
+  #startBar { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px 16px; background: linear-gradient(transparent, var(--bg) 30%); }
+  #startBar button { width: 100%; font-size: 20px; padding: 16px; }
+  .ext { display: grid; grid-template-columns: 70px 1fr 90px 30px; gap: 6px; align-items: center; margin: 6px 0; }
+  .ext input, .ext select { width: 100%; }
+  .err { color: var(--danger); }
+  .okc { color: var(--ok); }
+
+  /* ---------- Radar ---------- */
+  #run { position: fixed; inset: 0; display: flex; flex-direction: column; }
+  #top { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 8px 10px; }
+  .stat { text-align: center; }
+  .stat b { display: block; font-size: 26px; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .stat span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  #msg { text-align: center; font-size: 14px; color: var(--muted); min-height: 20px; padding: 0 10px; }
+  #msg.alert { color: var(--warn); font-weight: 600; }
+  #cv { flex: 1; width: 100%; min-height: 0; touch-action: none; }
+  #bottom { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 8px 10px 14px; }
+  #bottom button { padding: 14px 4px; font-size: 14px; }
+  #bottom button.on { background: var(--danger); border-color: var(--danger); }
+  #sim { position: absolute; right: 10px; bottom: 90px; display: grid; grid-template-columns: repeat(3, 52px); gap: 6px; }
+  #sim button { padding: 10px 0; }
+  #black { position: fixed; inset: 0; background: #000; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 30px; color: #333; font-size: 13px; }
+  #lock { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  #lockRing { width: 130px; height: 130px; border-radius: 50%; border: 3px solid #444; display: flex; align-items: center; justify-content: center; color: #666; font-size: 13px; text-align: center; padding: 10px; }
+</style>
+</head>
+<body>
+
+<!-- ================= Réglages ================= -->
+<div id="setup">
+  <h1>Radar roches</h1>
+  <div class="sub">Alerte sonore à l'approche des roches et hauts-fonds, selon la marée. Relevé Litto3D (Shom – IGN). <b>Ne remplace pas ta vigilance.</b></div>
+
+  <h2>Marée</h2>
+  <div class="card">
+    <div class="row"><span class="grow">Hauteur d'eau à Saint-Malo maintenant</span><b id="hNow">…</b></div>
+    <div class="row"><label><input type="checkbox" id="live" checked> Recalage en direct sur le marégraphe de Saint-Malo (réseau requis au départ)</label></div>
+    <div class="sub" id="liveInfo"></div>
+    <details style="margin-top:10px">
+      <summary>Recaler sur l'annuaire officiel (facultatif)</summary>
+      <div class="sub" style="margin:6px 0">Saisis les pleines et basses mers du jour (heure locale, hauteur en m) lues dans l'annuaire du port de ton choix.</div>
+      <div class="row">
+        <select id="offPort"></select>
+        <button id="offAdd">＋ Ligne</button>
+        <button id="offClear">Effacer</button>
+      </div>
+      <div id="offRows"></div>
+      <div class="sub" id="offInfo"></div>
+    </details>
+  </div>
+
+  <h2>Alertes</h2>
+  <div class="card">
+    <div class="row"><span class="grow">Eau minimale sous la planche (m)</span><input type="number" id="seuil" step="0.1" min="0.5" value="2.0"></div>
+    <div class="row"><span class="grow">Alertes à partir de (km/h)</span><input type="number" id="vmin" step="1" min="0" value="8"></div>
+    <div class="row"><span class="grow">Anticipation (secondes de navigation)</span><input type="number" id="antic" step="1" min="3" value="7"></div>
+    <div class="row"><label><input type="checkbox" id="smooth"> Alerter aussi sur les fonds lisses (sable, vase)</label></div>
+    <div class="row"><button id="testSound">🔊 Écouter les sons</button></div>
+    <div class="sub">1 bip grave = devant · 2 bips montants = tribord · 2 bips descendants = bâbord · les bips accélèrent en approchant · son continu = moins de 10 m · 3 bips très graves = GPS perdu.</div>
+  </div>
+
+  <h2>Mes roches (fichier de l'éditeur)</h2>
+  <div class="card">
+    <div class="row"><button id="geoBtn">Importer un GeoJSON…</button><input type="file" id="geoFile" accept=".geojson,.json,application/json" hidden><span class="sub" id="geoInfo"></span></div>
+  </div>
+
+  <h2>Essais</h2>
+  <div class="card">
+    <div class="row"><label><input type="checkbox" id="testMode"> <b>Mode test : hauteur d'eau forcée</b></label></div>
+    <div class="row"><input type="range" id="testH" min="0" max="14" step="0.1" value="6"><b id="testHTxt" style="min-width:60px;text-align:right">6.0 m</b></div>
+    <div class="row"><label><input type="checkbox" id="testNoL3d"> Ignorer le relevé Litto3D (essai sur un parking avec mes éléments de test)</label></div>
+    <div class="row"><label><input type="checkbox" id="simMode"> Simulation (sans GPS, flèches à l'écran)</label></div>
+    <div class="row" id="simStartRow"><span class="grow">Départ de la simulation</span><select id="simStart"></select></div>
+  </div>
+
+  <h2>Hors ligne</h2>
+  <div class="card">
+    <div class="row"><button id="offline">Télécharger toute la zone</button><span class="sub" id="offlineInfo"></span></div>
+    <div class="sub">≈ 45 Mo, à faire une fois en wifi. Sinon, les secteurs déjà parcourus restent disponibles sans réseau.</div>
+  </div>
+
+  <div class="sub" style="margin-top:16px" id="dataInfo">Chargement des données…</div>
+</div>
+<div id="startBar"><button class="primary" id="start" disabled>Démarrer</button></div>
+
+<!-- ================= Radar ================= -->
+<div id="run" hidden>
+  <div id="top">
+    <div class="stat"><b id="sH">–</b><span>eau (m) <span id="sTrend"></span></span></div>
+    <div class="stat"><b id="sV">–</b><span>km/h</span></div>
+    <div class="stat"><b id="sGps">–</b><span>GPS (m)</span></div>
+  </div>
+  <div id="msg"></div>
+  <canvas id="cv"></canvas>
+  <div id="sim" hidden>
+    <span></span><button data-a="faster">▲</button><span></span>
+    <button data-a="left">◀</button><button data-a="slower">▼</button><button data-a="right">▶</button>
+  </div>
+  <div id="bottom">
+    <button id="bMute">Muet</button>
+    <button id="bBlack">Écran noir</button>
+    <button id="bLock">Verrouiller</button>
+    <button id="bStop">Arrêter</button>
+  </div>
+</div>
+<div id="black" hidden>appui long pour rallumer</div>
+<div id="lock" hidden><div id="lockRing">appui long 2 s pour déverrouiller</div></div>
+
+<script src="noyau.js"></script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('radar.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('radar.' + k, JSON.stringify(v)); } catch {} },
+};
+
+function niveauCourant(lon, t) {
+  return $('testMode').checked ? +$('testH').value : niveauEau(lon, t);
+}
+function opts(affichage = true) {
+  return { seuil: +$('seuil').value, smooth: $('smooth').checked, antic: +$('antic').value, roches: mesRoches, affichage,
+    useL3d: !($('testMode').checked && $('testNoL3d').checked), inclTest: $('testMode').checked };
+}
+async function recalageDirect() {
+  if (!$('live').checked) { surge = 0; $('liveInfo').textContent = ''; return; }
+  $('liveInfo').textContent = 'Lecture du marégraphe…';
+  try {
+    const data = await lireMaregraphe(Date.now() - 12 * 3600e3, Date.now());
+    if (data.length < 24) throw new Error('trop peu de mesures');
+    surge = data.reduce((a, m) => a + m.h - hMaloModel(m.t), 0) / data.length;
+    const last = data[data.length - 1];
+    const info = `Effet météo du jour : ${surge >= 0 ? '+' : ''}${surge.toFixed(2)} m (moyenne sur ${(data.length / 6).toFixed(0)} h, dernière mesure ${last.h.toFixed(2)} m à ${new Date(last.t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}).`;
+    store.set('surge', { v: surge, t: Date.now() });
+    $('liveInfo').innerHTML = '<span class="okc">✓</span> ' + info;
+  } catch (err) {
+    const s = store.get('surge', null);
+    if (s && Date.now() - s.t < 6 * 3600e3) { surge = s.v; $('liveInfo').textContent = 'Hors ligne : recalage de ' + new Date(s.t).toLocaleTimeString('fr-FR') + ' réutilisé (' + (surge >= 0 ? '+' : '') + surge.toFixed(2) + ' m).'; }
+    else { surge = 0; $('liveInfo').innerHTML = '<span class="err">Marégraphe injoignable</span> : prédiction seule (écart possible ±0,5 m, garde de la marge).'; }
+  }
+}
+
+// ---------- Recalage annuaire ----------
+PORTS.forEach(p => $('offPort').add(new Option(p.nom, p.id)));
+function offRow(v = {}) {
+  const d = document.createElement('div'); d.className = 'ext';
+  d.innerHTML = `<select><option>PM</option><option>BM</option></select><input type="time"><input type="number" step="0.01" placeholder="m"><button title="Retirer">✕</button>`;
+  const [ty, ti, hi, rm] = d.children;
+  ty.value = v.type || 'PM'; ti.value = v.heure || ''; hi.value = v.h ?? '';
+  [ty, ti, hi].forEach(e => e.onchange = applyRecal);
+  rm.onclick = () => { d.remove(); applyRecal(); };
+  $('offRows').appendChild(d);
+}
+function applyRecal() {
+  const port = PORTS.find(p => p.id === $('offPort').value);
+  const rows = [...$('offRows').children].map(d => ({ type: d.children[0].value, heure: d.children[1].value, h: d.children[2].value }));
+  store.set('recal', { jour: new Date().toDateString(), port: port.id, rows });
+  const ok = rows.filter(r => r.heure && r.h !== '');
+  if (!ok.length || !tide) { recal = null; $('offInfo').textContent = ''; return; }
+  const today = new Date();
+  const pts = ok.map(r => {
+    const [hh, mm] = r.heure.split(':').map(Number);
+    const t = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hh, mm).getTime();
+    const e = extremeModele(port, t, r.type);
+    return { te: e.t, dt: t - e.t, dh: +r.h - e.h, type: r.type };
+  }).sort((a, b) => a.te - b.te);
+  recal = { port: port.id, pts };
+  $('offInfo').innerHTML = pts.map(p => `${p.type} : écart ${p.dt >= 0 ? '+' : ''}${Math.round(p.dt / 60000)} min, ${p.dh >= 0 ? '+' : ''}${p.dh.toFixed(2)} m`).join(' · ') +
+    (pts.some(p => Math.abs(p.dt) > 45 * 60000 || Math.abs(p.dh) > 0.8) ? '<br><span class="err">Écart important : vérifie la saisie (heure locale, bon port, bon jour).</span>' : '');
+  updHNow();
+}
+$('offAdd').onclick = () => offRow();
+$('offClear').onclick = () => { $('offRows').innerHTML = ''; applyRecal(); };
+$('offPort').onchange = applyRecal;
+
+// ---------- Mes roches (GeoJSON de l'éditeur) ----------
+let mesRoches = store.get('roches', []);
+function showGeoInfo() {
+  const n = mesRoches.filter(f => !f.test).length, t = mesRoches.filter(f => f.test).length;
+  $('geoInfo').textContent = mesRoches.length ? `${n} élément(s), ${t} de test` : 'aucun';
+}
+$('geoBtn').onclick = () => $('geoFile').click();
+$('geoFile').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const gj = JSON.parse(await f.text());
+    mesRoches = lireMesRoches(gj);
+    store.set('roches', mesRoches); showGeoInfo();
+  } catch (err) { alert('Fichier illisible : ' + err.message); }
+  e.target.value = '';
+};
+
+$('testSound').onclick = demoSons;
+
+// =====================================================================
+// Position : GPS ou simulation
+// =====================================================================
+const SIM_STARTS = [
+  { nom: 'Sillon (devant le casino)', lat: 48.6560, lon: -2.0140, cap: 20 },
+  { nom: 'Sillon (Hachées)', lat: 48.6612, lon: -2.0075, cap: 60 },
+  { nom: 'Lancieux (plage Saint-Sieu)', lat: 48.6105, lon: -2.1555, cap: 330 },
+  { nom: 'Saint-Briac', lat: 48.6260, lon: -2.1500, cap: 300 },
+];
+SIM_STARTS.forEach((s, i) => $('simStart').add(new Option(s.nom, i)));
+let fix = null, lastFixes = [], watchId = null, sim = null;
+function onFix(lat, lon, acc, speedGps, headingGps, t) {
+  lastFixes.push({ lat, lon, t }); while (lastFixes.length > 6) lastFixes.shift();
+  let speed = speedGps, course = headingGps;
+  const a = lastFixes[0], b = lastFixes[lastFixes.length - 1];
+  if (b.t - a.t > 1500) { // cap et vitesse sur les dernières secondes si le GPS ne les donne pas
+    const kx = 111320 * Math.cos(lat * Math.PI / 180), dx = (b.lon - a.lon) * kx, dy = (b.lat - a.lat) * 110540;
+    if (speed == null || isNaN(speed)) speed = Math.hypot(dx, dy) / ((b.t - a.t) / 1000);
+    if ((course == null || isNaN(course)) && Math.hypot(dx, dy) > 3) course = (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
+  }
+  fix = { lat, lon, acc, speed: speed || 0, course: course ?? (fix ? fix.course : 0), t };
+}
+function startGps() {
+  watchId = navigator.geolocation.watchPosition(
+    p => onFix(p.coords.latitude, p.coords.longitude, p.coords.accuracy, p.coords.speed, p.coords.heading, p.timestamp),
+    err => { $('msg').textContent = 'GPS : ' + err.message; },
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+}
+function startSim() {
+  const s = SIM_STARTS[+$('simStart').value];
+  sim = { lat: s.lat, lon: s.lon, cap: s.cap, v: 6 }; // m/s
+  $('sim').hidden = false;
+}
+document.querySelectorAll('#sim button').forEach(b => b.onclick = () => {
+  const a = b.dataset.a;
+  if (a === 'left') sim.cap = (sim.cap + 345) % 360; if (a === 'right') sim.cap = (sim.cap + 15) % 360;
+  if (a === 'faster') sim.v = Math.min(15, sim.v + 1); if (a === 'slower') sim.v = Math.max(0, sim.v - 1);
+});
+document.addEventListener('keydown', e => {
+  if (!sim) return;
+  const m = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'faster', ArrowDown: 'slower' }[e.key];
+  if (m) { e.preventDefault(); document.querySelector(`#sim [data-a=${m}]`).click(); }
+});
+function simStep(dt) {
+  const r = sim.cap * Math.PI / 180;
+  sim.lat += Math.cos(r) * sim.v * dt / 110540;
+  sim.lon += Math.sin(r) * sim.v * dt / (111320 * Math.cos(sim.lat * Math.PI / 180));
+  fix = { lat: sim.lat, lon: sim.lon, acc: 3, speed: sim.v, course: sim.cap, t: Date.now() };
+}
+
+// =====================================================================
+// Boucle principale
+// =====================================================================
+let running = false, last = null, analysis = null, wakeLock = null, prevW = null;
+const cv = $('cv');
+function resize() { const r = cv.getBoundingClientRect(), k = devicePixelRatio || 1; cv.width = r.width * k; cv.height = r.height * k; }
+addEventListener('resize', resize);
+
+// Calcul et son : minuterie (continue même si l'affichage est en pause) ; dessin : requestAnimationFrame
+let tickTimer = null;
+function tick() {
+  if (!running) return;
+  const now = performance.now();
+  const dt = last ? (now - last) / 1000 : 0; last = now;
+  if (sim) simStep(dt);
+  const t = Date.now();
+  const gpsAge = fix ? (t - fix.t) / 1000 : Infinity;
+  if (fix && (!analysis || now - analysis.at > 500)) {
+    const W = niveauCourant(fix.lon, t);
+    analysis = analyser(fix, fix.course, fix.speed, W, opts()); analysis.at = now; analysis.W = W;
+    const W30 = niveauCourant(fix.lon, t + 30 * 60000);
+    $('sH').textContent = isNaN(W) ? '–' : W.toFixed(1);
+    $('sTrend').textContent = $('testMode').checked ? '(test)' : (W30 > W + 0.05 ? '↑' : W30 < W - 0.05 ? '↓' : '→');
+    $('sV').textContent = (fix.speed * 3.6).toFixed(0);
+    $('sGps').textContent = fix.acc ? Math.round(fix.acc) : '–';
+  }
+  // ----- son -----
+  const at = audio().currentTime, vmin = +$('vmin').value / 3.6;
+  let message = '';
+  if (gpsAge > 5) {
+    continu(false);
+    message = fix ? 'GPS perdu depuis ' + Math.round(gpsAge) + ' s' : 'Recherche GPS…';
+    if (fix && !muted && at > nextBeep) { gpsPerdu(at); nextBeep = at + 10; }
+  } else if (analysis) {
+    const b = analysis.best, armed = fix.speed >= vmin;
+    if (b) message = texteMenace(b) + (armed ? '' : ' (alertes coupées sous ' + $('vmin').value + ' km/h)');
+    sonnerMenace(b, analysis.horizon, armed);
+  }
+  $('msg').textContent = message; $('msg').classList.toggle('alert', !!(analysis && analysis.best));
+}
+function frame() {
+  if (!running) return;
+  if ($('black').hidden) drawRadar(cv, analysis, fix);
+  requestAnimationFrame(frame);
+}
+
+// ---------- Boutons ----------
+$('bMute').onclick = () => { muted = !muted; $('bMute').classList.toggle('on', muted); $('bMute').textContent = muted ? 'Son coupé' : 'Muet'; if (muted) continu(false); };
+$('bBlack').onclick = () => { $('black').hidden = false; };
+$('bLock').onclick = () => { $('lock').hidden = false; };
+function longPress(el, ms, fn) {
+  let timer = null;
+  el.addEventListener('pointerdown', () => { timer = setTimeout(fn, ms); });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => el.addEventListener(ev, () => clearTimeout(timer)));
+}
+longPress($('black'), 1200, () => { $('black').hidden = true; });
+longPress($('lock'), 2000, () => { $('lock').hidden = true; });
+$('bStop').onclick = () => {
+  running = false; continu(false); clearInterval(tickTimer);
+  if (watchId != null) navigator.geolocation.clearWatch(watchId); watchId = null; sim = null; $('sim').hidden = true;
+  if (wakeLock) wakeLock.release().catch(() => {}); wakeLock = null;
+  $('run').hidden = true; $('setup').hidden = false; $('startBar').hidden = false;
+};
+$('start').onclick = async () => {
+  saveSettings();
+  audio();
+  $('setup').hidden = true; $('startBar').hidden = true; $('run').hidden = false; resize();
+  fix = null; lastFixes = []; analysis = null; last = null; running = true;
+  if ($('simMode').checked) startSim(); else startGps();
+  clearInterval(tickTimer); tickTimer = setInterval(tick, 100);
+  requestAnimationFrame(frame);
+  try { wakeLock = await navigator.wakeLock.request('screen'); } catch {}
+};
+document.addEventListener('visibilitychange', async () => {
+  if (running && document.visibilityState === 'visible' && !wakeLock) try { wakeLock = await navigator.wakeLock.request('screen'); } catch {}
+});
+
+// ---------- Réglages persistants ----------
+const SETTINGS = ['seuil', 'vmin', 'antic', 'smooth', 'live', 'testMode', 'testH', 'testNoL3d', 'simMode', 'simStart'];
+function saveSettings() { SETTINGS.forEach(k => store.set(k, $(k).type === 'checkbox' ? $(k).checked : $(k).value)); }
+function loadSettings() { SETTINGS.forEach(k => { const v = store.get(k, null); if (v != null) $(k).type === 'checkbox' ? ($(k).checked = v) : ($(k).value = v); }); }
+function updHNow() {
+  if (!tide) return;
+  const h = niveauEau(MALO.lon, Date.now());
+  $('hNow').textContent = isNaN(h) ? 'hors table' : h.toFixed(2) + ' m';
+}
+$('testH').oninput = () => $('testHTxt').textContent = (+$('testH').value).toFixed(1) + ' m';
+$('live').onchange = async () => { await recalageDirect(); updHNow(); };
+$('simMode').onchange = () => $('simStartRow').hidden = !$('simMode').checked;
+
+// ---------- Hors ligne ----------
+const CACHE_TUILES = 'radar-tuiles', CACHE_APP = 'radar-app-v2';
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+async function offlineCount() {
+  if (!meta || !('caches' in window)) return;
+  try {
+    const c = await caches.open(CACHE_TUILES), keys = await c.keys();
+    const n = keys.filter(r => r.url.includes('/donnees/tuiles/')).length;
+    $('offlineInfo').textContent = `${n} / ${meta.tuiles.length} tuiles disponibles hors ligne`;
+  } catch {}
+}
+$('offline').onclick = async () => {
+  const b = $('offline'); b.disabled = true;
+  try {
+    const c = await caches.open(CACHE_TUILES);
+    const have = new Set((await c.keys()).map(r => new URL(r.url).pathname));
+    const todo = meta.tuiles.map(t => `donnees/tuiles/${meta.zoom}/${t[0]}/${t[1]}.png`).filter(u => !have.has(new URL(u, location.href).pathname));
+    let done = meta.tuiles.length - todo.length;
+    for (let i = 0; i < todo.length; i += 12) {
+      await Promise.all(todo.slice(i, i + 12).map(u => c.add(u).catch(() => {})));
+      done = Math.min(meta.tuiles.length, done + 12);
+      $('offlineInfo').textContent = `${done} / ${meta.tuiles.length}…`;
+    }
+    await (await caches.open(CACHE_APP)).addAll(['radar.html', 'rejeu.html', 'noyau.js', 'donnees/meta.json', 'donnees/maree/saint_malo.json', 'donnees/maree/saint_malo.bin']);
+  } catch (err) { $('offlineInfo').textContent = 'Échec : ' + err.message; }
+  b.disabled = false; offlineCount();
+};
+
+// ---------- Démarrage ----------
+(async () => {
+  loadSettings(); $('testH').oninput(); $('simMode').onchange(); showGeoInfo();
+  const r = store.get('recal', null);
+  if (r && r.jour === new Date().toDateString()) { $('offPort').value = r.port; r.rows.forEach(offRow); }
+  try {
+    await chargerDonnees(); const m = meta, tj = tide.info;
+    $('dataInfo').textContent = `${m.tuiles.length} tuiles Litto3D · marée prédite jusqu'au ${new Date(tide.t0 + tide.h.length * tide.step).toLocaleDateString('fr-FR')} (écart-type ${tj.validation_2026.ecart_type_m} m sur 2026).`;
+    applyRecal(); await recalageDirect(); updHNow(); setInterval(updHNow, 60000);
+    $('start').disabled = false; offlineCount();
+  } catch (err) {
+    $('dataInfo').innerHTML = '<span class="err">' + (location.protocol === 'file:'
+      ? 'Ouvert par double-clic : le navigateur bloque la lecture des données. Lance lancer_outils.bat (ou utilise l’adresse en ligne).'
+      : 'Données introuvables : ' + err.message) + '</span>';
+  }
+})();
+</script>
+</body>
+</html>

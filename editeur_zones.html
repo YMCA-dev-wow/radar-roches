@@ -1,0 +1,754 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Éditeur de roches</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.css">
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1d2430; --muted: #667085; --line: #dde1e7;
+    --accent: #0b6bcb; --danger: #d92d20; --warn: #f79009; --ok: #12b76a; --emerge: #6b1d1d; --test: #7a5af8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #12161c; --panel: #1b2129; --text: #e6e9ee; --muted: #98a2b3; --line: #2c3540; --accent: #4ea1f3; }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #app { display: grid; grid-template-columns: 1fr 360px; height: 100%; }
+  #map { height: 100%; }
+  aside { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 12px 14px; }
+  h1 { font-size: 17px; margin: 0 0 2px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 18px 0 8px; }
+  .sub { color: var(--muted); font-size: 12px; }
+  .row { display: flex; gap: 8px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
+  label { font-size: 13px; }
+  input[type=number], input[type=text], select, textarea {
+    background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; font: inherit; }
+  input[type=number] { width: 80px; }
+  input[type=text], textarea { width: 100%; }
+  input[type=range] { flex: 1; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--bg); color: var(--text);
+    border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.on { outline: 2px solid var(--accent); }
+  button.del { color: var(--danger); }
+  .big { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 70px; text-align: right; }
+  .testbox { border: 2px dashed var(--test); border-radius: 8px; padding: 8px 10px; }
+  .testbox.off { border-color: var(--line); }
+  #list { list-style: none; padding: 0; margin: 0; }
+  #capList { list-style: none; padding: 0; margin: 0; }
+  #capList li { border-bottom: 1px solid var(--line); padding: 6px 0; }
+  #capList li.cal { background: var(--bg); }
+  .pairmk { width: 14px; height: 14px; border: 2px solid #d92d20; border-radius: 50%; background: rgba(255,255,255,.6); }
+  #list li { display: flex; gap: 8px; align-items: center; padding: 6px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  #list li:hover, #list li.sel { background: var(--bg); }
+  .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; border: 1px solid rgba(0,0,0,.3); }
+  .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tag { font-size: 11px; padding: 1px 5px; border-radius: 4px; background: var(--test); color: #fff; }
+  .legend span { display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; font-size: 12px; }
+  #form { border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin-top: 8px; }
+  #hint { position: absolute; z-index: 1000; top: 10px; left: 50%; transform: translateX(-50%);
+    background: var(--text); color: var(--panel); padding: 6px 12px; border-radius: 6px; font-size: 13px; display: none; }
+  #coords { position: absolute; z-index: 1000; bottom: 18px; left: 10px; background: rgba(255,255,255,.85);
+    color: #1d2430; padding: 2px 6px; border-radius: 4px; font: 12px ui-monospace, monospace; }
+  .lbl { background: rgba(255,255,255,.85); border: none; box-shadow: none; padding: 0 3px; font-size: 11px; font-weight: 600; color: #1d2430; }
+  .lbl::before { display: none; }
+  @media (max-width: 800px) { #app { grid-template-columns: 1fr; grid-template-rows: 55% 45%; } aside { border-left: none; border-top: 1px solid var(--line); } }
+</style>
+</head>
+<body>
+<div id="app">
+  <div style="position:relative;height:100%;min-height:0">
+    <div id="map"></div>
+    <div id="hint"></div>
+    <div id="coords"></div>
+  </div>
+  <aside>
+    <h1>Roches du Sillon</h1>
+    <div class="sub">Déclare les roches et hauts-fonds lus sur la carte SHOM. Les cotes sont exprimées par rapport au zéro hydrographique.</div>
+
+    <h2>Fond de carte</h2>
+    <div class="row">
+      <select id="base">
+        <option value="ortho">Photo aérienne IGN</option>
+        <option value="osm">OpenStreetMap</option>
+        <option value="none">Aucun</option>
+      </select>
+      <label><input type="checkbox" id="shomOn" checked> Carte SHOM</label>
+    </div>
+    <div class="row"><label><input type="checkbox" id="lidarOn"> Relief Litto3D (lidar SHOM/IGN) — chaque tête de roche apparaît</label></div>
+    <div class="row"><label style="width:110px">Opacité relief</label><input type="range" id="lidarOp" min="0" max="1" step="0.05" value="0.8"></div>
+    <div class="row"><label style="width:110px">Opacité SHOM</label><input type="range" id="shomOp" min="0" max="1" step="0.05" value="1"></div>
+
+    <h2>Captures de carte (1:10 000…)</h2>
+    <div class="sub">Ajoute une capture d'écran de data.shom.fr, puis cale-la avec 2 repères ou plus (croisements de graticule, tourelles, balises).</div>
+    <div class="row">
+      <button id="capAdd">＋ Ajouter une capture…</button>
+      <input type="file" id="capFile" accept="image/*" hidden>
+    </div>
+    <ul id="capList"></ul>
+    <div id="capCal" class="testbox" hidden>
+      <div class="row"><b style="flex:1" id="capCalTitle"></b></div>
+      <div class="sub" id="capCalInfo"></div>
+      <div class="row" id="capCoordRow" hidden>
+        <input type="text" id="capCoord" placeholder="48°39,50'N 2°00,00'W  ou  48.6583, -2.0">
+        <button id="capCoordOk">Valider ces coordonnées</button>
+      </div>
+      <div class="row">
+        <button class="primary" id="capPairAdd">＋ Ajouter un repère</button>
+        <button id="capPairUndo">Retirer le dernier</button>
+        <button id="capCalEnd">Terminer</button>
+      </div>
+    </div>
+
+    <h2>Hauteur d'eau</h2>
+    <div class="row"><label style="width:150px">Seuil de sécurité (m d'eau)</label><input type="number" id="seuil" step="0.1" min="0" value="2.0"></div>
+    <div class="testbox" id="testbox">
+      <div class="row"><label><input type="checkbox" id="testMode"> <b>Mode test : hauteur d'eau forcée</b></label></div>
+      <div class="row"><input type="range" id="hauteur" min="0" max="14" step="0.1" value="6"><span class="big" id="hauteurTxt">6.0 m</span></div>
+      <div class="sub">Hauteur de marée au-dessus du zéro hydro (comme dans l'annuaire des marées). Les couleurs montrent ce qui serait dangereux à cette hauteur.</div>
+    </div>
+    <div class="legend row" style="margin-top:8px">
+      <span><i class="dot" style="background:var(--emerge)"></i>émergé</span>
+      <span><i class="dot" style="background:var(--danger)"></i>&lt; seuil</span>
+      <span><i class="dot" style="background:var(--warn)"></i>seuil +1 m</span>
+      <span><i class="dot" style="background:var(--ok)"></i>sûr</span>
+    </div>
+
+    <h2>Dangers Litto3D (automatique)</h2>
+    <div class="row"><label><input type="checkbox" id="l3dOn"> Zones dangereuses à la hauteur d'eau ci-dessus</label></div>
+    <div class="row"><label><input type="checkbox" id="l3dSmooth" checked> Inclure les fonds lisses (sable, vase) en plus pâle</label></div>
+    <div class="row"><label><input type="checkbox" id="autoOn"> Têtes de roche détectées <span class="sub" id="autoCount"></span></label></div>
+    <div class="sub" id="l3dInfo">Calculé à partir du relevé laser Litto3D (Shom – IGN). Les couleurs suivent la hauteur d'eau et le seuil réglés plus haut, mode test coché ou non.</div>
+
+    <h2>Ajouter</h2>
+    <div class="row">
+      <button id="addPoint">＋ Roche (point)</button>
+      <button id="addZone">＋ Zone (polygone)</button>
+    </div>
+    <div class="row"><label><input type="checkbox" id="newIsTest"> Les nouveaux éléments sont des éléments de <span class="tag">test</span> (parking, vélo…)</label></div>
+
+    <div id="form" hidden></div>
+
+    <h2>Éléments déclarés <span id="count" class="sub"></span></h2>
+    <div class="row"><label><input type="checkbox" id="showTest" checked> Afficher les éléments de test</label></div>
+    <ul id="list"></ul>
+
+    <h2>Fichier</h2>
+    <div class="row">
+      <button class="primary" id="export">Exporter (GeoJSON)</button>
+      <button id="importBtn">Importer…</button>
+      <input type="file" id="importFile" accept=".geojson,.json,application/geo+json,application/json" hidden>
+    </div>
+    <div class="sub">Sauvegarde automatique dans ce navigateur. Exporte régulièrement : c'est ce fichier que lira le radar.</div>
+  </aside>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.min.js"></script>
+<script src="https://unpkg.com/leaflet-imageoverlay-rotated@0.2.1/Leaflet.ImageOverlay.Rotated.js"></script>
+<script>
+// ---------- Modèle ----------
+// Une feature = { id, kind: 'point'|'zone', geom: [lat,lng] | [[lat,lng],...], nom, ref: 'decouvre'|'sonde',
+//                 valeur (m, ≥0), rayon (m, points), test (bool), note }
+// z = cote du sommet par rapport au zéro hydro : découvre de v → +v ; sonde de v → −v
+// eau au-dessus = H − z
+const STORE_KEY = 'roches-sillon-v1';
+let features = [];
+let selectedId = null;
+
+const zOf = f => f.ref === 'decouvre' ? +f.valeur : -f.valeur;
+const fmtCote = f => (f.ref === 'decouvre' ? 'découvre ' : 'sonde ') + Number(f.valeur).toFixed(1) + ' m';
+const uid = () => Math.random().toString(36).slice(2, 10);
+
+function load() {
+  try { features = JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch { features = []; }
+}
+function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(features)); } catch {}
+}
+
+// ---------- Carte ----------
+const map = L.map('map', { maxZoom: 20 }).setView([48.6600, -2.003], 15);
+const geopf = (layer, fmt, maxNative) => L.tileLayer(
+  'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=' + layer +
+  '&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=' + fmt,
+  { maxZoom: 20, maxNativeZoom: maxNative, attribution: '© IGN / SHOM' });
+const bases = {
+  ortho: geopf('ORTHOIMAGERY.ORTHOPHOTOS', 'image/jpeg', 19),
+  osm: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 20, maxNativeZoom: 19, attribution: '© OpenStreetMap' }),
+  none: null,
+};
+const shom = geopf('GEOGRAPHICALGRIDSYSTEMS.COASTALMAPS', 'image/png', 16).setZIndex(5);
+let currentBase = bases.ortho; currentBase.addTo(map); shom.addTo(map);
+L.control.scale({ imperial: false }).addTo(map);
+
+const $ = id => document.getElementById(id);
+$('base').onchange = e => { if (currentBase) map.removeLayer(currentBase); currentBase = bases[e.target.value]; if (currentBase) currentBase.addTo(map).bringToBack(); };
+$('shomOn').onchange = e => e.target.checked ? shom.addTo(map) : map.removeLayer(shom);
+// Relief Litto3D Bretagne 2018-2021 (service WMS public du SHOM, licence ouverte)
+const lidar = L.tileLayer.wms('https://services.data.shom.fr/INSPIRE/wms/r', {
+  layers: 'LITTO3D_BZH_2018_2021_PYR_3857_WMSR', format: 'image/png', transparent: true, version: '1.3.0',
+  maxZoom: 20, opacity: 0.8, attribution: 'Litto3D® Shom – IGN',
+}).setZIndex(6);
+$('lidarOn').onchange = e => e.target.checked ? lidar.addTo(map) : map.removeLayer(lidar);
+$('lidarOp').oninput = e => lidar.setOpacity(+e.target.value);
+$('shomOp').oninput = e => shom.setOpacity(+e.target.value);
+map.on('mousemove', e => $('coords').textContent = e.latlng.lat.toFixed(6) + ', ' + e.latlng.lng.toFixed(6));
+
+// ---------- Couleurs selon hauteur d'eau ----------
+function status(f) {
+  if (!$('testMode').checked) return null;
+  const eau = +$('hauteur').value - zOf(f), seuil = +$('seuil').value;
+  if (eau < 0) return { c: '--emerge', t: 'émergé (' + (-eau).toFixed(1) + ' m)' };
+  if (eau < seuil) return { c: '--danger', t: eau.toFixed(1) + ' m d\'eau' };
+  if (eau < seuil + 1) return { c: '--warn', t: eau.toFixed(1) + ' m d\'eau' };
+  return { c: '--ok', t: eau.toFixed(1) + ' m d\'eau' };
+}
+const cssVar = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const colorOf = f => { const s = status(f); return s ? cssVar(s.c) : (f.test ? cssVar('--test') : cssVar('--accent')); };
+
+// ---------- Rendu ----------
+const layers = new Map(); // id -> { main, halo }
+function drawFeature(f) {
+  removeLayer(f.id);
+  if (f.test && !$('showTest').checked) return;
+  const col = colorOf(f), sel = f.id === selectedId;
+  let main, halo = null;
+  if (f.kind === 'point') {
+    halo = L.circle(f.geom, { radius: f.rayon || 0, color: col, weight: 1, dashArray: '4 4', fillOpacity: .12, interactive: false, pmIgnore: true }).addTo(map);
+    main = L.circleMarker(f.geom, { radius: sel ? 8 : 6, color: sel ? '#000' : '#fff', weight: 2, fillColor: col, fillOpacity: 1 }).addTo(map);
+  } else {
+    main = L.polygon(f.geom, { color: sel ? '#000' : col, weight: sel ? 3 : 2, fillColor: col, fillOpacity: .3 }).addTo(map);
+  }
+  const s = status(f);
+  main.bindTooltip((f.nom ? f.nom + ' · ' : '') + fmtCote(f) + (s ? ' → ' + s.t : ''), { permanent: map.getZoom() >= 17, direction: 'right', className: 'lbl', offset: [6, 0] });
+  main.on('click', ev => {
+    if (mapBusy()) return; // laisse passer le clic : dessin ou calage en cours
+    L.DomEvent.stopPropagation(ev); select(f.id);
+  });
+  if (sel) {
+    main.pm.enable({ draggable: true, allowSelfIntersection: false });
+    const sync = () => {
+      f.geom = f.kind === 'point' ? latlng2arr(main.getLatLng()) : main.getLatLngs()[0].map(latlng2arr);
+      if (halo) halo.setLatLng(main.getLatLng());
+      save();
+    };
+    main.on('pm:edit pm:dragend pm:markerdragend pm:vertexremoved', sync);
+    main.on('pm:drag', () => halo && halo.setLatLng(main.getLatLng()));
+  }
+  layers.set(f.id, { main, halo });
+}
+const latlng2arr = ll => [+ll.lat.toFixed(7), +ll.lng.toFixed(7)];
+function removeLayer(id) {
+  const l = layers.get(id); if (!l) return;
+  l.main.pm && l.main.pm.disable(); map.removeLayer(l.main); if (l.halo) map.removeLayer(l.halo); layers.delete(id);
+}
+// Zones superposées : chaque élément est évalué indépendamment (le plus dangereux l'emporte).
+// À l'affichage, on empile par cote croissante : les sommets restent au-dessus des plateaux, les roches au-dessus des zones.
+function redraw(list) {
+  list.forEach(drawFeature);
+  features.slice().sort((a, b) => (a.kind === 'point') - (b.kind === 'point') || zOf(a) - zOf(b))
+    .forEach(f => { const l = layers.get(f.id); if (l) { if (l.halo) l.halo.bringToFront(); l.main.bringToFront(); } });
+}
+function renderAll() { redraw(features); renderList(); }
+map.on('zoomend', () => redraw(features));
+
+function renderList() {
+  const showTest = $('showTest').checked;
+  const visible = features.filter(f => showTest || !f.test);
+  $('count').textContent = '(' + features.filter(f => !f.test).length + ' réels, ' + features.filter(f => f.test).length + ' test)';
+  $('list').innerHTML = '';
+  visible.slice().sort((a, b) => zOf(b) - zOf(a)).forEach(f => {
+    const li = document.createElement('li');
+    if (f.id === selectedId) li.className = 'sel';
+    const s = status(f);
+    li.innerHTML = `<i class="dot" style="background:${colorOf(f)}"></i>
+      <span class="grow">${f.kind === 'zone' ? '▱ ' : '● '}${esc(f.nom || '(sans nom)')}</span>
+      ${f.test ? '<span class="tag">test</span>' : ''}
+      <span class="sub">${fmtCote(f)}${s ? ' · ' + s.t : ''}</span>`;
+    li.onclick = () => { select(f.id); zoomTo(f); };
+    $('list').appendChild(li);
+  });
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function zoomTo(f) {
+  if (f.kind === 'point') map.setView(f.geom, Math.max(map.getZoom(), 17));
+  else map.fitBounds(L.latLngBounds(f.geom), { maxZoom: 18, padding: [40, 40] });
+}
+
+// ---------- Sélection / formulaire ----------
+function select(id) {
+  const prev = selectedId; selectedId = id;
+  [prev, id].forEach(x => { const f = features.find(g => g.id === x); if (f) redraw([f]); });
+  renderForm(); renderList();
+}
+function renderForm() {
+  const f = features.find(g => g.id === selectedId), box = $('form');
+  if (!f) { box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = `
+    <div class="row"><b style="flex:1">${f.kind === 'point' ? 'Roche' : 'Zone'}</b><button id="fClose">Fermer</button></div>
+    <div class="row"><input type="text" id="fNom" placeholder="Nom (ex. Les Létruns)" value="${esc(f.nom || '')}"></div>
+    <div class="row">
+      <select id="fRef"><option value="decouvre">Découvre de</option><option value="sonde">Sonde (toujours couverte)</option></select>
+      <input type="number" id="fVal" step="0.1" min="0" value="${f.valeur}"> m
+    </div>
+    <div class="sub">« Découvre de » = chiffre souligné sur la carte (hauteur au-dessus du zéro). « Sonde » = profondeur sous le zéro.${f.kind === 'zone' ? ' Pour une zone : la cote du point le plus haut.' : ''}</div>
+    ${f.kind === 'point' ? `<div class="row"><label>Rayon de sécurité</label><input type="number" id="fRayon" step="1" min="0" value="${f.rayon}"> m</div>` : ''}
+    <div class="row"><label><input type="checkbox" id="fTest" ${f.test ? 'checked' : ''}> Élément de <span class="tag">test</span></label></div>
+    <div class="row"><textarea id="fNote" rows="2" placeholder="Note">${esc(f.note || '')}</textarea></div>
+    <div class="sub">${f.kind === 'point' ? 'Glisse le point pour le déplacer.' : 'Glisse les sommets pour modifier la zone ; clic droit sur un sommet pour le supprimer.'}</div>
+    <div class="row" style="justify-content:flex-end"><button class="del" id="fDel">Supprimer</button></div>`;
+  $('fRef').value = f.ref;
+  const upd = () => {
+    f.nom = $('fNom').value.trim(); f.ref = $('fRef').value; f.valeur = Math.max(0, +$('fVal').value || 0);
+    if (f.kind === 'point') f.rayon = Math.max(0, +$('fRayon').value || 0);
+    f.test = $('fTest').checked; f.note = $('fNote').value;
+    save(); redraw([f]); renderList();
+  };
+  ['fNom', 'fRef', 'fVal', 'fRayon', 'fTest', 'fNote'].forEach(k => { const el = $(k); if (el) el.oninput = el.onchange = upd; });
+  $('fClose').onclick = () => select(null);
+  $('fDel').onclick = () => {
+    if (!confirm('Supprimer « ' + (f.nom || 'cet élément') + ' » ?')) return;
+    removeLayer(f.id); features = features.filter(g => g.id !== f.id); selectedId = null; save(); renderForm(); renderList();
+  };
+  if (justCreated === f.id) { justCreated = null; $('fVal').select(); }
+}
+
+// ---------- Création ----------
+function hint(t) { $('hint').textContent = t; $('hint').style.display = t ? 'block' : 'none'; }
+function setDrawBtn(which) { $('addPoint').classList.toggle('on', which === 'point'); $('addZone').classList.toggle('on', which === 'zone'); }
+$('addPoint').onclick = () => {
+  map.pm.disableDraw(); select(null); setDrawBtn('point');
+  map.pm.enableDraw('CircleMarker', { continueDrawing: false });
+  hint('Clique sur la roche · Échap pour annuler');
+};
+$('addZone').onclick = () => {
+  map.pm.disableDraw(); select(null); setDrawBtn('zone');
+  map.pm.enableDraw('Polygon', { allowSelfIntersection: false, snappable: false });
+  hint('Clique les sommets de la zone, puis clique le premier point pour fermer · Échap pour annuler');
+};
+map.on('pm:drawend', () => { hint(''); setDrawBtn(null); });
+// Nom par défaut : R001, R002… pour les roches, Z001… pour les zones (numéro suivant le plus grand existant)
+function nextCode(prefix) {
+  const re = new RegExp('^' + prefix + '(\\d+)$');
+  const max = features.reduce((m, f) => { const k = re.exec(f.nom || ''); return k ? Math.max(m, +k[1]) : m; }, 0);
+  return prefix + String(max + 1).padStart(3, '0');
+}
+let justCreated = null;
+map.on('pm:create', e => {
+  const isPoint = e.shape === 'CircleMarker';
+  const f = {
+    id: uid(), kind: isPoint ? 'point' : 'zone',
+    geom: isPoint ? latlng2arr(e.layer.getLatLng()) : e.layer.getLatLngs()[0].map(latlng2arr),
+    nom: nextCode(isPoint ? 'R' : 'Z'), ref: 'decouvre', valeur: 0, rayon: 15, test: $('newIsTest').checked, note: '',
+  };
+  map.removeLayer(e.layer);
+  features.push(f); save(); justCreated = f.id; select(f.id);
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { map.pm.disableDraw(); hint(''); setDrawBtn(null); } });
+map.on('click', () => { if (!mapBusy()) select(null); });
+
+// ---------- Hauteur d'eau ----------
+function refreshColors() {
+  $('hauteurTxt').textContent = (+$('hauteur').value).toFixed(1) + ' m';
+  $('testbox').classList.toggle('off', !$('testMode').checked);
+  redraw(features); renderList(); l3dRefresh();
+}
+['hauteur', 'seuil', 'testMode'].forEach(k => $(k).oninput = $(k).onchange = refreshColors);
+
+// ---------- Dangers Litto3D (tuiles produites par outils/construire.py) ----------
+// Tuile z16, PNG RVB : R = 255 sans mesure | 0 profond | 1..231 cote ZH = cote_min + (R−1)/10 | 254 terre
+//                      G = relief local en pas de 5 cm (rocher si ≥ 30 cm)
+let l3dMeta = null, autoFeats = null;
+const l3dData = new Map(); // 'x/y' -> Promise<Uint8ClampedArray | null>
+const ROCHE_RELIEF = 0.30;
+const L3D_COUL = [null, [247, 144, 9], [217, 45, 32], [107, 29, 29]]; // 1 vigilance, 2 danger, 3 émergé
+function l3dTile(x, y) {
+  const k = x + '/' + y;
+  if (!l3dData.has(k)) {
+    l3dData.set(k, !l3dMeta.set.has(k) ? Promise.resolve(null) : new Promise(res => {
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas'); c.width = c.height = 256;
+        const g = c.getContext('2d'); g.drawImage(img, 0, 0); res(g.getImageData(0, 0, 256, 256).data);
+      };
+      img.onerror = () => res(null);
+      img.src = 'donnees/tuiles/' + l3dMeta.zoom + '/' + k + '.png';
+    }));
+  }
+  return l3dData.get(k);
+}
+function l3dNiveau(R) { // 0 rien, 1..3 selon la hauteur d'eau, -1 sans mesure
+  if (R === 255) return -1;
+  if (R === 0) return 0;
+  const H = +$('hauteur').value, s = +$('seuil').value;
+  const eau = R === 254 ? -99 : H - (l3dMeta.cote_min + (R - 1) * l3dMeta.pas_cote);
+  return eau < 0 ? 3 : eau < s ? 2 : eau < s + 1 ? 1 : 0;
+}
+const L3DLayer = L.GridLayer.extend({
+  createTile(coords, done) {
+    const tile = document.createElement('canvas'); tile.width = tile.height = 256;
+    const Z = l3dMeta.zoom, z = coords.z;
+    const smooth = $('l3dSmooth').checked;
+    // gravité par pixel : −1 sans mesure, puis 2·niveau + 1 si rocher ; on garde la plus grave
+    const sev = new Int8Array(65536).fill(-2);
+    const paint = (p, R, G) => {
+      const n = l3dNiveau(R);
+      let g = -1;
+      if (n === 0) return;
+      if (n > 0) {
+        const rock = G * l3dMeta.pas_relief >= ROCHE_RELIEF || R === 254;
+        if (!rock && !smooth) return;
+        g = 2 * n + (rock ? 1 : 0);
+      }
+      if (g > sev[p]) sev[p] = g;
+    };
+    let jobs;
+    if (z >= Z) { // agrandissement : un morceau d'une tuile source
+      const f = 2 ** (z - Z), sx = Math.floor(coords.x / f), sy = Math.floor(coords.y / f), ox = (coords.x % f) * 256 / f, oy = (coords.y % f) * 256 / f;
+      jobs = l3dTile(sx, sy).then(d => {
+        if (!d) return;
+        for (let v = 0; v < 256; v++) for (let u = 0; u < 256; u++) {
+          const s = ((Math.floor(oy + v / f)) * 256 + Math.floor(ox + u / f)) * 4;
+          paint(v * 256 + u, d[s], d[s + 1]);
+        }
+      });
+    } else { // réduction : on garde le niveau le plus grave de chaque bloc
+      const f = 2 ** (Z - z), list = [];
+      for (let j = 0; j < f; j++) for (let i = 0; i < f; i++) {
+        const tx = coords.x * f + i, ty = coords.y * f + j;
+        list.push(l3dTile(tx, ty).then(d => {
+          if (!d) return;
+          for (let v = 0; v < 256; v++) for (let u = 0; u < 256; u++) {
+            const s = (v * 256 + u) * 4;
+            paint(Math.floor((j * 256 + v) / f) * 256 + Math.floor((i * 256 + u) / f), d[s], d[s + 1]);
+          }
+        }));
+      }
+      jobs = Promise.all(list);
+    }
+    jobs.then(() => {
+      const out = tile.getContext('2d').createImageData(256, 256), o = out.data;
+      for (let p = 0; p < 65536; p++) {
+        const g = sev[p]; if (g === -2) continue;
+        const q = p * 4;
+        if (g === -1) { o[q] = o[q + 1] = o[q + 2] = 128; o[q + 3] = 35; continue; }
+        const c = L3D_COUL[g >> 1]; o[q] = c[0]; o[q + 1] = c[1]; o[q + 2] = c[2]; o[q + 3] = g & 1 ? 210 : 90;
+      }
+      tile.getContext('2d').putImageData(out, 0, 0); done(null, tile);
+    });
+    return tile;
+  },
+});
+const l3dLayer = new L3DLayer({ minZoom: 13, maxZoom: 20, zIndex: 7, attribution: 'Litto3D® Shom – IGN' });
+const autoLayer = L.layerGroup();
+const autoRenderer = L.canvas({ padding: 0.3 });
+let l3dTimer = null;
+function l3dRefresh() {
+  clearTimeout(l3dTimer);
+  l3dTimer = setTimeout(() => {
+    if (map.hasLayer(l3dLayer)) l3dLayer.redraw();
+    if (map.hasLayer(autoLayer)) drawAuto();
+  }, 120);
+}
+function drawAuto() {
+  autoLayer.clearLayers();
+  if (!autoFeats) return;
+  const H = +$('hauteur').value, s = +$('seuil').value;
+  autoFeats.forEach(ft => {
+    const z = ft.properties.z, eau = H - z, n = eau < 0 ? 3 : eau < s ? 2 : eau < s + 1 ? 1 : 0;
+    const col = n ? 'rgb(' + L3D_COUL[n] + ')' : cssVar('--ok');
+    const [lng, lat] = ft.geometry.coordinates;
+    const m = L.circleMarker([lat, lng], { renderer: autoRenderer, radius: 4, color: '#fff', weight: 1, fillColor: col, fillOpacity: 1 });
+    const cote = z >= 0 ? 'découvre ' + z.toFixed(1) + ' m' : 'sonde ' + (-z).toFixed(1) + ' m';
+    m.bindTooltip(ft.properties.nom + ' · ' + cote + ' → ' + (eau < 0 ? 'émergée' : eau.toFixed(1) + ' m d\'eau'), { direction: 'right', className: 'lbl', offset: [6, 0] });
+    m.on('click', ev => {
+      L.DomEvent.stopPropagation(ev);
+      if (mapBusy()) return;
+      if (features.some(f => f.autoId === ft.properties.id)) { select(features.find(f => f.autoId === ft.properties.id).id); return; }
+      if (!confirm('Ajouter ' + ft.properties.nom + ' (' + cote + ') à tes roches ?')) return;
+      const f = { id: uid(), kind: 'point', geom: [lat, lng], nom: ft.properties.nom, ref: z >= 0 ? 'decouvre' : 'sonde',
+        valeur: +Math.abs(z).toFixed(1), rayon: 15, test: false, note: 'Litto3D (auto)', autoId: ft.properties.id };
+      features.push(f); save(); select(f.id);
+    });
+    autoLayer.addLayer(m);
+  });
+}
+async function l3dInit() {
+  try {
+    l3dMeta = await (await fetch('donnees/meta.json')).json();
+    l3dMeta.set = new Set(l3dMeta.tuiles.map(t => t[0] + '/' + t[1]));
+    autoFeats = (await (await fetch('donnees/tetes_auto.geojson')).json()).features;
+    $('autoCount').textContent = '(' + autoFeats.length + ')';
+  } catch (err) {
+    $('l3dInfo').textContent = 'Données Litto3D introuvables : lance l\'éditeur avec lancer_outils.bat (un double-clic sur le fichier HTML ne permet pas de les lire).';
+    ['l3dOn', 'autoOn', 'l3dSmooth'].forEach(k => $(k).disabled = true);
+  }
+}
+$('l3dOn').onchange = e => e.target.checked ? l3dLayer.addTo(map) : map.removeLayer(l3dLayer);
+$('l3dSmooth').onchange = () => map.hasLayer(l3dLayer) && l3dLayer.redraw();
+$('autoOn').onchange = e => { if (e.target.checked) { autoLayer.addTo(map); drawAuto(); } else map.removeLayer(autoLayer); };
+l3dInit();
+$('showTest').onchange = () => { redraw(features); renderList(); };
+
+// ---------- Import / export GeoJSON ----------
+function toGeoJSON() {
+  return {
+    type: 'FeatureCollection',
+    properties: { format: 'roches-sillon', version: 1, reference: 'zero hydrographique SHOM', exporte: new Date().toISOString() },
+    features: features.map(f => ({
+      type: 'Feature',
+      geometry: f.kind === 'point'
+        ? { type: 'Point', coordinates: [f.geom[1], f.geom[0]] }
+        : { type: 'Polygon', coordinates: [[...f.geom, f.geom[0]].map(p => [p[1], p[0]])] },
+      properties: { id: f.id, nom: f.nom, ref: f.ref, valeur: f.valeur, z: zOf(f), rayon: f.kind === 'point' ? f.rayon : 0, test: f.test, note: f.note },
+    })),
+  };
+}
+function fromGeoJSON(gj) {
+  return (gj.features || []).map(ft => {
+    const p = ft.properties || {}, g = ft.geometry;
+    const isPoint = g.type === 'Point';
+    let ring = isPoint ? null : g.coordinates[0].map(c => [c[1], c[0]]);
+    if (ring && ring.length > 1 && ring[0][0] === ring.at(-1)[0] && ring[0][1] === ring.at(-1)[1]) ring.pop();
+    return {
+      id: p.id || uid(), kind: isPoint ? 'point' : 'zone', geom: isPoint ? [g.coordinates[1], g.coordinates[0]] : ring,
+      nom: p.nom || '', ref: p.ref || (p.z >= 0 ? 'decouvre' : 'sonde'), valeur: p.valeur ?? Math.abs(p.z || 0),
+      rayon: p.rayon ?? 15, test: !!p.test, note: p.note || '',
+    };
+  });
+}
+$('export').onclick = () => {
+  const blob = new Blob([JSON.stringify(toGeoJSON(), null, 1)], { type: 'application/geo+json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'roches_sillon_' + new Date().toISOString().slice(0, 10) + '.geojson';
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+$('importBtn').onclick = () => $('importFile').click();
+$('importFile').onchange = async e => {
+  const file = e.target.files[0]; if (!file) return;
+  try {
+    const incoming = fromGeoJSON(JSON.parse(await file.text()));
+    const replace = features.length && confirm(incoming.length + ' éléments dans le fichier.\nOK = remplacer les ' + features.length + ' éléments actuels\nAnnuler = les ajouter aux éléments actuels');
+    features.forEach(f => removeLayer(f.id));
+    const ids = new Set(features.map(f => f.id));
+    features = replace ? incoming : features.concat(incoming.filter(f => !ids.has(f.id)));
+    selectedId = null; save(); renderAll(); renderForm();
+  } catch (err) { alert('Fichier illisible : ' + err.message); }
+  e.target.value = '';
+};
+
+// ---------- Captures de carte calées ----------
+// Une capture = { id, name, url (dataURL), w, h, T0, pairs: [{ px: [x,y], ll: [lat,lng] }], opacity, visible }
+// Calage : transformation affine pixel → mètres Web Mercator, X = a·x + b·y + c ; Y = d·x + e·y + f
+//   0 repère → position initiale, 1 → translation, 2 → similitude, ≥3 → affine aux moindres carrés
+let captures = [];
+const capLayers = new Map();
+let calib = null; // { id, step: null | 'img' | 'map', px }
+const mapBusy = () => map.pm.globalDrawModeEnabled() || !!calib;
+map.createPane('captures').style.zIndex = 350;
+const pairLayer = L.layerGroup().addTo(map);
+const cap = id => captures.find(c => c.id === id);
+
+const idb = (() => {
+  let dbp;
+  const open = () => dbp ||= new Promise((res, rej) => {
+    const r = indexedDB.open('roches-sillon', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('captures', { keyPath: 'id' });
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+  const tx = async (mode, fn) => {
+    const db = await open();
+    return new Promise((res, rej) => {
+      const t = db.transaction('captures', mode), req = fn(t.objectStore('captures'));
+      t.oncomplete = () => res(req.result); t.onerror = () => rej(t.error);
+    });
+  };
+  return { all: () => tx('readonly', s => s.getAll()), put: c => tx('readwrite', s => s.put(c)), del: id => tx('readwrite', s => s.delete(id)) };
+})();
+const saveCap = c => idb.put({ ...c, T: undefined }).catch(err => console.warn('capture non sauvegardée', err));
+
+const proj = ll => L.CRS.EPSG3857.project(L.latLng(ll));
+const unproj = (X, Y) => L.CRS.EPSG3857.unproject(L.point(X, Y));
+const applyT = (T, x, y) => [T[0] * x + T[1] * y + T[2], T[3] * x + T[4] * y + T[5]];
+function invT(T, X, Y) {
+  const det = T[0] * T[4] - T[1] * T[3]; X -= T[2]; Y -= T[5];
+  return [(T[4] * X - T[1] * Y) / det, (-T[3] * X + T[0] * Y) / det];
+}
+function solve3(A, b) {
+  const det = m => m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+  const D = det(A);
+  return [0, 1, 2].map(k => det(A.map((row, i) => row.map((v, j) => j === k ? b[i] : v))) / D);
+}
+function similarity(P) { // y pixel vers le bas → w = x − i·y ; z = s·w + t
+  const dw = [P[1].x - P[0].x, P[0].y - P[1].y], dz = [P[1].X - P[0].X, P[1].Y - P[0].Y];
+  const n = dw[0] ** 2 + dw[1] ** 2, sr = (dz[0] * dw[0] + dz[1] * dw[1]) / n, si = (dz[1] * dw[0] - dz[0] * dw[1]) / n;
+  return [sr, si, P[0].X - (sr * P[0].x + si * P[0].y), si, -sr, P[0].Y - (si * P[0].x - sr * P[0].y)];
+}
+function computeT(c) {
+  const P = c.pairs.map(p => { const m = proj(p.ll); return { x: p.px[0], y: p.px[1], X: m.x, Y: m.y }; });
+  if (P.length === 0) return c.T0;
+  if (P.length === 1) {
+    const [X0, Y0] = applyT(c.T0, P[0].x, P[0].y), T = c.T0.slice();
+    T[2] += P[0].X - X0; T[5] += P[0].Y - Y0; return T;
+  }
+  if (P.length === 2) return similarity(P);
+  const N = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], bx = [0, 0, 0], by = [0, 0, 0];
+  P.forEach(p => { const r = [p.x, p.y, 1]; for (let i = 0; i < 3; i++) { for (let j = 0; j < 3; j++) N[i][j] += r[i] * r[j]; bx[i] += r[i] * p.X; by[i] += r[i] * p.Y; } });
+  const T = [...solve3(N, bx), ...solve3(N, by)];
+  return T.every(Number.isFinite) ? T : similarity(P); // repères alignés → on se rabat sur la similitude
+}
+function rmsMeters(c) { // écart moyen entre repères et capture calée, en mètres réels
+  if (c.pairs.length < 3) return null;
+  const T = computeT(c);
+  const s = c.pairs.reduce((acc, p) => {
+    const m = proj(p.ll), [X, Y] = applyT(T, p.px[0], p.px[1]), k = Math.cos(p.ll[0] * Math.PI / 180);
+    return acc + ((X - m.x) * k) ** 2 + ((Y - m.y) * k) ** 2;
+  }, 0);
+  return Math.sqrt(s / c.pairs.length);
+}
+
+function drawCapture(c) {
+  const T = c.T = computeT(c);
+  const ll = (x, y) => { const [X, Y] = applyT(T, x, y); return unproj(X, Y); };
+  const old = capLayers.get(c.id); if (old) map.removeLayer(old);
+  const o = L.imageOverlay.rotated(c.url, ll(0, 0), ll(c.w, 0), ll(0, c.h), { pane: 'captures', opacity: c.opacity, interactive: false });
+  capLayers.set(c.id, o);
+  const hidden = calib && calib.id === c.id && calib.step === 'map';
+  if (c.visible && !hidden) o.addTo(map);
+}
+function drawPairs() {
+  pairLayer.clearLayers();
+  const c = calib && cap(calib.id); if (!c) return;
+  const icon = L.divIcon({ className: '', html: '<div class="pairmk"></div>', iconSize: [14, 14], iconAnchor: [7, 7] });
+  c.pairs.forEach((p, i) => {
+    const [X, Y] = applyT(c.T, p.px[0], p.px[1]);
+    L.polyline([unproj(X, Y), p.ll], { color: '#d92d20', weight: 2, dashArray: '3 3', interactive: false }).addTo(pairLayer);
+    L.marker(p.ll, { icon, interactive: false }).bindTooltip(String(i + 1), { permanent: true, direction: 'right', className: 'lbl' }).addTo(pairLayer);
+  });
+}
+
+function renderCaps() {
+  const ul = $('capList'); ul.innerHTML = '';
+  captures.forEach(c => {
+    const li = document.createElement('li'), rms = rmsMeters(c);
+    if (calib && calib.id === c.id) li.className = 'cal';
+    li.innerHTML = `
+      <div class="row"><b class="grow">${esc(c.name)}</b><label><input type="checkbox" data-k="vis" ${c.visible ? 'checked' : ''}> visible</label></div>
+      <div class="row"><label style="width:60px">Opacité</label><input type="range" data-k="op" min="0.1" max="1" step="0.05" value="${c.opacity}"></div>
+      <div class="row"><span class="sub grow">${c.pairs.length} repère(s)${rms != null ? ' · écart moyen ' + rms.toFixed(1) + ' m' : c.pairs.length < 2 ? ' · non calée' : ''}</span>
+        <button data-k="cal">Caler</button><button class="del" data-k="del">Supprimer</button></div>`;
+    li.querySelector('[data-k=vis]').onchange = e => { c.visible = e.target.checked; saveCap(c); drawCapture(c); };
+    li.querySelector('[data-k=op]').oninput = e => { c.opacity = +e.target.value; capLayers.get(c.id).setOpacity(c.opacity); };
+    li.querySelector('[data-k=op]').onchange = () => saveCap(c);
+    li.querySelector('[data-k=cal]').onclick = () => startCalib(c.id);
+    li.querySelector('[data-k=del]').onclick = () => {
+      if (!confirm('Supprimer la capture « ' + c.name + ' » ?')) return;
+      if (calib && calib.id === c.id) endCalib();
+      map.removeLayer(capLayers.get(c.id)); capLayers.delete(c.id);
+      captures = captures.filter(x => x !== c); idb.del(c.id).catch(() => {}); renderCaps();
+    };
+    ul.appendChild(li);
+  });
+}
+
+function updCalUI() {
+  const c = calib && cap(calib.id);
+  $('capCal').hidden = !c; if (!c) return;
+  $('capCalTitle').textContent = 'Calage : ' + c.name;
+  const n = c.pairs.length, rms = rmsMeters(c);
+  const steps = {
+    img: '<b>Étape 1/2</b> : clique un repère précis <b>sur la capture</b> (croisement de graticule, tourelle, balise…).',
+    map: '<b>Étape 2/2</b> : clique le même repère <b>sur le fond de carte</b> (la capture est masquée), ou saisis ses coordonnées.',
+  };
+  $('capCalInfo').innerHTML = (steps[calib.step] || '') + '<br>' + n + ' repère(s). ' +
+    (n < 2 ? 'Il en faut au moins 2. ' : '') + (n < 4 ? '3 ou 4 repères éloignés les uns des autres donnent le meilleur calage. ' : '') +
+    (rms != null ? 'Écart moyen : <b>' + rms.toFixed(1) + ' m</b>.' : '');
+  $('capCoordRow').hidden = calib.step !== 'map';
+  $('capPairAdd').disabled = !!calib.step;
+}
+function startCalib(id) {
+  if (calib) endCalib();
+  select(null); calib = { id, step: null };
+  const c = cap(id); c.visible = true; drawCapture(c); drawPairs(); updCalUI(); renderCaps();
+}
+function endCalib() {
+  const c = cap(calib.id); calib = null; hint('');
+  if (c) { drawCapture(c); saveCap(c); }
+  drawPairs(); updCalUI(); renderCaps();
+}
+function addPair(latlng) {
+  const c = cap(calib.id);
+  c.pairs.push({ px: calib.px.map(v => +v.toFixed(1)), ll: [+latlng.lat.toFixed(7), +latlng.lng.toFixed(7)] });
+  calib.step = null; hint(''); $('capCoord').value = '';
+  saveCap(c); drawCapture(c); drawPairs(); updCalUI(); renderCaps();
+}
+function parseCoord(s) { // « 48°39,50'N 2°00,00'W », « 48 39.5 N 2 0 O » ou « 48.6583, -2.0 »
+  s = s.toUpperCase().replace(/(\d),(\d)/g, '$1.$2');
+  const h = s.search(/[NS]/);
+  if (h >= 0) {
+    const part = t => { const n = (t.match(/\d+(?:\.\d+)?/g) || []).map(Number); return n.length ? n[0] + (n[1] || 0) / 60 + (n[2] || 0) / 3600 : NaN; };
+    const a = s.slice(0, h + 1), b = s.slice(h + 1);
+    const lat = part(a) * (a.includes('S') ? -1 : 1), lon = part(b) * (/[WO]/.test(b) ? -1 : 1);
+    return [lat, lon];
+  }
+  const n = (s.match(/-?\d+(?:\.\d+)?/g) || []).map(Number);
+  return n.length >= 2 ? [n[0], n[1]] : null;
+}
+
+$('capAdd').onclick = () => $('capFile').click();
+$('capFile').onchange = async e => {
+  const file = e.target.files[0]; e.target.value = ''; if (!file) return;
+  const url = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(file); });
+  const img = await new Promise((r, j) => { const i = new Image(); i.onload = () => r(i); i.onerror = j; i.src = url; });
+  const b = map.getBounds(), nw = proj(b.getNorthWest()), se = proj(b.getSouthEast());
+  const w = img.naturalWidth, h = img.naturalHeight;
+  let sc = 0.9 * Math.min((se.x - nw.x) / w, (nw.y - se.y) / h);
+  if (!(sc > 0)) sc = 1; // carte pas encore dimensionnée : échelle arbitraire, le calage la corrigera
+  const cx = (nw.x + se.x) / 2, cy = (nw.y + se.y) / 2;
+  const c = { id: uid(), name: file.name, url, w, h, T0: [sc, 0, cx - sc * w / 2, 0, -sc, cy + sc * h / 2], pairs: [], opacity: 0.85, visible: true };
+  captures.push(c); saveCap(c); startCalib(c.id);
+};
+$('capPairAdd').onclick = () => {
+  const c = cap(calib.id); calib.step = 'img'; c.visible = true; drawCapture(c);
+  hint('1/2 · Clique un repère précis sur la capture'); updCalUI();
+};
+$('capPairUndo').onclick = () => {
+  const c = cap(calib.id); c.pairs.pop(); calib.step = null; hint('');
+  saveCap(c); drawCapture(c); drawPairs(); updCalUI(); renderCaps();
+};
+$('capCalEnd').onclick = endCalib;
+$('capCoordOk').onclick = () => {
+  const p = parseCoord($('capCoord').value);
+  if (!p || !p.every(Number.isFinite) || Math.abs(p[0]) > 90 || Math.abs(p[1]) > 180) { alert('Coordonnées non reconnues.'); return; }
+  addPair(L.latLng(p[0], p[1]));
+};
+map.on('click', e => {
+  if (!calib || !calib.step) return;
+  const c = cap(calib.id);
+  if (calib.step === 'img') {
+    const m = proj(e.latlng), px = invT(c.T, m.x, m.y);
+    if (px[0] < 0 || px[1] < 0 || px[0] > c.w || px[1] > c.h) { hint('Ce clic est en dehors de la capture : clique un repère sur la capture'); return; }
+    calib.px = px; calib.step = 'map'; drawCapture(c);
+    hint('2/2 · Clique le même repère sur le fond de carte, ou saisis ses coordonnées dans le panneau');
+    updCalUI();
+  } else addPair(e.latlng);
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && calib && calib.step) { const c = cap(calib.id); calib.step = null; hint(''); drawCapture(c); updCalUI(); }
+});
+
+// ---------- Démarrage ----------
+load(); renderAll(); refreshColors();
+idb.all().then(list => { captures = list; captures.forEach(drawCapture); renderCaps(); }).catch(err => console.warn('captures indisponibles', err));
+if (features.length) map.fitBounds(L.featureGroup([...layers.values()].map(l => l.main)).getBounds(), { maxZoom: 17, padding: [40, 40] });
+</script>
+</body>
+</html>
