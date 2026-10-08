@@ -342,7 +342,10 @@ $('start').onclick = async () => {
   if ($('simMode').checked) startSim(); else startGps();
   clearInterval(tickTimer); tickTimer = setInterval(tick, 100);
   requestAnimationFrame(frame);
-  try { wakeLock = await navigator.wakeLock.request('screen'); } catch {}
+  try { wakeLock = await navigator.wakeLock.request('screen'); }
+  catch { // navigateur sans maintien d'écran : la mise en veille couperait le GPS et le son
+    setTimeout(() => alert('Ce navigateur ne peut pas empêcher la mise en veille de l’écran.\nRègle la mise en veille Android sur 30 min (ou plus) avant de partir, sinon le radar s’arrêtera quand l’écran s’éteindra.'), 300);
+  }
 };
 document.addEventListener('visibilitychange', async () => {
   if (running && document.visibilityState === 'visible' && !wakeLock) try { wakeLock = await navigator.wakeLock.request('screen'); } catch {}
@@ -374,6 +377,7 @@ async function offlineCount() {
 }
 $('offline').onclick = async () => {
   const b = $('offline'); b.disabled = true;
+  try { if (navigator.storage && navigator.storage.persist) await navigator.storage.persist(); } catch {} // évite que le navigateur efface la carte hors ligne
   try {
     const c = await caches.open(CACHE_TUILES);
     const have = new Set((await c.keys()).map(r => new URL(r.url).pathname));
