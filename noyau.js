@@ -356,28 +356,34 @@ function texteMaree(niveau, t) {
 }
 // Relais pendant la navigation : démarrage, pré-alerte, pannes GPS, point marée toutes les 30 min
 const relais = { actif: false, preVu: -1e15, lastPre: -1e15, lastMaree: 0, gpsOk: true };
-function relaisDemarrer(t, niveau, seuil, extra = '') {
-  Object.assign(relais, { preVu: -1e15, lastPre: -1e15, lastMaree: t, gpsOk: true });
-  if (!relais.actif) return;
+// etat et envoyer sont paramétrables pour que le rejeu puisse simuler les envois (marqueurs sur la frise)
+function relaisDemarrer(t, niveau, seuil, extra = '', etat = relais, envoyer = notifier) {
+  Object.assign(etat, { preVu: -1e15, lastPre: -1e15, lastMaree: t, perduDepuis: null, perduEnvoye: false });
+  if (!etat.actif) return;
   const m = texteMaree(niveau, t);
-  notifier('Radar actif', `${m.titre}, ${m.texte}, seuil ${seuil} m${extra}`);
+  envoyer('Radar actif', `${m.titre}, ${m.texte}, seuil ${seuil} m${extra}`, t);
 }
-function relaisPas(t, an, course, armed, niveau, gpsOk = true) {
-  if (!relais.actif) return;
-  if (!gpsOk && relais.gpsOk) notifier('GPS perdu', 'Plus de position : radar aveugle');
-  if (gpsOk && !relais.gpsOk) notifier('GPS retrouvé', 'Radar de nouveau actif');
-  relais.gpsOk = gpsOk;
-  if (!gpsOk) return;
-  if (an && an.pre && !an.best && armed) {
-    const nouveau = t - relais.preVu > 10000;          // le danger avait disparu depuis 10 s
-    if ((nouveau || t - relais.lastPre > 30000) && t - relais.lastPre > 15000) {
-      const r = resumeMontre(an, course);
-      notifier(r ? (styleMontre === 'grille' ? `${Math.round(an.pre.d)} m devant` : r.titre) : formatDirection(styleMontre, 0, an.pre.d, true), r ? r.texte : 'Rien autour');
-      relais.lastPre = t;
-    }
-    relais.preVu = t;
+// prePret(t) : vrai si une pré-alerte partirait à l'instant t (permet de ne calculer la grille qu'à ce moment-là)
+function prePret(t, etat = relais) { return (t - etat.preVu > 10000 || t - etat.lastPre > 30000) && t - etat.lastPre > 15000; }
+function relaisPas(t, an, course, armed, niveau, gpsOk = true, etat = relais, envoyer = notifier) {
+  if (!etat.actif) return;
+  // GPS : signalé seulement après 15 s sans position (une chute dans l'eau coupe souvent le signal quelques secondes)
+  if (!gpsOk) {
+    if (etat.perduDepuis == null) etat.perduDepuis = t;
+    if (!etat.perduEnvoye && t - etat.perduDepuis >= 15000) { envoyer('GPS perdu', 'Plus de position depuis 15 s : radar aveugle', t); etat.perduEnvoye = true; }
+    return;
   }
-  if (t - relais.lastMaree >= 30 * 60000) { const m = texteMaree(niveau, t); notifier(m.titre, m.texte); relais.lastMaree = t; }
+  if (etat.perduEnvoye) envoyer('GPS retrouvé', 'Radar de nouveau actif', t);
+  etat.perduDepuis = null; etat.perduEnvoye = false;
+  if (an && an.pre && !an.best && armed) {
+    if (prePret(t, etat)) {                          // nouveau danger (absent depuis 10 s), rappel 30 s, jamais moins de 15 s
+      const r = resumeMontre(an, course);
+      envoyer(r ? (styleMontre === 'grille' ? `${Math.round(an.pre.d)} m devant` : r.titre) : formatDirection(styleMontre, 0, an.pre.d, true), r ? r.texte : 'Rien autour', t);
+      etat.lastPre = t;
+    }
+    etat.preVu = t;
+  }
+  if (t - etat.lastMaree >= 30 * 60000) { const m = texteMaree(niveau, t); envoyer(m.titre, m.texte, t); etat.lastMaree = t; }
 }
 // Essais (série 2) : forcer une grille 3×3 alors que l'Ambit 3 ignore « \n ». Situation : danger devant (98 m) et à tribord avant.
 // A, B : autres caractères de fin de ligne ; C, D : lignes de la grille rendues insécables et assez longues pour que
@@ -419,15 +425,18 @@ function annoncerVeille(v) {
   else if (bipsActifs) sonVeille(v.cote, audio().currentTime);
 }
 function texteVeille(l) { return `${l.lvl === 3 ? 'Roches' : 'Hauts-fonds'} à ${l.rel > 0 ? 'tribord' : 'bâbord'} à ${Math.round(l.d)} m (veille)`; }
+// La voix ne dit que la pré-alerte puis le premier message d'alerte d'un même épisode ; les bips prennent ensuite le relais.
+// Un épisode se termine quand plus rien n'est signalé pendant 10 s.
 function annoncer(b, pre, armed, now = Date.now()) {
-  if (!voixActive || muted || !armed || !(b || pre)) { if (!(b || pre)) derniereVoix.cle = ''; return; }
+  if (b || pre) derniereVoix.vu = now;
+  else if (now - (derniereVoix.vu || 0) > 10000) { derniereVoix.pre = false; derniereVoix.alerte = false; }
+  if (!voixActive || muted || !armed || !(b || pre)) return;
+  if (b ? derniereVoix.alerte : derniereVoix.pre || derniereVoix.alerte) return;
+  if (b && b.d < 10) { derniereVoix.alerte = true; return; } // trop près : le son continu suffit
   const m = b || pre, cote = !b || Math.abs(b.rel) < 15 ? 'devant' : b.rel > 0 ? 'à tribord' : 'à bâbord';
-  const cle = (b ? 'A' : 'P') + cote;
-  if (b && b.d < 10) return;                           // le son continu prend le relais
-  if (cle === derniereVoix.cle && now - derniereVoix.t < 5000) return;
   const d = m.d >= 30 ? Math.round(m.d / 10) * 10 : Math.round(m.d);
   parler(`${m.lvl === 3 ? 'Roche' : 'Haut-fond'} ${cote}, ${d} mètres`);
-  derniereVoix = { t: now, cle };
+  if (b) derniereVoix.alerte = true; else derniereVoix.pre = true;
 }
 
 // =====================================================================

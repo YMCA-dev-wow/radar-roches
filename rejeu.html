@@ -110,7 +110,7 @@
       <span id="clock">–</span>
       <label class="sub"><input type="checkbox" id="follow" checked> Suivre sur la carte</label>
       <span style="flex:1"></span>
-      <span class="legend"><span><i class="dot" style="background:#ffd60a"></i>pré-alerte</span><span><i class="dot" style="background:var(--a1)"></i>bips</span><span><i class="dot" style="background:var(--a2)"></i>&lt; 10 m</span><span><i class="dot" style="background:var(--a3)"></i>contact</span><span><i class="dot" style="background:#5ac8fa"></i>hauteur d'eau</span></span>
+      <span class="legend"><span><i class="dot" style="background:#bf5af2"></i>montre</span><span><i class="dot" style="background:#5ac8fa"></i>veille</span><span><i class="dot" style="background:#ffd60a"></i>pré-alerte</span><span><i class="dot" style="background:var(--a1)"></i>bips</span><span><i class="dot" style="background:var(--a2)"></i>&lt; 10 m</span><span><i class="dot" style="background:var(--a3)"></i>contact</span><span><i class="dot" style="background:#5ac8fa"></i>hauteur d'eau</span></span>
     </div>
     <canvas id="tl"></canvas>
   </footer>
@@ -185,7 +185,7 @@ const boat = L.circleMarker([0, 0], { radius: 7, color: '#fff', weight: 2, fillC
 // =====================================================================
 // Trace
 // =====================================================================
-let pts = [], dernierGPX = null;       // { t, lat, lon, v (m/s), cap (°), W, lvl, best }
+let pts = [], dernierGPX = null, notifs = [];       // { t, lat, lon, v (m/s), cap (°), W, lvl, best }
 let tMeasured = null; // fonction hauteur mesurée à Saint-Malo, si disponible
 
 let sansHeure = false;
@@ -321,11 +321,19 @@ async function calculer() {
   busy(`Chargement du relevé (${need.size} tuiles)…`);
   await Promise.all([...need].map(k => { const [x, y] = k.split('/').map(Number); return loadTile(x, y); }));
   const vmin = +$('vmin').value / 3.6, o = opts(false), etatVeille = {};
+  notifs = [];
+  const etatR = { actif: true }, envoi = (titre, texte, t) => notifs.push({ t, titre, texte });
+  // marée des messages : prédiction (comme sur l'eau), les mesures ne couvrant que la durée de la session
+  const niv = lon => $('tideMode').value === 'forcee' ? () => +$('forceH').value : tt => niveauEau(lon, tt);
+  relaisDemarrer(pts[0].t, niv(pts[0].lon), $('seuil').value, '', etatR, envoi);
   for (let i = 0; i < pts.length; i++) {
     if (token !== calcToken) return;
     const p = pts[i];
     p.W = hauteurAt(p);
-    const an = analyser(p, p.cap, p.v, p.W, o);
+    let an = analyser(p, p.cap, p.v, p.W, o);
+    const armedP = p.v >= vmin;
+    if (an.pre && !an.best && armedP && prePret(p.t, etatR)) an = analyser(p, p.cap, p.v, p.W, opts(true)); // grille complète pour la notification
+    relaisPas(p.t, an, p.cap, armedP, niv(p.lon), true, etatR, envoi);
     p.best = an.best;
     p.lvl = niveauAlerte(p.best, p.v >= vmin);
     p.pre = !p.lvl && !!an.pre && p.v >= vmin;
@@ -363,13 +371,22 @@ function listerEvenements() {
   let nPre = 0; pts.forEach((p, i) => { if (p.pre && (i === 0 || !pts[i - 1].pre)) nPre++; });
   const nVeille = pts.filter(p => p.veille).length;
   $('evCount').textContent = `(${events.length}${$('preAlerte').checked ? ` · ${nPre} pré-alerte(s)` : ''}${$('veille').checked ? ` · ${nVeille} veille(s)` : ''})`;
+  $('evCount').textContent = $('evCount').textContent.replace(/\)$/, ` · ${notifs.length} notif. montre)`);
   const ul = $('events'); ul.innerHTML = '';
-  events.forEach(ev => {
-    const p = pts[ev.debut], li = document.createElement('li');
-    li.innerHTML = `<i class="dot" style="background:${COLS[ev.max]}"></i><span>${heure(p.t)} · ${ev.max === 3 ? 'contact' : ev.max === 2 ? 'moins de 10 m' : 'bips'} · ${Math.round(ev.dmin)} m mini · ${Math.round((pts[ev.fin].t - p.t) / 1000)} s · eau ${p.W.toFixed(1)} m</span>`;
-    li.onclick = () => { seek(p.t - 10000); map.setView([p.lat, p.lon], Math.max(map.getZoom(), 17)); };
+  const lignes = events.map(ev => ({ t: pts[ev.debut].t, ev })).concat(notifs.map(n => ({ t: n.t, n }))).sort((a, b) => a.t - b.t);
+  for (const { t, ev, n } of lignes) {
+    const li = document.createElement('li');
+    if (ev) {
+      const p = pts[ev.debut];
+      li.innerHTML = `<i class="dot" style="background:${COLS[ev.max]}"></i><span>${heure(p.t)} · ${ev.max === 3 ? 'contact' : ev.max === 2 ? 'moins de 10 m' : 'bips'} · ${Math.round(ev.dmin)} m mini · ${Math.round((pts[ev.fin].t - p.t) / 1000)} s · eau ${p.W.toFixed(1)} m</span>`;
+      li.onclick = () => { seek(p.t - 10000); map.setView([p.lat, p.lon], Math.max(map.getZoom(), 17)); };
+    } else {
+      li.innerHTML = `<i class="dot" style="background:#bf5af2"></i><span class="sub">${heure(t)} · ⌚ <b></b> : <span></span></span>`;
+      li.querySelector('b').textContent = n.titre; li.querySelector('span span').textContent = n.texte;
+      li.onclick = () => seek(t - 3000);
+    }
     ul.appendChild(li);
-  });
+  }
 }
 const heure = t => new Date(t).toLocaleTimeString('fr-FR');
 
@@ -391,6 +408,9 @@ function dessinerFrise() {
     g.fillStyle = COLS[pts[i].lvl]; const xa = x(pts[i].t), xb = Math.max(xa + 1, x(pts[i + 1].t));
     g.fillRect(xa, H * (pts[i].lvl === 1 ? 0.45 : pts[i].lvl === 2 ? 0.25 : 0.05), xb - xa, H);
   }
+  // notifications montre : losanges violets en haut
+  g.fillStyle = '#bf5af2';
+  for (const n of notifs) { const xn = x(n.t), y = 12 * k; g.beginPath(); g.moveTo(xn, y - 5 * k); g.lineTo(xn + 4 * k, y); g.lineTo(xn, y + 5 * k); g.lineTo(xn - 4 * k, y); g.closePath(); g.fill(); }
   // veille latérale : petits triangles bleus en haut
   g.fillStyle = '#5ac8fa';
   for (const p of pts) if (p.veille) { const xv = x(p.t); g.beginPath(); g.moveTo(xv - 4 * k, 0); g.lineTo(xv + 4 * k, 0); g.lineTo(xv, 7 * k); g.closePath(); g.fill(); }
