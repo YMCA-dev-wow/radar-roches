@@ -75,7 +75,8 @@
         <div><b id="sV">–</b><span>km/h</span></div>
         <div><b id="sCap">–</b><span>cap</span></div>
       </div>
-      <div class="montre" id="apercu" title="Grille envoyée à la montre en pré-alerte"><b>montre</b>–</div>
+      <div class="montre" id="apercu" title="Aperçu en direct ; le cadran clignote en violet à chaque envoi vers la montre"><b>montre</b>–</div>
+      <div class="sub" style="text-align:center;margin-top:-4px">aperçu en direct · <span style="color:#bf5af2">violet = envoyé</span></div>
       <div id="settings">
         <div class="r" id="vRow" hidden><span>Trace sans heures : vitesse supposée (km/h)</span><input type="number" id="vSupp" step="1" min="3" value="22"></div>
         <div class="r"><span>Marée</span>
@@ -332,7 +333,7 @@ async function calculer() {
     p.W = hauteurAt(p);
     let an = analyser(p, p.cap, p.v, p.W, o);
     const armedP = p.v >= vmin;
-    if (an.pre && !an.best && armedP && prePret(p.t, etatR)) an = analyser(p, p.cap, p.v, p.W, opts(true)); // grille complète pour la notification
+    if (dangerSignale(an) && armedP && prePret(p.t, etatR, an)) an = analyser(p, p.cap, p.v, p.W, opts(true)); // grille complète pour la notification
     relaisPas(p.t, an, p.cap, armedP, niv(p.lon), true, etatR, envoi);
     p.best = an.best;
     p.lvl = niveauAlerte(p.best, p.v >= vmin);
@@ -511,6 +512,7 @@ async function droitsMontre() {
   return p === 'granted';
 }
 $('relais').onchange = async () => { if ($('relais').checked && !(await droitsMontre())) $('relais').checked = false; };
+surMontre = () => { const a = $('apercu'); a.style.borderColor = '#bf5af2'; a.style.boxShadow = '0 0 12px #bf5af2'; setTimeout(() => { a.style.borderColor = ''; a.style.boxShadow = ''; }, 2000); };
 $('testMontre').onclick = async () => { await droitsMontre(); testerMontre(); };
 $('styleMontre').onchange = () => { styleMontre = $('styleMontre').value; seek(cur); };
 

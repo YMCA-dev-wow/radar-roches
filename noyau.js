@@ -358,13 +358,20 @@ function texteMaree(niveau, t) {
 const relais = { actif: false, preVu: -1e15, lastPre: -1e15, lastMaree: 0, gpsOk: true };
 // etat et envoyer sont paramétrables pour que le rejeu puisse simuler les envois (marqueurs sur la frise)
 function relaisDemarrer(t, niveau, seuil, extra = '', etat = relais, envoyer = notifier) {
-  Object.assign(etat, { preVu: -1e15, lastPre: -1e15, lastMaree: t, perduDepuis: null, perduEnvoye: false });
+  Object.assign(etat, { preVu: -1e15, lastPre: -1e15, alerteVu: -1e15, lastMaree: t, perduDepuis: null, perduEnvoye: false });
   if (!etat.actif) return;
   const m = texteMaree(niveau, t);
   envoyer('Radar actif', `${m.titre}, ${m.texte}, seuil ${seuil} m${extra}`, t);
 }
-// prePret(t) : vrai si une pré-alerte partirait à l'instant t (permet de ne calculer la grille qu'à ce moment-là)
-function prePret(t, etat = relais) { return (t - etat.preVu > 10000 || t - etat.lastPre > 30000) && t - etat.lastPre > 15000; }
+// Grille envoyée à la montre pour tout danger signalé (pré-alerte, alerte, veille latérale) :
+// à chaque nouvel épisode (rien depuis 10 s), puis rappel toutes les 30 s tant qu'un danger est sur la route ; jamais moins de 15 s d'écart.
+const dangerSignale = an => !!an && !!(an.pre || an.best || an.lat);
+// Une alerte qui (re)commence après 5 s sans alerte (ex. après un empannage) part aussi tout de suite.
+function prePret(t, etat = relais, an = null) {
+  const nouveau = t - etat.preVu > 10000, rappel = t - etat.lastPre > 30000 && !!an && !!(an.pre || an.best);
+  const nouvelleAlerte = !!an && !!an.best && t - (etat.alerteVu ?? -1e15) > 5000;
+  return (nouveau || rappel || nouvelleAlerte) && t - etat.lastPre > 15000;
+}
 function relaisPas(t, an, course, armed, niveau, gpsOk = true, etat = relais, envoyer = notifier) {
   if (!etat.actif) return;
   // GPS : signalé seulement après 15 s sans position (une chute dans l'eau coupe souvent le signal quelques secondes)
@@ -375,13 +382,15 @@ function relaisPas(t, an, course, armed, niveau, gpsOk = true, etat = relais, en
   }
   if (etat.perduEnvoye) envoyer('GPS retrouvé', 'Radar de nouveau actif', t);
   etat.perduDepuis = null; etat.perduEnvoye = false;
-  if (an && an.pre && !an.best && armed) {
-    if (prePret(t, etat)) {                          // nouveau danger (absent depuis 10 s), rappel 30 s, jamais moins de 15 s
-      const r = resumeMontre(an, course);
-      envoyer(r ? (styleMontre === 'grille' ? `${Math.round(an.pre.d)} m devant` : r.titre) : formatDirection(styleMontre, 0, an.pre.d, true), r ? r.texte : 'Rien autour', t);
+  if (dangerSignale(an) && armed) {
+    if (prePret(t, etat, an)) {
+      const ref = an.best || an.pre || an.lat, r = resumeMontre(an, course);
+      const cote = Math.abs(ref.rel) < 15 ? 'devant' : ref.rel > 0 ? 'tribord' : 'bâbord';
+      envoyer(styleMontre === 'grille' || !r ? `${Math.round(ref.d)} m ${cote}` : r.titre, r ? r.texte : 'Rien autour', t);
       etat.lastPre = t;
     }
     etat.preVu = t;
+    if (an.best) etat.alerteVu = t;
   }
   if (t - etat.lastMaree >= 30 * 60000) { const m = texteMaree(niveau, t); envoyer(m.titre, m.texte, t); etat.lastMaree = t; }
 }
