@@ -426,11 +426,19 @@ function annoncerVeille(v) {
 }
 function texteVeille(l) { return `${l.lvl === 3 ? 'Roches' : 'Hauts-fonds'} à ${l.rel > 0 ? 'tribord' : 'bâbord'} à ${Math.round(l.d)} m (veille)`; }
 // La voix ne dit que la pré-alerte puis le premier message d'alerte d'un même épisode ; les bips prennent ensuite le relais.
+// Voix seule (bips coupés) : elle ajoute « Impact imminent » + direction à mi-distance d'alerte (la moitié du temps d'anticipation).
 // Un épisode se termine quand plus rien n'est signalé pendant 10 s.
-function annoncer(b, pre, armed, now = Date.now()) {
+function annoncer(b, pre, armed, now = Date.now(), horizon = 40) {
   if (b || pre) derniereVoix.vu = now;
-  else if (now - (derniereVoix.vu || 0) > 10000) { derniereVoix.pre = false; derniereVoix.alerte = false; }
+  else if (now - (derniereVoix.vu || 0) > 10000) { derniereVoix.pre = false; derniereVoix.alerte = false; derniereVoix.impact = false; }
   if (!voixActive || muted || !armed || !(b || pre)) return;
+  if (b && !bipsActifs && b.d <= horizon / 2) {
+    if (!derniereVoix.impact) {
+      parler(`Impact imminent, ${Math.abs(b.rel) < 15 ? 'devant' : b.rel > 0 ? 'tribord' : 'bâbord'}`);
+      derniereVoix.impact = true; derniereVoix.alerte = true;
+    }
+    return;
+  }
   if (b ? derniereVoix.alerte : derniereVoix.pre || derniereVoix.alerte) return;
   if (b && b.d < 10) { derniereVoix.alerte = true; return; } // trop près : le son continu suffit
   const m = b || pre, cote = !b || Math.abs(b.rel) < 15 ? 'devant' : b.rel > 0 ? 'à tribord' : 'à bâbord';

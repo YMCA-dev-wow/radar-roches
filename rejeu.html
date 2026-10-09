@@ -459,7 +459,7 @@ function rendre(sonner = false) {
   if (sonner) {
     bipsActifs = $('bips').checked; voixActive = $('voix').checked;
     for (let k = (dernierIdxSon ?? fix.i) + 1; k <= fix.i; k++) if (pts[k].veille) annoncerVeille(pts[k].veille); // veilles franchies depuis le dernier pas
-    annoncer(b, pr, armed); sonnerMenace(b, analysis.horizon, armed, pr);
+    annoncer(b, pr, armed, Date.now(), analysis.horizon); sonnerMenace(b, analysis.horizon, armed, pr);
     dernierIdxSon = fix.i;
   } else { continu(false); dernierIdxSon = null; }
   const g = resumeMontre(analysis, fix.course);
