@@ -92,7 +92,7 @@
         <div class="r"><label><input type="checkbox" id="preAlerte" checked> Pré-alerte (±10°, 2× la distance)</label></div>
         <div class="r"><label><input type="checkbox" id="smooth"> Fonds lisses aussi</label></div>
         <div class="r"><label><input type="checkbox" id="sound" checked> Sons pendant la lecture (×1 à ×5)</label></div>
-        <div class="r"><label><input type="checkbox" id="voix" checked> Annonces vocales</label></div>
+        <div class="r"><label><input type="checkbox" id="bips" checked> Bips</label><label><input type="checkbox" id="voix" checked> Annonces vocales</label></div>
         <div class="r"><label><input type="checkbox" id="relais"> Envoyer à la montre pendant la lecture (×1)</label><button id="testMontre">⌚ Tester</button></div>
         <div class="r"><span>Format montre</span><select id="styleMontre"><option value="mots">Mots (Tribord 60)</option><option value="heures">Heures (2h 60)</option><option value="fleches">Flèches (&gt; 60)</option></select></div>
         <div class="sub" id="montreInfo"></div>
@@ -429,7 +429,7 @@ function rendre(sonner = false) {
   const pr = analysis.pre;
   $('msg').textContent = b ? texteMenace(b) + (armed ? '' : ' (sous la vitesse d\'alerte)') : pr ? textePre(pr) : '';
   $('msg').classList.toggle('alert', !!(b && armed));
-  if (sonner) { sonnerMenace(b, analysis.horizon, armed, pr); voixActive = $('voix').checked; annoncer(b, pr, armed); } else continu(false);
+  if (sonner) { bipsActifs = $('bips').checked; voixActive = $('voix').checked; annoncer(b, pr, armed); sonnerMenace(b, analysis.horizon, armed, pr); } else continu(false);
   const g = resumeMontre(analysis, fix.course);
   $('apercu').innerHTML = '<b></b><span></span>';
   $('apercu').firstChild.textContent = g ? g.titre : 'montre'; $('apercu').lastChild.textContent = g ? g.texte : '–';

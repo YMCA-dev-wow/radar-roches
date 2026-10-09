@@ -138,7 +138,7 @@ function analyser(pos, course, speed, W, opts) {
   const consider = (dx, dy, lvl, d) => {
     let rel = Math.atan2(dx, -dy) * 180 / Math.PI - course; rel = ((rel + 540) % 360) - 180;
     if (preH && d > horizon && d <= preH && Math.abs(rel) <= CONE_PRE && (!pre || d < pre.d)) pre = { d, rel, lvl };
-    const inCone = Math.abs(rel) <= CONE_ALERTE || d < 20;
+    const inCone = Math.abs(rel) <= CONE_ALERTE || (d < 20 && Math.abs(rel) <= 110); // proche : devant et côtés, pas derrière
     if (!inCone || d > horizon) return;
     const score = d / Math.max(0.35, Math.cos(Math.min(Math.abs(rel), 80) * Math.PI / 180)) - lvl * 3;
     if (!best || score < best.score) best = { d, rel, lvl, score };
@@ -234,19 +234,25 @@ function demoSons() {
   const t = audio().currentTime + 0.1;
   tintement(t); motif(0, 2, t + 1.0); motif(40, 2, t + 1.8); motif(-40, 2, t + 2.6); motif(0, 3, t + 3.4); gpsPerdu(t + 4.2);
 }
-// Joue l'alerte correspondant à la menace b, sinon la pré-alerte pre (appelé à chaque pas) ; armed = vitesse suffisante
-let nextPre = 0;
+// Joue l'alerte correspondant à la menace b, sinon la pré-alerte pre (appelé à chaque pas) ; armed = vitesse suffisante.
+// Bips désactivables ; pas de bip pendant que la voix parle, sauf sous 10 m où le son continu coupe la voix.
+let nextPre = 0, bipsActifs = true;
+const voixEnCours = () => 'speechSynthesis' in window && speechSynthesis.speaking;
 function sonnerMenace(b, horizon, armed, pre) {
   const at = audio().currentTime;
   if (b && armed && !muted) {
-    if (b.d < 10) { continu(true, b.lvl === 3 ? 1400 : 1100); return; }
+    if (b.d < 10) {
+      if (bipsActifs) { if (voixEnCours()) speechSynthesis.cancel(); continu(true, b.lvl === 3 ? 1400 : 1100); } else continu(false);
+      return;
+    }
     continu(false);
+    if (!bipsActifs || voixEnCours()) return;
     const period = 0.18 + 1.1 * Math.min(1, b.d / horizon);
     if (at > nextBeep) { motif(b.rel, b.lvl, at); nextBeep = at + period; }
     return;
   }
   continu(false);
-  if (pre && armed && !muted && at > nextPre) { tintement(at); nextPre = at + 3; } // rappel toutes les 3 s tant que le danger reste devant
+  if (pre && armed && !muted && bipsActifs && !voixEnCours() && at > nextPre) { tintement(at); nextPre = at + 3; } // rappel toutes les 3 s
 }
 // Niveau d'alerte pour la frise : 0 rien, 1 bips, 2 son continu (< 10 m), 3 contact (< 3 m)
 function niveauAlerte(b, armed) {
