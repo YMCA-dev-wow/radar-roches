@@ -255,6 +255,94 @@ function niveauAlerte(b, armed) {
 }
 
 // =====================================================================
+// Montre : notifications Android relayées par la Suunto app (texte seul, un seul son)
+// =====================================================================
+let surMontre = null; // rappel (titre, texte) pour l'aperçu à l'écran
+async function montrePermission() {
+  if (!('Notification' in window)) return 'absent';
+  if (Notification.permission === 'default') await Notification.requestPermission();
+  return Notification.permission;
+}
+async function notifier(titre, texte) {
+  if (surMontre) surMontre(titre, texte);
+  if (!('Notification' in window) || Notification.permission !== 'granted') return false;
+  try {
+    const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
+    if (reg) { await reg.showNotification(titre, { body: texte, tag: 'radar', renotify: true }); return true; }
+    new Notification(titre, { body: texte, tag: 'radar', renotify: true }); return true;
+  } catch { return false; }
+}
+// Grille 3×3 vue du dessus, cap vers le haut : distance du danger le plus proche au centre, X dans les secteurs de 45° où il y a un danger
+const SECTEUR_CASE = [[0, 1], [0, 2], [1, 2], [2, 2], [2, 1], [2, 0], [1, 0], [0, 0]]; // devant, avant-tribord, tribord… avant-bâbord
+function grilleMontre(an, course) {
+  if (!an) return null;
+  const lim = an.preH || 2 * an.horizon, g = [['.', '.', '.'], ['.', '', '.'], ['.', '.', '.']];
+  let dmin = Infinity;
+  const ajoute = (dx, dy) => {
+    const d = Math.hypot(dx, dy); if (d > lim) return;
+    let rel = Math.atan2(dx, -dy) * 180 / Math.PI - course; rel = ((rel + 540) % 360) - 180;
+    const [r, c] = SECTEUR_CASE[((Math.round(rel / 45) % 8) + 8) % 8];
+    g[r][c] = 'X'; dmin = Math.min(dmin, d);
+  };
+  const c = an.cells;
+  for (let i = 0; i < c.length; i += 3) if (c[i + 2] >= 2) ajoute(c[i], c[i + 1]);
+  for (const z of an.zones) if (z.lvl >= 2 && !z.pts) ajoute(z.dx, z.dy);
+  if (!isFinite(dmin)) return null;
+  g[1][1] = String(Math.round(dmin));
+  return { dmin, texte: g.map(r => r.join(' ')).join('\n') };
+}
+// Prochaine pleine ou basse mer (pas de 5 min, sur 13 h) ; niveau(t) donne la hauteur d'eau
+function prochainExtreme(niveau, t) {
+  let prev = niveau(t), dir = Math.sign(niveau(t + 300000) - prev);
+  for (let s = 1; s <= 156; s++) {
+    const tt = t + s * 300000, h = niveau(tt), d = Math.sign(h - prev);
+    if (d && dir && d !== dir) return { type: dir > 0 ? 'PM' : 'BM', t: tt - 300000, h: prev };
+    if (d) dir = d; prev = h;
+  }
+  return null;
+}
+const hhmm = t => new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+function texteMaree(niveau, t) {
+  const W = niveau(t), dW = niveau(t + 600000) - W, sens = dW > 0.005 ? 'monte' : dW < -0.005 ? 'descend' : '(fixe)', e = prochainExtreme(niveau, t);
+  return { titre: `MAREE ${W.toFixed(1)} m ${sens}`, texte: e ? `${e.type} ${hhmm(e.t)} : ${e.h.toFixed(1)} m` : '' };
+}
+// Relais pendant la navigation : démarrage, pré-alerte, pannes GPS, point marée toutes les 30 min
+const relais = { actif: false, preVu: -1e15, lastPre: -1e15, lastMaree: 0, gpsOk: true };
+function relaisDemarrer(t, niveau, seuil, extra = '') {
+  Object.assign(relais, { preVu: -1e15, lastPre: -1e15, lastMaree: t, gpsOk: true });
+  if (!relais.actif) return;
+  const m = texteMaree(niveau, t);
+  notifier('RADAR ACTIF', `Eau ${niveau(t).toFixed(1)} m ${m.titre.split(' ').pop()}\n${m.texte}\nSeuil ${seuil} m${extra}`);
+}
+function relaisPas(t, an, course, armed, niveau, gpsOk = true) {
+  if (!relais.actif) return;
+  if (!gpsOk && relais.gpsOk) notifier('GPS PERDU', 'Plus de position : radar aveugle');
+  if (gpsOk && !relais.gpsOk) notifier('GPS OK', 'Position retrouvée');
+  relais.gpsOk = gpsOk;
+  if (!gpsOk) return;
+  if (an && an.pre && !an.best && armed) {
+    const nouveau = t - relais.preVu > 10000;          // le danger avait disparu depuis 10 s
+    if ((nouveau || t - relais.lastPre > 30000) && t - relais.lastPre > 15000) {
+      const g = grilleMontre(an, course);
+      notifier(`PRE-ALERTE ${Math.round(an.pre.d)} m`, g ? g.texte : 'Danger droit devant');
+      relais.lastPre = t;
+    }
+    relais.preVu = t;
+  }
+  if (t - relais.lastMaree >= 30 * 60000) { const m = texteMaree(niveau, t); notifier(m.titre, m.texte); relais.lastMaree = t; }
+}
+// Série d'essais pour juger ce que la montre sait afficher
+function testerMontre() {
+  const essais = [
+    ['TEST 1/4 texte', 'Pré-alerte : écueil à 85 m. Accents é è à ç ?'],
+    ['TEST 2/4 grille', '. X .\n. 85 .\n. . .'],
+    ['TEST 3/4 une ligne', '.X. | 85 | ...'],
+    ['TEST 4/4 symboles', '↑ ↗ → ↘ ↓ ↙ ← ↖ ▲ ● ×'],
+  ];
+  essais.forEach(([ti, tx], i) => setTimeout(() => notifier(ti, tx), i * 8000));
+}
+
+// =====================================================================
 // Dessin du radar (cap vers le haut)
 // =====================================================================
 function drawRadar(cv, analysis, fix) {

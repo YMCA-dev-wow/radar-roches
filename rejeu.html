@@ -41,6 +41,8 @@
   #clock { font-variant-numeric: tabular-nums; font-size: 16px; min-width: 150px; }
   #tl { width: 100%; height: 56px; display: block; cursor: pointer; touch-action: none; }
   .legend span { display: inline-flex; gap: 4px; align-items: center; margin-right: 10px; font-size: 12px; color: var(--muted); }
+  .montre { font: 15px/1.3 ui-monospace, Consolas, monospace; white-space: pre; background: #000; color: #e8edf3; border: 2px solid #444; border-radius: 50%; width: 150px; height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; margin: 8px auto; }
+  .montre b { font-size: 11px; color: #ffd60a; }
   #busy { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 2000; font-size: 16px; }
   @media (max-width: 800px) {
     #app { display: block; height: auto; }
@@ -72,6 +74,7 @@
         <div><b id="sV">–</b><span>km/h</span></div>
         <div><b id="sCap">–</b><span>cap</span></div>
       </div>
+      <div class="montre" id="apercu" title="Grille envoyée à la montre en pré-alerte"><b>montre</b>–</div>
       <div id="settings">
         <div class="r" id="vRow" hidden><span>Trace sans heures : vitesse supposée (km/h)</span><input type="number" id="vSupp" step="1" min="3" value="22"></div>
         <div class="r"><span>Marée</span>
@@ -89,6 +92,8 @@
         <div class="r"><label><input type="checkbox" id="preAlerte" checked> Pré-alerte (±10°, 2× la distance)</label></div>
         <div class="r"><label><input type="checkbox" id="smooth"> Fonds lisses aussi</label></div>
         <div class="r"><label><input type="checkbox" id="sound" checked> Sons pendant la lecture (×1 à ×5)</label></div>
+        <div class="r"><label><input type="checkbox" id="relais"> Envoyer à la montre pendant la lecture (×1)</label><button id="testMontre">⌚ Tester</button></div>
+        <div class="sub" id="montreInfo"></div>
         <h3 style="font-size:12px;text-transform:uppercase;color:var(--muted);margin:14px 0 4px">Alertes de la session <span id="evCount"></span></h3>
         <ul id="events"></ul>
       </div>
@@ -423,6 +428,10 @@ function rendre(sonner = false) {
   $('msg').textContent = b ? texteMenace(b) + (armed ? '' : ' (sous la vitesse d\'alerte)') : pr ? textePre(pr) : '';
   $('msg').classList.toggle('alert', !!(b && armed));
   if (sonner) sonnerMenace(b, analysis.horizon, armed, pr); else continu(false);
+  const g = grilleMontre(analysis, fix.course);
+  $('apercu').innerHTML = '<b></b>'; $('apercu').firstChild.textContent = pr ? `PRE-ALERTE ${Math.round(pr.d)} m` : 'montre';
+  $('apercu').append('\n' + (g ? g.texte : '. . .\n. – .\n. . .'));
+  if (playing && relais.actif && +$('speed').value === 1) relaisPas(cur, analysis, fix.course, armed, tt => hauteurAt({ lon: fix.lon, t: tt }));
   $('sH').textContent = W.toFixed(1); $('sV').textContent = (fix.speed * 3.6).toFixed(0); $('sCap').textContent = Math.round(fix.course) + '°';
   $('clock').textContent = `${heure(cur)}  (+${fmtDuree(cur - pts[0].t)})`;
   boat.setLatLng([fix.lat, fix.lon]);
@@ -443,7 +452,11 @@ let playTimer = null;
 function togglePlay(on = !playing) {
   playing = on; $('play').textContent = on ? '⏸' : '▶';
   clearInterval(playTimer); lastTick = null;
-  if (on) { audio(); if (cur >= pts[pts.length - 1].t) cur = pts[0].t; playTimer = setInterval(tickLecture, 100); }
+  if (on) {
+    audio(); if (cur >= pts[pts.length - 1].t) cur = pts[0].t; playTimer = setInterval(tickLecture, 100);
+    relais.actif = $('relais').checked;
+    if (relais.actif) relaisDemarrer(cur, tt => hauteurAt({ lon: etatA(cur).lon, t: tt }), $('seuil').value, '\n(rejeu)');
+  }
   else continu(false);
 }
 $('play').onclick = () => togglePlay();
@@ -455,6 +468,16 @@ document.addEventListener('keydown', e => {
 });
 
 function resizeRadar() { const c = $('radar'), r = c.getBoundingClientRect(), k = devicePixelRatio || 1; c.width = r.width * k; c.height = r.height * k; if (fix) drawRadar(c, analysis, fix); }
+
+// ---------- Montre ----------
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+async function droitsMontre() {
+  const p = await montrePermission();
+  $('montreInfo').textContent = p === 'granted' ? '' : p === 'absent' ? 'Notifications non disponibles dans ce navigateur.' : 'Notifications refusées : autorise-les dans les réglages du site.';
+  return p === 'granted';
+}
+$('relais').onchange = async () => { if ($('relais').checked && !(await droitsMontre())) $('relais').checked = false; };
+$('testMontre').onclick = async () => { await droitsMontre(); testerMontre(); };
 
 // =====================================================================
 // Réglages et import

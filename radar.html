@@ -49,6 +49,8 @@
   #sim { position: absolute; right: 10px; bottom: 90px; display: grid; grid-template-columns: repeat(3, 52px); gap: 6px; }
   #sim button { padding: 10px 0; }
   #black { position: fixed; inset: 0; background: #000; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 30px; color: #333; font-size: 13px; }
+  .montre { font: 15px/1.3 ui-monospace, Consolas, monospace; white-space: pre; background: #000; color: #e8edf3; border: 2px solid #444; border-radius: 50%; width: 150px; height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; margin: 8px auto; }
+  .montre b { font-size: 11px; color: #ffd60a; }
   #lock { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
   #lockRing { width: 130px; height: 130px; border-radius: 50%; border: 3px solid #444; display: flex; align-items: center; justify-content: center; color: #666; font-size: 13px; text-align: center; padding: 10px; }
 </style>
@@ -87,6 +89,14 @@
     <div class="row"><label><input type="checkbox" id="smooth"> Alerter aussi sur les fonds lisses (sable, vase)</label></div>
     <div class="row"><button id="testSound">🔊 Écouter les sons</button></div>
     <div class="sub">Tintement doux descendant = pré-alerte (danger droit devant, encore loin) · 1 bip grave = devant · 2 bips montants = tribord · 2 bips descendants = bâbord · les bips accélèrent en approchant · son continu = moins de 10 m · 3 bips très graves = GPS perdu.</div>
+  </div>
+
+  <h2>Montre (notifications)</h2>
+  <div class="card">
+    <div class="row"><label><input type="checkbox" id="relais"> Relayer sur la montre : démarrage, pré-alerte (grille 3×3), GPS perdu, batterie faible, point marée toutes les 30 min</label></div>
+    <div class="row"><button id="testMontre">⌚ Tester la montre</button><span class="sub" id="montreInfo"></span></div>
+    <div class="sub">Dans la Suunto app, autorise les notifications de ton navigateur (Firefox). Le test envoie 4 messages à 8 s d'intervalle : note lesquels s'affichent bien.</div>
+    <div class="montre" id="apercu"><b>aperçu</b>–</div>
   </div>
 
   <h2>Mes roches (fichier de l'éditeur)</h2>
@@ -310,7 +320,9 @@ function tick() {
     const p = analysis.pre, coupe = armed ? '' : ' (alertes coupées sous ' + $('vmin').value + ' km/h)';
     if (b) message = texteMenace(b) + coupe; else if (p) message = textePre(p) + coupe;
     sonnerMenace(b, analysis.horizon, armed, p);
+    relaisPas(t, analysis, fix.course, armed, tt => niveauCourant(fix.lon, tt), true);
   }
+  if (gpsAge > 5 && fix) relaisPas(t, analysis, 0, false, tt => niveauCourant(fix.lon, tt), false);
   $('msg').textContent = message; $('msg').classList.toggle('alert', !!(analysis && analysis.best));
 }
 function frame() {
@@ -344,6 +356,10 @@ $('start').onclick = async () => {
   if ($('simMode').checked) startSim(); else startGps();
   clearInterval(tickTimer); tickTimer = setInterval(tick, 100);
   requestAnimationFrame(frame);
+  relais.actif = $('relais').checked;
+  relaisDemarrer(Date.now(), tt => niveauCourant(sim ? sim.lon : MALO.lon, tt), $('seuil').value,
+    $('live').checked && !$('liveInfo').textContent.startsWith('✓') ? '\nMaregraphe injoignable' : '');
+  surveillerBatterie();
   try { wakeLock = await navigator.wakeLock.request('screen'); }
   catch { // navigateur sans maintien d'écran : la mise en veille couperait le GPS et le son
     setTimeout(() => alert('Ce navigateur ne peut pas empêcher la mise en veille de l’écran.\nRègle la mise en veille Android sur 30 min (ou plus) avant de partir, sinon le radar s’arrêtera quand l’écran s’éteindra.'), 300);
@@ -354,7 +370,7 @@ document.addEventListener('visibilitychange', async () => {
 });
 
 // ---------- Réglages persistants ----------
-const SETTINGS = ['seuil', 'vmin', 'antic', 'preAlerte', 'smooth', 'live', 'testMode', 'testH', 'testNoL3d', 'simMode', 'simStart'];
+const SETTINGS = ['relais', 'seuil', 'vmin', 'antic', 'preAlerte', 'smooth', 'live', 'testMode', 'testH', 'testNoL3d', 'simMode', 'simStart'];
 function saveSettings() { SETTINGS.forEach(k => store.set(k, $(k).type === 'checkbox' ? $(k).checked : $(k).value)); }
 function loadSettings() { SETTINGS.forEach(k => { const v = store.get(k, null); if (v != null) $(k).type === 'checkbox' ? ($(k).checked = v) : ($(k).value = v); }); }
 function updHNow() {
@@ -365,6 +381,29 @@ function updHNow() {
 $('testH').oninput = () => $('testHTxt').textContent = (+$('testH').value).toFixed(1) + ' m';
 $('live').onchange = async () => { await recalageDirect(); updHNow(); };
 $('simMode').onchange = () => $('simStartRow').hidden = !$('simMode').checked;
+
+// ---------- Montre ----------
+surMontre = (ti, tx) => { $('apercu').innerHTML = '<b></b>'; $('apercu').firstChild.textContent = ti; $('apercu').append('\n' + tx); };
+async function droitsMontre() {
+  const p = await montrePermission();
+  $('montreInfo').textContent = p === 'granted' ? '' : p === 'absent' ? 'Notifications non disponibles dans ce navigateur.' : 'Notifications refusées : autorise-les dans les réglages du site.';
+  return p === 'granted';
+}
+$('relais').onchange = async () => { if ($('relais').checked && !(await droitsMontre())) $('relais').checked = false; saveSettings(); };
+$('testMontre').onclick = async () => { await droitsMontre(); testerMontre(); };
+let batterieVue = 100;
+async function surveillerBatterie() { // API absente de Firefox : simplement ignorée
+  if (!navigator.getBattery) return;
+  try {
+    const b = await navigator.getBattery();
+    const verif = () => {
+      const p = Math.round(b.level * 100);
+      for (const s of [20, 10]) if (p <= s && batterieVue > s && running) notifier(`BATTERIE ${p} %`, 'Pense à rentrer');
+      batterieVue = p;
+    };
+    b.onlevelchange = verif; verif();
+  } catch {}
+}
 
 // ---------- Hors ligne ----------
 const CACHE_TUILES = 'radar-tuiles', CACHE_APP = 'radar-app-v2';
