@@ -86,6 +86,7 @@
     <div class="row"><span class="grow">Alertes à partir de (km/h)</span><input type="number" id="vmin" step="1" min="0" value="8"></div>
     <div class="row"><span class="grow">Anticipation (secondes de navigation)</span><input type="number" id="antic" step="1" min="3" value="7"></div>
     <div class="row"><label><input type="checkbox" id="preAlerte" checked> Pré-alerte : danger droit devant (±10°) jusqu'à 2× la distance d'alerte</label></div>
+    <div class="row"><label><input type="checkbox" id="voix" checked> Annonces vocales : « Roche à tribord, 40 mètres » (en plus des bips)</label></div>
     <div class="row"><label><input type="checkbox" id="smooth"> Alerter aussi sur les fonds lisses (sable, vase)</label></div>
     <div class="row"><button id="testSound">🔊 Écouter les sons</button></div>
     <div class="sub">Tintement doux descendant = pré-alerte (danger droit devant, encore loin) · 1 bip grave = devant · 2 bips montants = tribord · 2 bips descendants = bâbord · les bips accélèrent en approchant · son continu = moins de 10 m · 3 bips très graves = GPS perdu.</div>
@@ -96,7 +97,7 @@
     <div class="row"><label><input type="checkbox" id="relais"> Relayer sur la montre : démarrage, pré-alerte (grille 3×3), GPS perdu, batterie faible, point marée toutes les 30 min</label></div>
     <div class="row"><span class="grow">Format des directions</span><select id="styleMontre"><option value="mots">Mots (Tribord 60)</option><option value="heures">Heures (2h 60)</option><option value="fleches">Flèches (&gt; 60)</option></select></div>
     <div class="row"><button id="testMontre">⌚ Tester la montre</button><span class="sub" id="montreInfo"></span></div>
-    <div class="sub">Le test envoie la même situation dans les 3 formats (8 s d'intervalle) : titre = danger devant, texte = autres dangers proches.</div>
+    <div class="sub">Le test envoie 5 essais (A à E, 8 s d'intervalle) pour tenter d'obtenir une grille 3×3 sur l'Ambit 3 : photographie chacun.</div>
     <div class="montre" id="apercu"><b>aperçu</b>–</div>
   </div>
 
@@ -231,7 +232,7 @@ $('geoFile').onchange = async e => {
   e.target.value = '';
 };
 
-$('testSound').onclick = demoSons;
+$('testSound').onclick = () => { demoSons(); if ($('voix').checked) setTimeout(() => parler('Roche à tribord, 40 mètres'), 5000); };
 
 // =====================================================================
 // Position : GPS ou simulation
@@ -321,6 +322,7 @@ function tick() {
     const p = analysis.pre, coupe = armed ? '' : ' (alertes coupées sous ' + $('vmin').value + ' km/h)';
     if (b) message = texteMenace(b) + coupe; else if (p) message = textePre(p) + coupe;
     sonnerMenace(b, analysis.horizon, armed, p);
+    annoncer(b, p, armed);
     relaisPas(t, analysis, fix.course, armed, tt => niveauCourant(fix.lon, tt), true);
   }
   if (gpsAge > 5 && fix) relaisPas(t, analysis, 0, false, tt => niveauCourant(fix.lon, tt), false);
@@ -357,6 +359,7 @@ $('start').onclick = async () => {
   if ($('simMode').checked) startSim(); else startGps();
   clearInterval(tickTimer); tickTimer = setInterval(tick, 100);
   requestAnimationFrame(frame);
+  voixActive = $('voix').checked; if (voixActive) parler('Radar actif'); // le premier appel doit suivre un appui
   relais.actif = $('relais').checked;
   relaisDemarrer(Date.now(), tt => niveauCourant(sim ? sim.lon : MALO.lon, tt), $('seuil').value,
     $('live').checked && !$('liveInfo').textContent.startsWith('✓') ? '\nMaregraphe injoignable' : '');
@@ -371,7 +374,7 @@ document.addEventListener('visibilitychange', async () => {
 });
 
 // ---------- Réglages persistants ----------
-const SETTINGS = ['relais', 'styleMontre', 'seuil', 'vmin', 'antic', 'preAlerte', 'smooth', 'live', 'testMode', 'testH', 'testNoL3d', 'simMode', 'simStart'];
+const SETTINGS = ['voix', 'relais', 'styleMontre', 'seuil', 'vmin', 'antic', 'preAlerte', 'smooth', 'live', 'testMode', 'testH', 'testNoL3d', 'simMode', 'simStart'];
 function saveSettings() { SETTINGS.forEach(k => store.set(k, $(k).type === 'checkbox' ? $(k).checked : $(k).value)); }
 function loadSettings() { SETTINGS.forEach(k => { const v = store.get(k, null); if (v != null) $(k).type === 'checkbox' ? ($(k).checked = v) : ($(k).value = v); }); }
 function updHNow() {

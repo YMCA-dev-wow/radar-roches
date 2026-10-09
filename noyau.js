@@ -302,7 +302,7 @@ function resumeMontre(an, course, style = styleMontre) {
   if (!devant && !autres.length) return null;
   return {
     titre: devant ? formatDirection(style, 0, devant.d, true) : 'Rien devant',
-    texte: autres.length ? autres.map(p => formatDirection(style, p.rel, p.d, false)).join(' · ') + ' m' : 'Rien autour',
+    texte: autres.length ? autres.map(p => formatDirection(style, p.rel, p.d, false)).join(', ') + ' m' : 'Rien autour',
   };
 }
 // Prochaine pleine ou basse mer (pas de 5 min, sur 13 h) ; niveau(t) donne la hauteur d'eau
@@ -318,7 +318,7 @@ function prochainExtreme(niveau, t) {
 const hhmm = t => new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 function texteMaree(niveau, t) {
   const W = niveau(t), dW = niveau(t + 600000) - W, sens = dW > 0.005 ? 'monte' : dW < -0.005 ? 'descend' : '(fixe)', e = prochainExtreme(niveau, t);
-  return { titre: `Eau ${W.toFixed(1)} m`, sens, texte: [sens, e ? `${e.type} ${hhmm(e.t)} ${e.h.toFixed(1)} m` : ''].filter(Boolean).join(' · ') };
+  return { titre: `Eau ${W.toFixed(1)} m`, sens, texte: [sens, e ? `${e.type} ${hhmm(e.t)} ${e.h.toFixed(1)} m` : ''].filter(Boolean).join(', ') };
 }
 // Relais pendant la navigation : démarrage, pré-alerte, pannes GPS, point marée toutes les 30 min
 const relais = { actif: false, preVu: -1e15, lastPre: -1e15, lastMaree: 0, gpsOk: true };
@@ -326,7 +326,7 @@ function relaisDemarrer(t, niveau, seuil, extra = '') {
   Object.assign(relais, { preVu: -1e15, lastPre: -1e15, lastMaree: t, gpsOk: true });
   if (!relais.actif) return;
   const m = texteMaree(niveau, t);
-  notifier('Radar actif', `${m.titre} · ${m.texte} · seuil ${seuil} m${extra}`);
+  notifier('Radar actif', `${m.titre}, ${m.texte}, seuil ${seuil} m${extra}`);
 }
 function relaisPas(t, an, course, armed, niveau, gpsOk = true) {
   if (!relais.actif) return;
@@ -345,12 +345,40 @@ function relaisPas(t, an, course, armed, niveau, gpsOk = true) {
   }
   if (t - relais.lastMaree >= 30 * 60000) { const m = texteMaree(niveau, t); notifier(m.titre, m.texte); relais.lastMaree = t; }
 }
-// Essais : même situation (danger à 98 m devant, 60 m à tribord avant, 120 m à bâbord) dans les 3 formats
+// Essais (série 2) : forcer une grille 3×3 alors que l'Ambit 3 ignore « \n ». Situation : danger devant (98 m) et à tribord avant.
+// A, B : autres caractères de fin de ligne ; C, D : lignes de la grille rendues insécables et assez longues pour que
+// la montre coupe entre elles ; E : mesure du nombre de caractères par ligne.
 function testerMontre() {
-  const ex = [{ rel: 40, d: 60 }, { rel: -95, d: 120 }];
-  ['mots', 'heures', 'fleches'].forEach((st, i) => setTimeout(() => notifier(
-    formatDirection(st, 0, 98, true),
-    ex.map(p => formatDirection(st, p.rel, p.d, false)).join(' · ') + ' m'), i * 8000));
+  const NB = '\u00a0';
+  const essais = [
+    ['Essai A', 'O X X\r\nO 98 O\r\nO O O'],
+    ['Essai B', 'O X X\u2028O 98 O\u2028O O O'],
+    ['Essai C', ['O', 'X', 'X'].join(NB + NB) + ' ' + ['O', '98', 'O'].join(NB + NB) + ' ' + ['O', 'O', 'O'].join(NB + NB)],
+    ['Essai D', 'O__X__X O__98__O O__O__O'],
+    ['Essai E', '1234567890ABCDEFGHIJ1234567890'],
+  ];
+  essais.forEach(([ti, tx], i) => setTimeout(() => notifier(ti, tx), i * 8000));
+}
+
+// =====================================================================
+// Voix : annonce de la direction et de la distance (synthèse vocale du téléphone)
+// =====================================================================
+let voixActive = false, derniereVoix = { t: 0, cle: '' };
+function parler(txt) {
+  if (!('speechSynthesis' in window)) return false;
+  const u = new SpeechSynthesisUtterance(txt); u.lang = 'fr-FR'; u.rate = 1.2; u.volume = 1;
+  speechSynthesis.cancel(); speechSynthesis.speak(u); return true;
+}
+// Annonce à chaque nouvelle menace ou changement de côté, puis rappel toutes les 5 s avec la distance à jour
+function annoncer(b, pre, armed, now = Date.now()) {
+  if (!voixActive || muted || !armed || !(b || pre)) { if (!(b || pre)) derniereVoix.cle = ''; return; }
+  const m = b || pre, cote = !b || Math.abs(b.rel) < 15 ? 'devant' : b.rel > 0 ? 'à tribord' : 'à bâbord';
+  const cle = (b ? 'A' : 'P') + cote;
+  if (b && b.d < 10) return;                           // le son continu prend le relais
+  if (cle === derniereVoix.cle && now - derniereVoix.t < 5000) return;
+  const d = m.d >= 30 ? Math.round(m.d / 10) * 10 : Math.round(m.d);
+  parler(`${m.lvl === 3 ? 'Roche' : 'Haut-fond'} ${cote}, ${d} mètres`);
+  derniereVoix = { t: now, cle };
 }
 
 // =====================================================================
