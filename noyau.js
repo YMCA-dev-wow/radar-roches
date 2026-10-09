@@ -125,19 +125,23 @@ function lireMesRoches(gj) {
 // opts : { seuil, smooth, useL3d, inclTest, antic, roches, affichage, preAlerte }
 // Renvoie la menace principale (alerte : cône ±50°, distance d'alerte), la pré-alerte (cône ±10°, jusqu'à 2× la distance
 // d'alerte) et, si affichage, les cellules dangereuses autour de la position.
-const CONE_ALERTE = 50, CONE_PRE = 10;
+const CONE_ALERTE = 50, CONE_PRE = 10, VEILLE_MAX = 110; // veille latérale : jusqu'à 110° de part et d'autre du cap
 function analyser(pos, course, speed, W, opts) {
-  const { seuil, smooth, useL3d, inclTest, antic, roches = [], affichage = true, preAlerte = false } = opts;
+  const { seuil, smooth, useL3d, inclTest, antic, roches = [], affichage = true, preAlerte = false, veille = false } = opts;
   const horizon = Math.max(40, speed * antic);                                   // distance d'alerte (m)
   const preH = preAlerte ? 2 * horizon : 0;                                      // distance de pré-alerte (m)
-  const R = affichage ? Math.min(300, Math.max(120, horizon * 1.6, preH * 1.1)) : Math.max(horizon, preH); // rayon de lecture
+  const latH = veille ? 2 * horizon : 0;                                         // portée de la veille latérale (m)
+  const R = affichage ? Math.min(300, Math.max(120, horizon * 1.6, preH * 1.1, latH * 1.1)) : Math.max(horizon, preH, latH); // rayon de lecture
   const mpp = mPerPx(pos.lat), [px, py] = toPx(pos.lat, pos.lon);
   const rp = Math.ceil(R / mpp);
   const cells = [];                                                              // [dx, dy, niveau] en mètres, est/sud positifs
-  let best = null, pre = null;
+  let best = null, pre = null, lat = null;
   const consider = (dx, dy, lvl, d) => {
     let rel = Math.atan2(dx, -dy) * 180 / Math.PI - course; rel = ((rel + 540) % 360) - 180;
     if (preH && d > horizon && d <= preH && Math.abs(rel) <= CONE_PRE && (!pre || d < pre.d)) pre = { d, rel, lvl };
+    // veille : tout danger à portée (2× la distance d'alerte) jusqu'à 110°, sauf ce que couvrent déjà l'alerte et la pré-alerte
+    const a = Math.abs(rel), couvert = (a <= CONE_ALERTE && d <= horizon) || (preH && a <= CONE_PRE);
+    if (latH && d <= latH && a <= VEILLE_MAX && !couvert && (!lat || d < lat.d)) lat = { d, rel, lvl };
     const inCone = Math.abs(rel) <= CONE_ALERTE || (d < 20 && Math.abs(rel) <= 110); // proche : devant et côtés, pas derrière
     if (!inCone || d > horizon) return;
     const score = d / Math.max(0.35, Math.cos(Math.min(Math.abs(rel), 80) * Math.PI / 180)) - lvl * 3;
@@ -186,7 +190,7 @@ function analyser(pos, course, speed, W, opts) {
       if (lvl >= 2) consider(n.x, n.y, lvl, n.d);
     }
   }
-  return { cells, zones, best, pre, horizon, preH, R };
+  return { cells, zones, best, pre, lat, horizon, preH, latH, R };
 }
 function nearestOnPoly(pts) { // point du polygone le plus proche de l'origine (0 si dedans)
   let inside = false, bd = Infinity, bx = 0, by = 0;
@@ -232,7 +236,7 @@ function tintement(t) { tone(1760, 1760, t, 0.22, 0.8, 'triangle'); tone(1320, 1
 function gpsPerdu(t) { [0, 0.25, 0.5].forEach(s => tone(260, 260, t + s, 0.15)); }
 function demoSons() {
   const t = audio().currentTime + 0.1;
-  tintement(t); motif(0, 2, t + 1.0); motif(40, 2, t + 1.8); motif(-40, 2, t + 2.6); motif(0, 3, t + 3.4); gpsPerdu(t + 4.2);
+  tintement(t); sonVeille('tribord', t + 0.6); motif(0, 2, t + 1.6); motif(40, 2, t + 1.8); motif(-40, 2, t + 2.6); motif(0, 3, t + 3.4); gpsPerdu(t + 4.2);
 }
 // Joue l'alerte correspondant à la menace b, sinon la pré-alerte pre (appelé à chaque pas) ; armed = vitesse suffisante.
 // Bips désactivables ; pas de bip pendant que la voix parle, sauf sous 10 m où le son continu coupe la voix.
@@ -281,7 +285,30 @@ async function notifier(titre, texte) {
 // Résumé pour l'écran de l'Ambit 3 (essais du 2026-10-09) : texte seul, retours à la ligne ignorés, police à chasse variable,
 // pas de flèches Unicode, titre ≈ 13 caractères, corps ≈ 3 lignes de 14-16 caractères.
 // Titre = danger droit devant ; corps = les autres dangers proches, par direction, du plus proche au plus loin.
-let styleMontre = 'mots'; // 'mots' | 'heures' | 'fleches'
+let styleMontre = 'grille'; // 'grille' | 'mots' | 'heures' | 'fleches'
+// Grille 3×3 (essai D validé sur l'Ambit 3) : chaque ligne est un « mot » sans espace, liée par des « _ », pour que la montre
+// passe à la ligne entre les lignes. Haut = devant ; X = danger dans ce secteur de 45° ; centre = distance du plus proche.
+const SECTEUR_CASE = [[0, 1], [0, 2], [1, 2], [2, 2], [2, 1], [2, 0], [1, 0], [0, 0]];
+function grilleAmbit(an, course) {
+  const lim = Math.max(an.preH || 0, an.latH || 0, 2 * an.horizon), g = [['O', 'O', 'O'], ['O', '', 'O'], ['O', 'O', 'O']];
+  let dmin = Infinity;
+  const ajoute = (dx, dy) => {
+    const d = Math.hypot(dx, dy); if (d > lim) return;
+    let rel = Math.atan2(dx, -dy) * 180 / Math.PI - course; rel = ((rel + 540) % 360) - 180;
+    const [r, c] = SECTEUR_CASE[((Math.round(rel / 45) % 8) + 8) % 8];
+    g[r][c] = 'X'; dmin = Math.min(dmin, d);
+  };
+  const c = an.cells;
+  for (let i = 0; i < c.length; i += 3) if (c[i + 2] >= 2) ajoute(c[i], c[i + 1]);
+  for (const z of an.zones) if (z.lvl >= 2 && !z.pts) ajoute(z.dx, z.dy);
+  if (!isFinite(dmin)) return null;
+  const n = String(Math.round(dmin)), sep = n.length >= 3 ? '_' : '__';  // 3 chiffres : un seul « _ » pour tenir en largeur
+  return {
+    titre: an.pre ? 'Pré-alerte' : an.best ? 'Alerte' : 'Dangers',
+    texte: [g[0].join('__'), [g[1][0], n, g[1][2]].join(sep), g[2].join('__')].join(' '),
+    lignes: 3,
+  };
+}
 const MOTS = ['Devant', 'Av. trib.', 'Tribord', 'Ar. trib.', 'Derrière', 'Ar. bâb.', 'Bâbord', 'Av. bâb.'];
 const FLECHES = ['^', '^>', '>', 'v>', 'v', '<v', '<', '<^'];
 function formatDirection(style, rel, d, titre) {
@@ -292,6 +319,7 @@ function formatDirection(style, rel, d, titre) {
 }
 function resumeMontre(an, course, style = styleMontre) {
   if (!an) return null;
+  if (style === 'grille') return grilleAmbit(an, course);
   const lim = an.preH || 2 * an.horizon, nb = style === 'heures' ? 12 : 8, pas = 360 / nb;
   const proches = new Array(nb).fill(null);               // danger le plus proche par secteur
   const ajoute = (dx, dy) => {
@@ -344,7 +372,7 @@ function relaisPas(t, an, course, armed, niveau, gpsOk = true) {
     const nouveau = t - relais.preVu > 10000;          // le danger avait disparu depuis 10 s
     if ((nouveau || t - relais.lastPre > 30000) && t - relais.lastPre > 15000) {
       const r = resumeMontre(an, course);
-      notifier(r ? r.titre : formatDirection(styleMontre, 0, an.pre.d, true), r ? r.texte : 'Rien autour');
+      notifier(r ? (styleMontre === 'grille' ? `${Math.round(an.pre.d)} m devant` : r.titre) : formatDirection(styleMontre, 0, an.pre.d, true), r ? r.texte : 'Rien autour');
       relais.lastPre = t;
     }
     relais.preVu = t;
@@ -355,13 +383,10 @@ function relaisPas(t, an, course, armed, niveau, gpsOk = true) {
 // A, B : autres caractères de fin de ligne ; C, D : lignes de la grille rendues insécables et assez longues pour que
 // la montre coupe entre elles ; E : mesure du nombre de caractères par ligne.
 function testerMontre() {
-  const NB = '\u00a0';
   const essais = [
-    ['Essai A', 'O X X\r\nO 98 O\r\nO O O'],
-    ['Essai B', 'O X X\u2028O 98 O\u2028O O O'],
-    ['Essai C', ['O', 'X', 'X'].join(NB + NB) + ' ' + ['O', '98', 'O'].join(NB + NB) + ' ' + ['O', 'O', 'O'].join(NB + NB)],
-    ['Essai D', 'O__X__X O__98__O O__O__O'],
-    ['Essai E', '1234567890ABCDEFGHIJ1234567890'],
+    ['98 m devant', 'O__X__X O__98__O O__O__O'],
+    ['120 m devant', 'X__X__O X_120_O O__O__O'],
+    ['Roches tribord', '60 m, veille latérale'],
   ];
   essais.forEach(([ti, tx], i) => setTimeout(() => notifier(ti, tx), i * 8000));
 }
@@ -376,6 +401,24 @@ function parler(txt) {
   speechSynthesis.cancel(); speechSynthesis.speak(u); return true;
 }
 // Annonce à chaque nouvelle menace ou changement de côté, puis rappel toutes les 5 s avec la distance à jour
+// Veille latérale : une annonce par côté quand des dangers y apparaissent (absents depuis 20 s), si aucune alerte n'est en cours
+function nouvelleVeille(etat, an, armed, t) {
+  if (!an || !an.lat || !armed) return null;
+  const cote = an.lat.rel > 0 ? 'tribord' : 'bâbord', nouveau = t - (etat[cote] ?? -1e15) > 20000;
+  etat[cote] = t;
+  return nouveau && !an.best ? { cote, d: an.lat.d, lvl: an.lat.lvl } : null;
+}
+function sonVeille(cote, t) { // glissando doux et grave : montant = tribord, descendant = bâbord
+  const [a, b] = cote === 'tribord' ? [380, 620] : [620, 380];
+  tone(a, b, t, 0.35, 0.7, 'sine'); tone(a, b, t + 0.45, 0.35, 0.7, 'sine');
+}
+function annoncerVeille(v) {
+  if (!v || muted) return;
+  const d = v.d >= 30 ? Math.round(v.d / 10) * 10 : Math.round(v.d);
+  if (voixActive) { if (!voixEnCours()) parler(`${v.lvl === 3 ? 'Roches' : 'Hauts-fonds'} à ${v.cote}, ${d} mètres`); }
+  else if (bipsActifs) sonVeille(v.cote, audio().currentTime);
+}
+function texteVeille(l) { return `${l.lvl === 3 ? 'Roches' : 'Hauts-fonds'} à ${l.rel > 0 ? 'tribord' : 'bâbord'} à ${Math.round(l.d)} m (veille)`; }
 function annoncer(b, pre, armed, now = Date.now()) {
   if (!voixActive || muted || !armed || !(b || pre)) { if (!(b || pre)) derniereVoix.cle = ''; return; }
   const m = b || pre, cote = !b || Math.abs(b.rel) < 15 ? 'devant' : b.rel > 0 ? 'à tribord' : 'à bâbord';
@@ -414,6 +457,11 @@ function drawRadar(cv, analysis, fix) {
     ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = stroke; ctx.lineWidth = 1.5 * k; ctx.stroke();
   };
   const h = analysis.horizon * sc, a = CONE_ALERTE * Math.PI / 180;
+  if (analysis.latH) for (const s of [1, -1]) { // secteurs de veille, de 10° (ou 0°) à 110° de chaque côté
+    ctx.beginPath(); ctx.moveTo(0, 0);
+    ctx.arc(0, 0, analysis.latH * sc, -Math.PI / 2 + s * (analysis.preH ? CONE_PRE : 0) * Math.PI / 180, -Math.PI / 2 + s * VEILLE_MAX * Math.PI / 180, s < 0);
+    ctx.closePath(); ctx.fillStyle = 'rgba(90,200,250,0.06)'; ctx.fill(); ctx.setLineDash([4 * k, 4 * k]); ctx.strokeStyle = 'rgba(90,200,250,0.5)'; ctx.lineWidth = k; ctx.stroke(); ctx.setLineDash([]);
+  }
   if (analysis.preH) cone(analysis.preH * sc, CONE_PRE, 'rgba(255,214,10,0.10)', 'rgba(255,214,10,0.75)');
   cone(h, CONE_ALERTE, 'rgba(61,155,240,0.12)', 'rgba(61,155,240,0.6)');
   ctx.font = `bold ${12 * k}px system-ui`; ctx.textAlign = 'center';

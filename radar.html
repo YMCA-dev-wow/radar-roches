@@ -50,6 +50,7 @@
   #sim button { padding: 10px 0; }
   #black { position: fixed; inset: 0; background: #000; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 30px; color: #333; font-size: 13px; }
   .montre { font: 15px/1.25 system-ui, sans-serif; padding: 22px; gap: 4px; overflow: hidden; background: #000; color: #e8edf3; border: 2px solid #444; border-radius: 50%; width: 150px; height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; margin: 8px auto; }
+  .montre span { white-space: pre-line; }
   .montre b { font-size: 17px; color: #ffd60a; border-bottom: 1px dotted #888; padding-bottom: 3px; }
   #lock { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
   #lockRing { width: 130px; height: 130px; border-radius: 50%; border: 3px solid #444; display: flex; align-items: center; justify-content: center; color: #666; font-size: 13px; text-align: center; padding: 10px; }
@@ -88,6 +89,7 @@
     <div class="row"><label><input type="checkbox" id="preAlerte" checked> Pré-alerte : danger droit devant (±10°) jusqu'à 2× la distance d'alerte</label></div>
     <div class="row"><label><input type="checkbox" id="bips" checked> Bips d'alerte (rythme selon la distance, tintement de pré-alerte)</label></div>
     <div class="row"><label><input type="checkbox" id="voix" checked> Annonces vocales : « Roche à tribord, 40 mètres » (pas de bip pendant qu'elle parle)</label></div>
+    <div class="row"><label><input type="checkbox" id="veille" checked> Veille latérale : annonce une fois les dangers proches hors de ta route (jusqu'à 110° de chaque côté), avant une manœuvre</label></div>
     <div class="row"><label><input type="checkbox" id="smooth"> Alerter aussi sur les fonds lisses (sable, vase)</label></div>
     <div class="row"><button id="testSound">🔊 Écouter les sons</button></div>
     <div class="sub">Tintement doux descendant = pré-alerte (danger droit devant, encore loin) · 1 bip grave = devant · 2 bips montants = tribord · 2 bips descendants = bâbord · les bips accélèrent en approchant · son continu = moins de 10 m · 3 bips très graves = GPS perdu.</div>
@@ -96,7 +98,7 @@
   <h2>Montre (notifications)</h2>
   <div class="card">
     <div class="row"><label><input type="checkbox" id="relais"> Relayer sur la montre : démarrage, pré-alerte (grille 3×3), GPS perdu, batterie faible, point marée toutes les 30 min</label></div>
-    <div class="row"><span class="grow">Format des directions</span><select id="styleMontre"><option value="mots">Mots (Tribord 60)</option><option value="heures">Heures (2h 60)</option><option value="fleches">Flèches (&gt; 60)</option></select></div>
+    <div class="row"><span class="grow">Format des directions</span><select id="styleMontre"><option value="grille">Grille 3×3 (Ambit 3)</option><option value="mots">Mots (Tribord 60)</option><option value="heures">Heures (2h 60)</option><option value="fleches">Flèches (&gt; 60)</option></select></div>
     <div class="row"><button id="testMontre">⌚ Tester la montre</button><span class="sub" id="montreInfo"></span></div>
     <div class="sub">Le test envoie 5 essais (A à E, 8 s d'intervalle) pour tenter d'obtenir une grille 3×3 sur l'Ambit 3 : photographie chacun.</div>
     <div class="montre" id="apercu"><b>aperçu</b>–</div>
@@ -162,7 +164,7 @@ function niveauCourant(lon, t) {
   return $('testMode').checked ? +$('testH').value : niveauEau(lon, t);
 }
 function opts(affichage = true) {
-  return { seuil: +$('seuil').value, smooth: $('smooth').checked, antic: +$('antic').value, roches: mesRoches, affichage, preAlerte: $('preAlerte').checked,
+  return { seuil: +$('seuil').value, smooth: $('smooth').checked, antic: +$('antic').value, roches: mesRoches, affichage, preAlerte: $('preAlerte').checked, veille: $('veille').checked,
     useL3d: !($('testMode').checked && $('testNoL3d').checked), inclTest: $('testMode').checked };
 }
 async function recalageDirect() {
@@ -321,9 +323,10 @@ function tick() {
   } else if (analysis) {
     const b = analysis.best, armed = fix.speed >= vmin;
     const p = analysis.pre, coupe = armed ? '' : ' (alertes coupées sous ' + $('vmin').value + ' km/h)';
-    if (b) message = texteMenace(b) + coupe; else if (p) message = textePre(p) + coupe;
+    if (b) message = texteMenace(b) + coupe; else if (p) message = textePre(p) + coupe; else if (analysis.lat) message = texteVeille(analysis.lat) + coupe;
     sonnerMenace(b, analysis.horizon, armed, p);
     annoncer(b, p, armed);
+    annoncerVeille(nouvelleVeille(veilleEtat, analysis, armed, t));
     relaisPas(t, analysis, fix.course, armed, tt => niveauCourant(fix.lon, tt), true);
   }
   if (gpsAge > 5 && fix) relaisPas(t, analysis, 0, false, tt => niveauCourant(fix.lon, tt), false);
@@ -375,7 +378,8 @@ document.addEventListener('visibilitychange', async () => {
 });
 
 // ---------- Réglages persistants ----------
-const SETTINGS = ['bips', 'voix', 'relais', 'styleMontre', 'seuil', 'vmin', 'antic', 'preAlerte', 'smooth', 'live', 'testMode', 'testH', 'testNoL3d', 'simMode', 'simStart'];
+const veilleEtat = {};
+const SETTINGS = ['veille', 'bips', 'voix', 'relais', 'styleMontre', 'seuil', 'vmin', 'antic', 'preAlerte', 'smooth', 'live', 'testMode', 'testH', 'testNoL3d', 'simMode', 'simStart'];
 function saveSettings() { SETTINGS.forEach(k => store.set(k, $(k).type === 'checkbox' ? $(k).checked : $(k).value)); }
 function loadSettings() { SETTINGS.forEach(k => { const v = store.get(k, null); if (v != null) $(k).type === 'checkbox' ? ($(k).checked = v) : ($(k).value = v); }); }
 function updHNow() {
@@ -388,7 +392,7 @@ $('live').onchange = async () => { await recalageDirect(); updHNow(); };
 $('simMode').onchange = () => $('simStartRow').hidden = !$('simMode').checked;
 
 // ---------- Montre ----------
-surMontre = (ti, tx) => { $('apercu').innerHTML = '<b></b><span></span>'; $('apercu').firstChild.textContent = ti; $('apercu').lastChild.textContent = tx; };
+surMontre = (ti, tx) => { $('apercu').innerHTML = '<b></b><span></span>'; $('apercu').firstChild.textContent = ti; $('apercu').lastChild.textContent = /__/.test(tx) ? tx.replace(/ /g, '\n') : tx; };
 async function droitsMontre() {
   const p = await montrePermission();
   $('montreInfo').textContent = p === 'granted' ? '' : p === 'absent' ? 'Notifications non disponibles dans ce navigateur.' : 'Notifications refusées : autorise-les dans les réglages du site.';
