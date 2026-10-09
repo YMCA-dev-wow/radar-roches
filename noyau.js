@@ -398,11 +398,9 @@ function relaisPas(t, an, course, armed, niveau, gpsOk = true, etat = relais, en
     etat.preVu = t;
     if (an.best) etat.alerteVu = t;
   }
-  // suivi : un danger change de secteur -> nouvelle grille (au plus toutes les 5 s) ; plus rien autour -> « Dégagé »
-  if (etat.suivi && t - etat.lastPre >= 5000) {
-    if (!g) { envoyer('Dégagé', 'Plus de danger proche', t); Object.assign(etat, { suivi: false, sig: '', lastPre: t }); }
-    else if (g.sig !== etat.sig) envoiGrille();
-  }
+  // suivi : un danger change de secteur -> nouvelle grille (au plus toutes les 5 s) ; plus rien autour -> fin du suivi, sans message
+  if (etat.suivi && !g) Object.assign(etat, { suivi: false, sig: '' });
+  else if (etat.suivi && t - etat.lastPre >= 5000 && g.sig !== etat.sig) envoiGrille();
 }
 // Essais d'affichage sur la montre : grille à 2 et 3 chiffres, message de veille
 function testerMontre() {
