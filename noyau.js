@@ -291,12 +291,12 @@ let styleMontre = 'grille'; // 'grille' | 'mots' | 'heures' | 'fleches'
 const SECTEUR_CASE = [[0, 1], [0, 2], [1, 2], [2, 2], [2, 1], [2, 0], [1, 0], [0, 0]];
 function grilleAmbit(an, course) {
   const lim = Math.max(an.preH || 0, an.latH || 0, 2 * an.horizon), g = [['O', 'O', 'O'], ['O', '', 'O'], ['O', 'O', 'O']];
-  let dmin = Infinity;
+  let dmin = Infinity, relMin = 0;
   const ajoute = (dx, dy) => {
     const d = Math.hypot(dx, dy); if (d > lim) return;
     let rel = Math.atan2(dx, -dy) * 180 / Math.PI - course; rel = ((rel + 540) % 360) - 180;
     const [r, c] = SECTEUR_CASE[((Math.round(rel / 45) % 8) + 8) % 8];
-    g[r][c] = 'X'; dmin = Math.min(dmin, d);
+    g[r][c] = 'X'; if (d < dmin) { dmin = d; relMin = rel; }
   };
   const c = an.cells;
   for (let i = 0; i < c.length; i += 3) if (c[i + 2] >= 2) ajoute(c[i], c[i + 1]);
@@ -306,7 +306,7 @@ function grilleAmbit(an, course) {
   return {
     titre: an.pre ? 'Pré-alerte' : an.best ? 'Alerte' : 'Dangers',
     texte: [g[0].join('__'), [g[1][0], n, g[1][2]].join(sep), g[2].join('__')].join(' '),
-    lignes: 3,
+    lignes: 3, sig: g.flat().join(''), dmin, rel: relMin,
   };
 }
 const MOTS = ['Devant', 'Av. trib.', 'Tribord', 'Ar. trib.', 'Derrière', 'Ar. bâb.', 'Bâbord', 'Av. bâb.'];
@@ -350,27 +350,25 @@ function prochainExtreme(niveau, t) {
   return null;
 }
 const hhmm = t => new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-function texteMaree(niveau, t) {
-  const W = niveau(t), dW = niveau(t + 600000) - W, sens = dW > 0.005 ? 'monte' : dW < -0.005 ? 'descend' : '(fixe)', e = prochainExtreme(niveau, t);
-  return { titre: `Eau ${W.toFixed(1)} m`, sens, texte: [sens, e ? `${e.type} ${hhmm(e.t)} ${e.h.toFixed(1)} m` : ''].filter(Boolean).join(', ') };
-}
-// Relais pendant la navigation : démarrage, pré-alerte, pannes GPS, point marée toutes les 30 min
-const relais = { actif: false, preVu: -1e15, lastPre: -1e15, lastMaree: 0, gpsOk: true };
+// Relais pendant la navigation : démarrage (sens de la marée, prochaine PM/BM, seuil), dangers et leur déplacement, pannes GPS
+const relais = { actif: false, preVu: -1e15, lastPre: -1e15 };
 // etat et envoyer sont paramétrables pour que le rejeu puisse simuler les envois (marqueurs sur la frise)
 function relaisDemarrer(t, niveau, seuil, extra = '', etat = relais, envoyer = notifier) {
-  Object.assign(etat, { preVu: -1e15, lastPre: -1e15, alerteVu: -1e15, lastMaree: t, perduDepuis: null, perduEnvoye: false });
+  Object.assign(etat, { preVu: -1e15, lastPre: -1e15, alerteVu: -1e15, perduDepuis: null, perduEnvoye: false, suivi: false, sig: '' });
   if (!etat.actif) return;
-  const m = texteMaree(niveau, t);
-  envoyer('Radar actif', `${m.titre}, ${m.texte}, seuil ${seuil} m${extra}`, t);
+  const W = niveau(t), dW = niveau(t + 600000) - W, e = prochainExtreme(niveau, t);
+  const sens = dW > 0.005 ? 'Montante' : dW < -0.005 ? 'Descendante' : 'Hauteur forcée';
+  envoyer('Radar actif', [sens, e ? `${e.type} ${hhmm(e.t)}` : '', `seuil ${seuil} m`].filter(Boolean).join(', ') + extra, t);
 }
-// Grille envoyée à la montre pour tout danger signalé (pré-alerte, alerte, veille latérale) :
-// à chaque nouvel épisode (rien depuis 10 s), puis rappel toutes les 30 s tant qu'un danger est sur la route ; jamais moins de 15 s d'écart.
+// Grille envoyée à la montre pour tout danger signalé (pré-alerte, alerte, veille latérale) : à chaque nouvel épisode
+// (rien depuis 10 s), rappel toutes les 30 s tant qu'un danger est sur la route, et à chaque changement de secteur (suivi) ;
+// jamais deux envois à moins de 5 s.
 const dangerSignale = an => !!an && !!(an.pre || an.best || an.lat);
 // Une alerte qui (re)commence après 5 s sans alerte (ex. après un empannage) part aussi tout de suite.
 function prePret(t, etat = relais, an = null) {
   const nouveau = t - etat.preVu > 10000, rappel = t - etat.lastPre > 30000 && !!an && !!(an.pre || an.best);
   const nouvelleAlerte = !!an && !!an.best && t - (etat.alerteVu ?? -1e15) > 5000;
-  return (nouveau || rappel || nouvelleAlerte) && t - etat.lastPre > 15000;
+  return (nouveau || rappel || nouvelleAlerte) && t - etat.lastPre >= 5000;
 }
 function relaisPas(t, an, course, armed, niveau, gpsOk = true, etat = relais, envoyer = notifier) {
   if (!etat.actif) return;
@@ -382,21 +380,31 @@ function relaisPas(t, an, course, armed, niveau, gpsOk = true, etat = relais, en
   }
   if (etat.perduEnvoye) envoyer('GPS retrouvé', 'Radar de nouveau actif', t);
   etat.perduDepuis = null; etat.perduEnvoye = false;
-  if (dangerSignale(an) && armed) {
-    if (prePret(t, etat, an)) {
-      const ref = an.best || an.pre || an.lat, r = resumeMontre(an, course);
-      const cote = Math.abs(ref.rel) < 15 ? 'devant' : ref.rel > 0 ? 'tribord' : 'bâbord';
-      envoyer(styleMontre === 'grille' || !r ? `${Math.round(ref.d)} m ${cote}` : r.titre, r ? r.texte : 'Rien autour', t);
-      etat.lastPre = t;
-    }
+  if (!armed) { // à l'arrêt plus de 20 s (chute, pause) : fin du suivi, sans message
+    if (etat.lentDepuis == null) etat.lentDepuis = t;
+    if (t - etat.lentDepuis > 20000) Object.assign(etat, { suivi: false, sig: '' });
+    return;
+  }
+  etat.lentDepuis = null;
+  if (!an) return;
+  const g = grilleAmbit(an, course);                // secteurs occupés (signature) et danger le plus proche
+  const envoiGrille = () => {
+    const r = resumeMontre(an, course), cote = Math.abs(g.rel) < 15 ? 'devant' : g.rel > 0 ? 'tribord' : 'bâbord';
+    envoyer(styleMontre === 'grille' || !r ? `${Math.round(g.dmin)} m ${cote}` : r.titre, r ? r.texte : 'Rien autour', t);
+    etat.lastPre = t; etat.sig = g.sig; etat.suivi = true;
+  };
+  if (dangerSignale(an)) {
+    if (g && prePret(t, etat, an)) envoiGrille();
     etat.preVu = t;
     if (an.best) etat.alerteVu = t;
   }
-  if (t - etat.lastMaree >= 30 * 60000) { const m = texteMaree(niveau, t); envoyer(m.titre, m.texte, t); etat.lastMaree = t; }
+  // suivi : un danger change de secteur -> nouvelle grille (au plus toutes les 5 s) ; plus rien autour -> « Dégagé »
+  if (etat.suivi && t - etat.lastPre >= 5000) {
+    if (!g) { envoyer('Dégagé', 'Plus de danger proche', t); Object.assign(etat, { suivi: false, sig: '', lastPre: t }); }
+    else if (g.sig !== etat.sig) envoiGrille();
+  }
 }
-// Essais (série 2) : forcer une grille 3×3 alors que l'Ambit 3 ignore « \n ». Situation : danger devant (98 m) et à tribord avant.
-// A, B : autres caractères de fin de ligne ; C, D : lignes de la grille rendues insécables et assez longues pour que
-// la montre coupe entre elles ; E : mesure du nombre de caractères par ligne.
+// Essais d'affichage sur la montre : grille à 2 et 3 chiffres, message de veille
 function testerMontre() {
   const essais = [
     ['98 m devant', 'O__X__X O__98__O O__O__O'],

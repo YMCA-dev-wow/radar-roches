@@ -333,7 +333,7 @@ async function calculer() {
     p.W = hauteurAt(p);
     let an = analyser(p, p.cap, p.v, p.W, o);
     const armedP = p.v >= vmin;
-    if (dangerSignale(an) && armedP && prePret(p.t, etatR, an)) an = analyser(p, p.cap, p.v, p.W, opts(true)); // grille complète pour la notification
+    if (armedP && (dangerSignale(an) || etatR.suivi)) an = analyser(p, p.cap, p.v, p.W, opts(true)); // grille complète (suivi des secteurs)
     relaisPas(p.t, an, p.cap, armedP, niv(p.lon), true, etatR, envoi);
     p.best = an.best;
     p.lvl = niveauAlerte(p.best, p.v >= vmin);
