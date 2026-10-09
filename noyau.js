@@ -272,24 +272,38 @@ async function notifier(titre, texte) {
     new Notification(titre, { body: texte, tag: 'radar', renotify: true }); return true;
   } catch { return false; }
 }
-// Grille 3×3 vue du dessus, cap vers le haut : distance du danger le plus proche au centre, X dans les secteurs de 45° où il y a un danger
-const SECTEUR_CASE = [[0, 1], [0, 2], [1, 2], [2, 2], [2, 1], [2, 0], [1, 0], [0, 0]]; // devant, avant-tribord, tribord… avant-bâbord
-function grilleMontre(an, course) {
+// Résumé pour l'écran de l'Ambit 3 (essais du 2026-10-09) : texte seul, retours à la ligne ignorés, police à chasse variable,
+// pas de flèches Unicode, titre ≈ 13 caractères, corps ≈ 3 lignes de 14-16 caractères.
+// Titre = danger droit devant ; corps = les autres dangers proches, par direction, du plus proche au plus loin.
+let styleMontre = 'mots'; // 'mots' | 'heures' | 'fleches'
+const MOTS = ['Devant', 'Av. trib.', 'Tribord', 'Ar. trib.', 'Derrière', 'Ar. bâb.', 'Bâbord', 'Av. bâb.'];
+const FLECHES = ['^', '^>', '>', 'v>', 'v', '<v', '<', '<^'];
+function formatDirection(style, rel, d, titre) {
+  const m = Math.round(d) + (titre ? ' m' : '');
+  if (style === 'heures') { const h = ((Math.round(rel / 30) % 12) + 12) % 12 || 12; return `${h}h ${m}`; }
+  const k = ((Math.round(rel / 45) % 8) + 8) % 8;
+  return style === 'fleches' ? `${FLECHES[k]} ${m}` : `${MOTS[k]} ${m}`;
+}
+function resumeMontre(an, course, style = styleMontre) {
   if (!an) return null;
-  const lim = an.preH || 2 * an.horizon, g = [['.', '.', '.'], ['.', '', '.'], ['.', '.', '.']];
-  let dmin = Infinity;
+  const lim = an.preH || 2 * an.horizon, nb = style === 'heures' ? 12 : 8, pas = 360 / nb;
+  const proches = new Array(nb).fill(null);               // danger le plus proche par secteur
   const ajoute = (dx, dy) => {
     const d = Math.hypot(dx, dy); if (d > lim) return;
     let rel = Math.atan2(dx, -dy) * 180 / Math.PI - course; rel = ((rel + 540) % 360) - 180;
-    const [r, c] = SECTEUR_CASE[((Math.round(rel / 45) % 8) + 8) % 8];
-    g[r][c] = 'X'; dmin = Math.min(dmin, d);
+    const k = ((Math.round(rel / pas) % nb) + nb) % nb;
+    if (!proches[k] || d < proches[k].d) proches[k] = { d, rel };
   };
   const c = an.cells;
   for (let i = 0; i < c.length; i += 3) if (c[i + 2] >= 2) ajoute(c[i], c[i + 1]);
   for (const z of an.zones) if (z.lvl >= 2 && !z.pts) ajoute(z.dx, z.dy);
-  if (!isFinite(dmin)) return null;
-  g[1][1] = String(Math.round(dmin));
-  return { dmin, texte: g.map(r => r.join(' ')).join('\n') };
+  const devant = an.pre || proches[0];
+  const autres = proches.filter((p, k) => p && k !== 0).sort((x, y) => x.d - y.d).slice(0, 3);
+  if (!devant && !autres.length) return null;
+  return {
+    titre: devant ? formatDirection(style, 0, devant.d, true) : 'Rien devant',
+    texte: autres.length ? autres.map(p => formatDirection(style, p.rel, p.d, false)).join(' · ') + ' m' : 'Rien autour',
+  };
 }
 // Prochaine pleine ou basse mer (pas de 5 min, sur 13 h) ; niveau(t) donne la hauteur d'eau
 function prochainExtreme(niveau, t) {
@@ -304,7 +318,7 @@ function prochainExtreme(niveau, t) {
 const hhmm = t => new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 function texteMaree(niveau, t) {
   const W = niveau(t), dW = niveau(t + 600000) - W, sens = dW > 0.005 ? 'monte' : dW < -0.005 ? 'descend' : '(fixe)', e = prochainExtreme(niveau, t);
-  return { titre: `MAREE ${W.toFixed(1)} m ${sens}`, texte: e ? `${e.type} ${hhmm(e.t)} : ${e.h.toFixed(1)} m` : '' };
+  return { titre: `Eau ${W.toFixed(1)} m`, sens, texte: [sens, e ? `${e.type} ${hhmm(e.t)} ${e.h.toFixed(1)} m` : ''].filter(Boolean).join(' · ') };
 }
 // Relais pendant la navigation : démarrage, pré-alerte, pannes GPS, point marée toutes les 30 min
 const relais = { actif: false, preVu: -1e15, lastPre: -1e15, lastMaree: 0, gpsOk: true };
@@ -312,34 +326,31 @@ function relaisDemarrer(t, niveau, seuil, extra = '') {
   Object.assign(relais, { preVu: -1e15, lastPre: -1e15, lastMaree: t, gpsOk: true });
   if (!relais.actif) return;
   const m = texteMaree(niveau, t);
-  notifier('RADAR ACTIF', [`Eau ${niveau(t).toFixed(1)} m ${m.titre.split(' ').pop()}`, m.texte, `Seuil ${seuil} m`].filter(Boolean).join('\n') + extra);
+  notifier('Radar actif', `${m.titre} · ${m.texte} · seuil ${seuil} m${extra}`);
 }
 function relaisPas(t, an, course, armed, niveau, gpsOk = true) {
   if (!relais.actif) return;
-  if (!gpsOk && relais.gpsOk) notifier('GPS PERDU', 'Plus de position : radar aveugle');
-  if (gpsOk && !relais.gpsOk) notifier('GPS OK', 'Position retrouvée');
+  if (!gpsOk && relais.gpsOk) notifier('GPS perdu', 'Plus de position : radar aveugle');
+  if (gpsOk && !relais.gpsOk) notifier('GPS retrouvé', 'Radar de nouveau actif');
   relais.gpsOk = gpsOk;
   if (!gpsOk) return;
   if (an && an.pre && !an.best && armed) {
     const nouveau = t - relais.preVu > 10000;          // le danger avait disparu depuis 10 s
     if ((nouveau || t - relais.lastPre > 30000) && t - relais.lastPre > 15000) {
-      const g = grilleMontre(an, course);
-      notifier(`PRE-ALERTE ${Math.round(an.pre.d)} m`, g ? g.texte : 'Danger droit devant');
+      const r = resumeMontre(an, course);
+      notifier(r ? r.titre : formatDirection(styleMontre, 0, an.pre.d, true), r ? r.texte : 'Rien autour');
       relais.lastPre = t;
     }
     relais.preVu = t;
   }
   if (t - relais.lastMaree >= 30 * 60000) { const m = texteMaree(niveau, t); notifier(m.titre, m.texte); relais.lastMaree = t; }
 }
-// Série d'essais pour juger ce que la montre sait afficher
+// Essais : même situation (danger à 98 m devant, 60 m à tribord avant, 120 m à bâbord) dans les 3 formats
 function testerMontre() {
-  const essais = [
-    ['TEST 1/4 texte', 'Pré-alerte : écueil à 85 m. Accents é è à ç ?'],
-    ['TEST 2/4 grille', '. X .\n. 85 .\n. . .'],
-    ['TEST 3/4 une ligne', '.X. | 85 | ...'],
-    ['TEST 4/4 symboles', '↑ ↗ → ↘ ↓ ↙ ← ↖ ▲ ● ×'],
-  ];
-  essais.forEach(([ti, tx], i) => setTimeout(() => notifier(ti, tx), i * 8000));
+  const ex = [{ rel: 40, d: 60 }, { rel: -95, d: 120 }];
+  ['mots', 'heures', 'fleches'].forEach((st, i) => setTimeout(() => notifier(
+    formatDirection(st, 0, 98, true),
+    ex.map(p => formatDirection(st, p.rel, p.d, false)).join(' · ') + ' m'), i * 8000));
 }
 
 // =====================================================================
