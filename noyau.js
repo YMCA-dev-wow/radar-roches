@@ -312,7 +312,7 @@ function relaisDemarrer(t, niveau, seuil, extra = '') {
   Object.assign(relais, { preVu: -1e15, lastPre: -1e15, lastMaree: t, gpsOk: true });
   if (!relais.actif) return;
   const m = texteMaree(niveau, t);
-  notifier('RADAR ACTIF', `Eau ${niveau(t).toFixed(1)} m ${m.titre.split(' ').pop()}\n${m.texte}\nSeuil ${seuil} m${extra}`);
+  notifier('RADAR ACTIF', [`Eau ${niveau(t).toFixed(1)} m ${m.titre.split(' ').pop()}`, m.texte, `Seuil ${seuil} m`].filter(Boolean).join('\n') + extra);
 }
 function relaisPas(t, an, course, armed, niveau, gpsOk = true) {
   if (!relais.actif) return;
