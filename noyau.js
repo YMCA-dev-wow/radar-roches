@@ -92,11 +92,17 @@ async function lireMaregraphe(debut, fin, pasMin = 10) {
 // =====================================================================
 let meta = null;
 const tiles = new Map(); // 'x/y' -> Uint8ClampedArray | null | Promise
+// chargementEnAttente : fichiers pas encore reçus (affichés par le diagnostic si le chargement traîne)
+const chargementEnAttente = new Set();
 async function chargerDonnees() {
+  const lire = (f, type) => {
+    chargementEnAttente.add(f);
+    return fetch(f).then(r => { if (!r.ok) throw new Error(f + ' : HTTP ' + r.status); return r[type](); }).finally(() => chargementEnAttente.delete(f));
+  };
   const [m, tj, tb] = await Promise.all([
-    fetch('donnees/meta.json').then(r => r.json()),
-    fetch('donnees/maree/saint_malo.json').then(r => r.json()),
-    fetch('donnees/maree/saint_malo.bin').then(r => r.arrayBuffer()),
+    lire('donnees/meta.json', 'json'),
+    lire('donnees/maree/saint_malo.json', 'json'),
+    lire('donnees/maree/saint_malo.bin', 'arrayBuffer'),
   ]);
   meta = m; meta.set = new Set(m.tuiles.map(t => t[0] + '/' + t[1]));
   tide = { t0: Date.parse(tj.debut_utc), step: tj.pas_min * 60000, h: new Int16Array(tb), info: tj };

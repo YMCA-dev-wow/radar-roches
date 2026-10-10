@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="fr">
 <head>
+<script src="diagnostic.js"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="theme-color" content="#000000">
@@ -128,6 +129,16 @@
   </div>
 
   <div class="sub" style="margin-top:16px" id="dataInfo">Chargement des données…</div>
+  <div class="sub" style="margin-top:6px;font-size:11px" id="diagInfo"></div>
+  <script>
+    diagEtat().then(t => document.getElementById('diagInfo').textContent = t);
+    setTimeout(() => { // chargement anormalement long : dire ce qui manque
+      if (typeof chargementEnAttente !== 'undefined' && chargementEnAttente.size)
+        document.getElementById('dataInfo').textContent = 'Chargement bloqué sur : ' + [...chargementEnAttente].join(', ');
+      else if (typeof meta === 'undefined' || !meta)
+        document.getElementById('dataInfo').textContent += ' (le script ne s’est pas lancé : voir le bandeau rouge)';
+    }, 8000);
+  </script>
 </div>
 <div id="startBar"><button class="primary" id="start" disabled>Démarrer</button></div>
 
