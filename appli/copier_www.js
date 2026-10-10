@@ -9,5 +9,12 @@ for (const f of FICHIERS) {
   fs.copyFileSync(path.join(src, f), path.join(dst, f));
 }
 fs.cpSync(path.join(src, 'donnees', 'tuiles'), path.join(dst, 'donnees', 'tuiles'), { recursive: true });
+// bibliothèque Capacitor (registerPlugin…), chargée avant noyau.js dans les pages de l'appli seulement
+fs.copyFileSync(path.join(__dirname, 'node_modules', '@capacitor', 'core', 'dist', 'capacitor.js'), path.join(dst, 'capacitor.js'));
+for (const page of ['radar.html', 'rejeu.html']) {
+  const p = path.join(dst, page), html = fs.readFileSync(p, 'utf8');
+  if (!html.includes('<script src="noyau.js"></script>')) throw new Error(page + ' : balise noyau.js introuvable');
+  fs.writeFileSync(p, html.replace('<script src="noyau.js"></script>', '<script src="capacitor.js"></script>\n<script src="noyau.js"></script>'));
+}
 fs.writeFileSync(path.join(dst, 'version.txt'), process.env.GITHUB_RUN_NUMBER || 'locale');
 console.log('www prêt');

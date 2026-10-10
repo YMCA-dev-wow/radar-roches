@@ -131,12 +131,12 @@
   <div class="sub" style="margin-top:16px" id="dataInfo">Chargement des données…</div>
   <div class="sub" style="margin-top:6px;font-size:11px" id="diagInfo"></div>
   <script>
-    diagEtat().then(t => document.getElementById('diagInfo').textContent = t);
+    addEventListener('load', () => diagEtat().then(t => document.getElementById('diagInfo').textContent = t));
     setTimeout(() => { // chargement anormalement long : dire ce qui manque
-      if (typeof chargementEnAttente !== 'undefined' && chargementEnAttente.size)
-        document.getElementById('dataInfo').textContent = 'Chargement bloqué sur : ' + [...chargementEnAttente].join(', ');
-      else if (typeof meta === 'undefined' || !meta)
-        document.getElementById('dataInfo').textContent += ' (le script ne s’est pas lancé : voir le bandeau rouge)';
+      try {
+        if (chargementEnAttente.size) document.getElementById('dataInfo').textContent = 'Chargement bloqué sur : ' + [...chargementEnAttente].join(', ');
+        else if (!meta) document.getElementById('dataInfo').textContent += ' (échec : voir le bandeau rouge)';
+      } catch { document.getElementById('dataInfo').textContent += ' (le script ne s’est pas lancé : voir le bandeau rouge)'; }
     }, 8000);
   </script>
 </div>

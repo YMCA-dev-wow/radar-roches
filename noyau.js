@@ -5,7 +5,11 @@
 // Appli Android (Capacitor) : mêmes pages, fonctions natives quand elles existent
 // =====================================================================
 // GPS en arrière-plan (service permanent, écran éteint), notifications locales (relayées à la montre), synthèse vocale.
-const APPLI = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+// registerPlugin vient de capacitor.js (bibliothèque Capacitor), que l'appli charge avant ce fichier.
+const APPLI = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()
+  && typeof window.Capacitor.registerPlugin === 'function');
+if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform() && !APPLI)
+  setTimeout(() => { throw new Error('Appli : bibliothèque Capacitor absente (capacitor.js), fonctions natives désactivées'); });
 const Natif = APPLI ? {
   geo: window.Capacitor.registerPlugin('BackgroundGeolocation'),
   notifs: window.Capacitor.registerPlugin('LocalNotifications'),
