@@ -59,8 +59,10 @@ jobs:
           tail -n 60 "$RUNNER_TEMP/gradle.log"
           if [ $CODE -ne 0 ]; then
             # erreurs reprises en annotations (lisibles sans être connecté)
-            MSG=$(grep -E "error|Error|What went wrong|FAILED|>" "$RUNNER_TEMP/gradle.log" | grep -v "^> Task" | tail -n 25 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
-            echo "::error title=Gradle::$MSG"
+            enc() { sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}'; }
+            echo "::error title=Gradle (cause)::$(grep -A 20 'What went wrong' "$RUNNER_TEMP/gradle.log" | head -n 40 | enc)"
+            echo "::error title=Gradle (erreurs)::$(grep -E '\.java:[0-9]+|error:|Execution failed|Could not|Caused by|warning:.*deprecated' "$RUNNER_TEMP/gradle.log" | head -n 30 | enc)"
+            echo "::error title=Gradle (tâches)::$(grep -E '^> Task' "$RUNNER_TEMP/gradle.log" | tail -n 8 | enc)"
             exit $CODE
           fi
           cp "app/build/outputs/apk/$SORTIE" "$RUNNER_TEMP/radar-roches.apk"
