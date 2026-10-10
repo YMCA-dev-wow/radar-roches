@@ -16,6 +16,11 @@
   }
   window.addEventListener('error', e => afficher(`${e.message || e} @ ${(e.filename || '').split('/').pop()}:${e.lineno || ''}:${e.colno || ''}`));
   window.addEventListener('unhandledrejection', e => afficher('Promesse rejetée : ' + (e.reason && (e.reason.stack || e.reason.message) || e.reason)));
+  // Appli Android : le sélecteur de fichiers filtre par type MIME et grise les .fit, .gpx, .geojson (types inconnus).
+  // On retire donc le filtre (sauf images) : tous les fichiers sont sélectionnables, la page vérifie le format.
+  if (window.androidBridge) document.addEventListener('DOMContentLoaded', () => {
+    for (const i of document.querySelectorAll('input[type=file][accept]')) if (!/^image\//.test(i.accept)) i.removeAttribute('accept');
+  });
   window.diagEtat = async function () {
     const C = window.Capacitor;
     let version = 'web';
