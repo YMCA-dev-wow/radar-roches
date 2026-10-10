@@ -80,7 +80,8 @@ async function lireMaregraphe(debut, fin, pasMin = 10) {
   const out = [];
   for (let a = debut; a < fin; a += 30 * 86400e3) {
     const b = Math.min(fin, a + 30 * 86400e3);
-    const r = await fetch(`https://services.data.shom.fr/maregraphie/observation/json/410?sources=1&dtStart=${iso(a)}&dtEnd=${iso(b)}&interval=${pasMin}`);
+    const r = await fetch(`https://services.data.shom.fr/maregraphie/observation/json/410?sources=1&dtStart=${iso(a)}&dtEnd=${iso(b)}&interval=${pasMin}`,
+      { signal: AbortSignal.timeout(10000) }); // sans réseau : abandon au bout de 10 s
     for (const m of (await r.json()).data) if (m.value != null) out.push({ t: Date.parse(m.timestamp.replace(/\//g, '-').replace(' ', 'T') + 'Z'), h: m.value });
   }
   return out;

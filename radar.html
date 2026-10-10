@@ -60,6 +60,7 @@
 
 <!-- ================= Réglages ================= -->
 <div id="setup">
+  <a href="index.html" style="color:var(--accent);text-decoration:none;font-size:14px">← Accueil</a>
   <h1>Radar roches</h1>
   <div class="sub">Alerte sonore à l'approche des roches et hauts-fonds, selon la marée. Relevé Litto3D (Shom – IGN). <b>Ne remplace pas ta vigilance.</b></div>
 
@@ -420,7 +421,7 @@ function longPress(el, ms, fn) {
 longPress($('black'), 1200, () => { $('black').hidden = true; });
 longPress($('lock'), 2000, () => { $('lock').hidden = true; });
 $('bStop').onclick = () => {
-  running = false; continu(false); clearInterval(tickTimer);
+  running = false; window.radarEnCours = false; continu(false); clearInterval(tickTimer);
   stopGps(); sim = null; $('sim').hidden = true;
   if (APPLI) Natif.veille.liberer().catch(() => {});
   if (wakeLock) wakeLock.release().catch(() => {}); wakeLock = null;
@@ -430,7 +431,7 @@ $('start').onclick = async () => {
   saveSettings();
   audio();
   $('setup').hidden = true; $('startBar').hidden = true; $('run').hidden = false; resize();
-  fix = null; lastFixes = []; analysis = null; last = null; running = true;
+  fix = null; lastFixes = []; analysis = null; last = null; running = true; window.radarEnCours = true;
   if ($('simMode').checked) startSim(); else startGps();
   clearInterval(tickTimer); tickTimer = setInterval(tick, 100);
   requestAnimationFrame(frame);
@@ -490,7 +491,7 @@ async function surveillerBatterie() { // API absente de Firefox : simplement ign
 // ---------- Hors ligne ----------
 const CACHE_TUILES = 'radar-tuiles', CACHE_APP = 'radar-app-v2';
 if ('serviceWorker' in navigator && !APPLI) navigator.serviceWorker.register('sw.js').catch(() => {});
-if (APPLI) $('offline').closest('.card').innerHTML = '<div class="sub">Appli : toute la zone est déjà dans l’appli, rien à télécharger.</div>';
+if (APPLI) { const c = $('offline').closest('.card'); c.hidden = true; c.insertAdjacentHTML('afterend', '<div class="card sub">Appli : toute la zone est déjà dans l’appli, rien à télécharger.</div>'); }
 async function offlineCount() {
   if (!meta || !('caches' in window)) return;
   try {
@@ -525,8 +526,8 @@ $('offline').onclick = async () => {
   try {
     await chargerDonnees(); const m = meta, tj = tide.info;
     $('dataInfo').textContent = `${m.tuiles.length} tuiles Litto3D · marée prédite jusqu'au ${new Date(tide.t0 + tide.h.length * tide.step).toLocaleDateString('fr-FR')} (écart-type ${tj.validation_2026.ecart_type_m} m sur 2026).`;
-    applyRecal(); await recalageDirect(); updHNow(); setInterval(updHNow, 60000);
-    $('start').disabled = false; offlineCount();
+    applyRecal(); $('start').disabled = false; offlineCount();
+    await recalageDirect(); updHNow(); setInterval(updHNow, 60000);
   } catch (err) {
     $('dataInfo').innerHTML = '<span class="err">' + (location.protocol === 'file:'
       ? 'Ouvert par double-clic : le navigateur bloque la lecture des données. Lance lancer_outils.bat (ou utilise l’adresse en ligne).'

@@ -3,6 +3,7 @@
   "appName": "Radar roches",
   "webDir": "www",
   "android": {
-    "useLegacyBridge": true
+    "useLegacyBridge": true,
+    "adjustMarginsForEdgeToEdge": "force"
   }
 }
