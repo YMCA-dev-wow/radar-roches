@@ -505,7 +505,7 @@ document.addEventListener('keydown', e => {
 function resizeRadar() { const c = $('radar'), r = c.getBoundingClientRect(), k = devicePixelRatio || 1; c.width = r.width * k; c.height = r.height * k; if (fix) drawRadar(c, analysis, fix); }
 
 // ---------- Montre ----------
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator && !APPLI) navigator.serviceWorker.register('sw.js').catch(() => {});
 async function droitsMontre() {
   const p = await montrePermission();
   $('montreInfo').textContent = p === 'granted' ? '' : p === 'absent' ? 'Notifications non disponibles dans ce navigateur.' : 'Notifications refusées : autorise-les dans les réglages du site.';

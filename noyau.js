@@ -2,6 +2,18 @@
 'use strict';
 
 // =====================================================================
+// Appli Android (Capacitor) : mêmes pages, fonctions natives quand elles existent
+// =====================================================================
+// GPS en arrière-plan (service permanent, écran éteint), notifications locales (relayées à la montre), synthèse vocale.
+const APPLI = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+const Natif = APPLI ? {
+  geo: window.Capacitor.registerPlugin('BackgroundGeolocation'),
+  notifs: window.Capacitor.registerPlugin('LocalNotifications'),
+  voix: window.Capacitor.registerPlugin('TextToSpeech'),
+  veille: window.Capacitor.registerPlugin('Veille'), // processeur gardé éveillé pendant la navigation (plugin de l'appli)
+} : null;
+
+// =====================================================================
 // Marée
 // =====================================================================
 // Références altimétriques maritimes (Shom) : NM, PMVE, BMVE au-dessus du zéro hydro local, et cote de ce zéro dans IGN69.
@@ -241,18 +253,22 @@ function demoSons() {
 // Joue l'alerte correspondant à la menace b, sinon la pré-alerte pre (appelé à chaque pas) ; armed = vitesse suffisante.
 // Bips désactivables ; pas de bip pendant que la voix parle, sauf sous 10 m où le son continu coupe la voix.
 let nextPre = 0, bipsActifs = true;
-const voixEnCours = () => 'speechSynthesis' in window && speechSynthesis.speaking;
+let parleNatif = false;
+const voixEnCours = () => APPLI ? parleNatif : 'speechSynthesis' in window && speechSynthesis.speaking;
+function taireVoix() { if (APPLI) { Natif.voix.stop().catch(() => {}); parleNatif = false; } else if ('speechSynthesis' in window) speechSynthesis.cancel(); }
 function sonnerMenace(b, horizon, armed, pre) {
   const at = audio().currentTime;
   if (b && armed && !muted) {
     if (b.d < 10) {
-      if (bipsActifs) { if (voixEnCours()) speechSynthesis.cancel(); continu(true, b.lvl === 3 ? 1400 : 1100); } else continu(false);
+      if (bipsActifs) { if (voixEnCours()) taireVoix(); continu(true, b.lvl === 3 ? 1400 : 1100); } else continu(false);
       return;
     }
     continu(false);
     if (!bipsActifs || voixEnCours()) return;
     const period = 0.18 + 1.1 * Math.min(1, b.d / horizon);
-    if (at > nextBeep) { motif(b.rel, b.lvl, at); nextBeep = at + period; }
+    if (APPLI && document.hidden) { // écran éteint : bips planifiés d'avance, au cas où le calcul ralentit
+      if (at > nextBeep - 0.3) { let tb = Math.max(nextBeep, at); while (tb < at + 1) { motif(b.rel, b.lvl, tb); tb += period; } nextBeep = tb; }
+    } else if (at > nextBeep) { motif(b.rel, b.lvl, at); nextBeep = at + period; }
     return;
   }
   continu(false);
@@ -269,12 +285,17 @@ function niveauAlerte(b, armed) {
 // =====================================================================
 let surMontre = null; // rappel (titre, texte) pour l'aperçu à l'écran
 async function montrePermission() {
+  if (APPLI) { try { const p = await Natif.notifs.requestPermissions(); return p.display === 'granted' ? 'granted' : 'denied'; } catch { return 'denied'; } }
   if (!('Notification' in window)) return 'absent';
   if (Notification.permission === 'default') await Notification.requestPermission();
   return Notification.permission;
 }
+let idNotif = 1;
 async function notifier(titre, texte) {
   if (surMontre) surMontre(titre, texte);
+  if (APPLI) {
+    try { await Natif.notifs.schedule({ notifications: [{ id: idNotif++, title: titre, body: texte }] }); return true; } catch { return false; }
+  }
   if (!('Notification' in window) || Notification.permission !== 'granted') return false;
   try {
     const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
@@ -417,6 +438,11 @@ function testerMontre() {
 // =====================================================================
 let voixActive = false, derniereVoix = { t: 0, cle: '' };
 function parler(txt) {
+  if (APPLI) {
+    taireVoix(); parleNatif = true;
+    Natif.voix.speak({ text: txt, lang: 'fr-FR', rate: 1.2, volume: 1 }).catch(() => {}).finally(() => { parleNatif = false; });
+    return true;
+  }
   if (!('speechSynthesis' in window)) return false;
   const u = new SpeechSynthesisUtterance(txt); u.lang = 'fr-FR'; u.rate = 1.2; u.volume = 1;
   speechSynthesis.cancel(); speechSynthesis.speak(u); return true;

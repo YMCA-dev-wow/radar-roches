@@ -284,9 +284,19 @@ function erreurGps(err) {
   setTimeout(() => { if (running && !sim && watchId == null) lancerSuivi(); }, 1000);
 }
 function lancerSuivi() { watchId = navigator.geolocation.watchPosition(p => recevoir(p, 'suivi'), erreurGps, GPS_OPTS); }
+let idNatif = null;
 function startGps() {
   Object.assign(gpsStats, { n: 0, depuis: Date.now(), sources: { suivi: 0, relance: 0 }, ecartHeure: null, erreur: '' });
   derniereReception = Date.now();
+  if (APPLI) { // service GPS Android : continue écran éteint (notification permanente « Radar actif »)
+    Natif.geo.addWatcher({ backgroundTitle: 'Radar roches actif', backgroundMessage: 'Surveillance des roches en cours', requestPermissions: true, stale: false, distanceFilter: 0 },
+      (loc, err) => {
+        if (err) { gpsStats.erreur = err.code === 'NOT_AUTHORIZED' ? 'accès refusé (réglages Android)' : err.message; return; }
+        recevoir({ coords: { latitude: loc.latitude, longitude: loc.longitude, accuracy: loc.accuracy, speed: loc.speed, heading: loc.bearing }, timestamp: loc.time }, 'suivi');
+        tick(); // le calcul suit chaque position, même si les minuteries ralentissent écran éteint
+      }).then(id => { idNatif = id; });
+    return;
+  }
   lancerSuivi();
   clearInterval(gpsRelance);
   let enCours = false;
@@ -297,6 +307,7 @@ function startGps() {
   }, 1000);
 }
 function stopGps() {
+  if (idNatif != null) { Natif.geo.removeWatcher({ id: idNatif }); idNatif = null; }
   if (watchId != null) navigator.geolocation.clearWatch(watchId);
   watchId = null; clearInterval(gpsRelance); gpsRelance = null;
 }
@@ -411,6 +422,7 @@ longPress($('lock'), 2000, () => { $('lock').hidden = true; });
 $('bStop').onclick = () => {
   running = false; continu(false); clearInterval(tickTimer);
   stopGps(); sim = null; $('sim').hidden = true;
+  if (APPLI) Natif.veille.liberer().catch(() => {});
   if (wakeLock) wakeLock.release().catch(() => {}); wakeLock = null;
   $('run').hidden = true; $('setup').hidden = false; $('startBar').hidden = false;
 };
@@ -427,6 +439,7 @@ $('start').onclick = async () => {
   relaisDemarrer(Date.now(), tt => niveauCourant(sim ? sim.lon : MALO.lon, tt), $('seuil').value,
     $('live').checked && !$('liveInfo').textContent.startsWith('✓') ? '\nMaregraphe injoignable' : '');
   surveillerBatterie();
+  if (APPLI) { Natif.veille.garder().catch(() => {}); if (!sim) $('msg').textContent = 'Tu peux éteindre l’écran : le radar continue.'; return; }
   try { wakeLock = await navigator.wakeLock.request('screen'); }
   catch { // navigateur sans maintien d'écran : la mise en veille couperait le GPS et le son
     setTimeout(() => alert('Ce navigateur ne peut pas empêcher la mise en veille de l’écran.\nRègle la mise en veille Android sur 30 min (ou plus) avant de partir, sinon le radar s’arrêtera quand l’écran s’éteindra.'), 300);
@@ -476,7 +489,8 @@ async function surveillerBatterie() { // API absente de Firefox : simplement ign
 
 // ---------- Hors ligne ----------
 const CACHE_TUILES = 'radar-tuiles', CACHE_APP = 'radar-app-v2';
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator && !APPLI) navigator.serviceWorker.register('sw.js').catch(() => {});
+if (APPLI) $('offline').closest('.card').innerHTML = '<div class="sub">Appli : toute la zone est déjà dans l’appli, rien à télécharger.</div>';
 async function offlineCount() {
   if (!meta || !('caches' in window)) return;
   try {

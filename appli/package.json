@@ -1,0 +1,20 @@
+{
+  "name": "radar-roches",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Radar roches : appli Android (Capacitor) autour des pages web du radar",
+  "scripts": {
+    "www": "node copier_www.js",
+    "sync": "node copier_www.js && npx cap sync android"
+  },
+  "dependencies": {
+    "@capacitor-community/background-geolocation": "1.2.26",
+    "@capacitor-community/text-to-speech": "6.1.0",
+    "@capacitor/android": "7.6.9",
+    "@capacitor/core": "7.6.9",
+    "@capacitor/local-notifications": "7.0.7"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "7.6.9"
+  }
+}

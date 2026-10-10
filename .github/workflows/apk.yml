@@ -1,0 +1,75 @@
+# Fabrique l'appli Android (APK) à chaque mise à jour et la publie à une adresse fixe :
+# https://github.com/YMCA-dev-wow/radar-roches/releases/latest/download/radar-roches.apk
+# Copié dans .github/workflows/ du dépôt par outils/preparer_site.py.
+name: APK Android
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Dépendances et pages web
+        working-directory: appli
+        run: |
+          npm ci --no-audit --no-fund
+          node copier_www.js
+          npx cap sync android
+
+      - name: Clé de signature (secrets du dépôt)
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS" ]; then
+            echo "$KS" | base64 -d > "$RUNNER_TEMP/radar.p12"
+            echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/radar.p12" >> "$GITHUB_ENV"
+          else
+            echo "::warning::Secret ANDROID_KEYSTORE_B64 absent : APK de test (signature provisoire, mises à jour impossibles sans désinstaller)"
+          fi
+
+      - name: Construction
+        working-directory: appli/android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          if [ -n "$ANDROID_KEYSTORE_FILE" ]; then
+            ./gradlew assembleRelease --no-daemon
+            cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/radar-roches.apk"
+          else
+            ./gradlew assembleDebug --no-daemon
+            cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/radar-roches.apk"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: radar-roches-apk
+          path: ${{ runner.temp }}/radar-roches.apk
+
+      - name: Publication (adresse fixe)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: appli
+          name: Radar roches – appli Android
+          body: |
+            Appli Android du radar (construction n° ${{ github.run_number }}).
+            Télécharger depuis le téléphone : https://github.com/${{ github.repository }}/releases/latest/download/radar-roches.apk
+          files: ${{ runner.temp }}/radar-roches.apk
+          make_latest: true
