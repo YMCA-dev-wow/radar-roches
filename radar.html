@@ -111,6 +111,8 @@
 
   <h2>Essais</h2>
   <div class="card">
+    <div class="row"><button id="testGps">📡 Tester le GPS (30 s)</button></div>
+    <div class="sub" id="gpsInfo">À faire à terre avant d'aller à l'eau : il faut environ 1 position par seconde.</div>
     <div class="row"><label><input type="checkbox" id="testMode"> <b>Mode test : hauteur d'eau forcée</b></label></div>
     <div class="row"><input type="range" id="testH" min="0" max="14" step="0.1" value="6"><b id="testHTxt" style="min-width:60px;text-align:right">6.0 m</b></div>
     <div class="row"><label><input type="checkbox" id="testNoL3d"> Ignorer le relevé Litto3D (essai sur un parking avec mes éléments de test)</label></div>
@@ -136,6 +138,7 @@
     <div class="stat"><b id="sGps">–</b><span>GPS (m)</span></div>
   </div>
   <div id="msg"></div>
+  <div id="gpsEtat" class="sub" style="text-align:center;font-size:11px"></div>
   <canvas id="cv"></canvas>
   <div id="sim" hidden>
     <span></span><button data-a="faster">▲</button><span></span>
@@ -259,12 +262,67 @@ function onFix(lat, lon, acc, speedGps, headingGps, t) {
   }
   fix = { lat, lon, acc, speed: speed || 0, course: course ?? (fix ? fix.course : 0), t };
 }
-function startGps() {
-  watchId = navigator.geolocation.watchPosition(
-    p => onFix(p.coords.latitude, p.coords.longitude, p.coords.accuracy, p.coords.speed, p.coords.heading, p.timestamp),
-    err => { $('msg').textContent = 'GPS : ' + err.message; },
-    { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+// GPS. Deux pièges constatés en mer (Firefox Android) :
+//  - l'heure fournie avec la position peut être décalée (horloge GPS) : on date chaque position à sa réception ;
+//  - le suivi peut ne plus rien envoyer tant qu'on ne bouge pas : on redemande la position si rien n'arrive depuis 1,2 s,
+//    et on relance le suivi après une erreur.
+const GPS_OPTS = { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 };
+const gpsStats = { n: 0, depuis: 0, sources: { suivi: 0, relance: 0 }, ecartHeure: null, erreur: '' };
+let gpsRelance = null, derniereReception = 0;
+function recevoir(p, source) {
+  const t = Date.now();
+  derniereReception = t;
+  gpsStats.n++; gpsStats.sources[source]++; gpsStats.erreur = '';
+  if (p.timestamp) gpsStats.ecartHeure = (t - p.timestamp) / 1000;
+  onFix(p.coords.latitude, p.coords.longitude, p.coords.accuracy, p.coords.speed, p.coords.heading, t);
 }
+function erreurGps(err) {
+  gpsStats.erreur = ['', 'accès refusé', 'position indisponible', 'délai dépassé'][err.code] || err.message;
+  if (err.code === 1) return; // refus : inutile d'insister
+  if (watchId != null) navigator.geolocation.clearWatch(watchId);
+  watchId = null;
+  setTimeout(() => { if (running && !sim && watchId == null) lancerSuivi(); }, 1000);
+}
+function lancerSuivi() { watchId = navigator.geolocation.watchPosition(p => recevoir(p, 'suivi'), erreurGps, GPS_OPTS); }
+function startGps() {
+  Object.assign(gpsStats, { n: 0, depuis: Date.now(), sources: { suivi: 0, relance: 0 }, ecartHeure: null, erreur: '' });
+  derniereReception = Date.now();
+  lancerSuivi();
+  clearInterval(gpsRelance);
+  let enCours = false;
+  gpsRelance = setInterval(() => {
+    if (!running || sim || enCours || Date.now() - derniereReception < 1200) return;
+    enCours = true;
+    navigator.geolocation.getCurrentPosition(p => { enCours = false; recevoir(p, 'relance'); }, e => { enCours = false; gpsStats.erreur = e.message; }, GPS_OPTS);
+  }, 1000);
+}
+function stopGps() {
+  if (watchId != null) navigator.geolocation.clearWatch(watchId);
+  watchId = null; clearInterval(gpsRelance); gpsRelance = null;
+}
+function texteGps() {
+  const s = (Date.now() - gpsStats.depuis) / 1000;
+  return `${gpsStats.n} positions en ${Math.round(s)} s (${(gpsStats.n / Math.max(1, s)).toFixed(1)}/s : ${gpsStats.sources.suivi} suivi, ${gpsStats.sources.relance} relance)` +
+    (gpsStats.ecartHeure != null ? ` · décalage horloge GPS ${gpsStats.ecartHeure.toFixed(1)} s` : '') + (gpsStats.erreur ? ` · erreur : ${gpsStats.erreur}` : '');
+}
+// Test à terre : 30 s de positions, sans lancer le radar
+$('testGps').onclick = () => {
+  const b = $('testGps'); b.disabled = true;
+  const st = { n: 0, t0: Date.now(), ecarts: [], precision: [], erreur: '', relances: 0 };
+  let last = Date.now();
+  const rec = p => { st.n++; last = Date.now(); if (p.timestamp) st.ecarts.push((Date.now() - p.timestamp) / 1000); st.precision.push(p.coords.accuracy); };
+  const id = navigator.geolocation.watchPosition(rec, e => { st.erreur = e.message; }, GPS_OPTS);
+  const relance = setInterval(() => { if (Date.now() - last > 2000) { st.relances++; navigator.geolocation.getCurrentPosition(rec, () => {}, GPS_OPTS); } }, 1000);
+  const maj = setInterval(() => {
+    const s = (Date.now() - st.t0) / 1000, moy = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : NaN;
+    $('gpsInfo').textContent = `${Math.round(s)} s : ${st.n} positions (${(st.n / s).toFixed(1)}/s), précision ${Math.round(moy(st.precision)) || '–'} m` +
+      (st.ecarts.length ? `, décalage horloge ${moy(st.ecarts).toFixed(1)} s` : '') + (st.relances ? `, ${st.relances} relance(s)` : '') + (st.erreur ? `, erreur : ${st.erreur}` : '');
+    if (s >= 30) {
+      clearInterval(maj); clearInterval(relance); navigator.geolocation.clearWatch(id); b.disabled = false;
+      $('gpsInfo').textContent += st.n >= 20 ? ' ✓ GPS OK' : ' ✗ trop peu de positions : vérifie la localisation précise dans Android et les autorisations de Firefox';
+    }
+  }, 1000);
+};
 function startSim() {
   const s = SIM_STARTS[+$('simStart').value];
   sim = { lat: s.lat, lon: s.lon, cap: s.cap, v: 6 }; // m/s
@@ -316,6 +374,7 @@ function tick() {
   // ----- son -----
   const at = audio().currentTime, vmin = +$('vmin').value / 3.6;
   let message = '';
+  if (!sim) $('gpsEtat').textContent = texteGps();
   if (gpsAge > 5) {
     continu(false);
     message = fix ? 'GPS perdu depuis ' + Math.round(gpsAge) + ' s' : 'Recherche GPS…';
@@ -351,7 +410,7 @@ longPress($('black'), 1200, () => { $('black').hidden = true; });
 longPress($('lock'), 2000, () => { $('lock').hidden = true; });
 $('bStop').onclick = () => {
   running = false; continu(false); clearInterval(tickTimer);
-  if (watchId != null) navigator.geolocation.clearWatch(watchId); watchId = null; sim = null; $('sim').hidden = true;
+  stopGps(); sim = null; $('sim').hidden = true;
   if (wakeLock) wakeLock.release().catch(() => {}); wakeLock = null;
   $('run').hidden = true; $('setup').hidden = false; $('startBar').hidden = false;
 };
