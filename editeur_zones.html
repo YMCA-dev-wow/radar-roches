@@ -527,7 +527,21 @@ function fromGeoJSON(gj) {
     };
   });
 }
+// Roches au format du radar (lu par radar.html sous la clé radar.roches)
+function versRadar() {
+  return features.map(f => {
+    const z = zOf(f);
+    return f.kind === 'point'
+      ? { kind: 'point', lat: f.geom[0], lon: f.geom[1], r: f.rayon || 0, z, test: !!f.test, nom: f.nom || '' }
+      : { kind: 'zone', ring: f.geom, z, test: !!f.test, nom: f.nom || '' };
+  });
+}
 $('export').onclick = () => {
+  if (window.androidBridge) { // appli : pas de téléchargement possible, on transmet directement au radar (même mémoire)
+    try { localStorage.setItem('radar.roches', JSON.stringify(versRadar())); } catch {}
+    alert(features.length + ' élément(s) transmis au radar de l’appli.\nIls seront utilisés au prochain démarrage du radar.');
+    return;
+  }
   const blob = new Blob([JSON.stringify(toGeoJSON(), null, 1)], { type: 'application/geo+json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = 'roches_sillon_' + new Date().toISOString().slice(0, 10) + '.geojson';

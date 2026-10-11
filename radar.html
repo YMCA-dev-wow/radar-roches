@@ -108,6 +108,7 @@
 
   <h2>Mes roches (fichier de l'éditeur)</h2>
   <div class="card">
+    <div class="row"><button id="editeurBtn">↺ Reprendre les roches de l'éditeur</button></div>
     <div class="row"><button id="geoBtn">Importer un GeoJSON…</button><input type="file" id="geoFile" accept=".geojson,.json,application/json" hidden><span class="sub" id="geoInfo"></span></div>
   </div>
 
@@ -235,6 +236,19 @@ $('offPort').onchange = applyRecal;
 
 // ---------- Mes roches (GeoJSON de l'éditeur) ----------
 let mesRoches = store.get('roches', []);
+// Roches saisies dans l'éditeur du même site ou de l'appli (même mémoire), sans passer par un fichier
+$('editeurBtn').onclick = () => {
+  let f = [];
+  try { f = JSON.parse(localStorage.getItem('roches-sillon-v1')) || []; } catch {}
+  if (!f.length) { alert('Aucune roche dans l’éditeur.'); return; }
+  mesRoches = f.map(e => {
+    const z = e.ref === 'decouvre' ? +e.valeur : -e.valeur;
+    return e.kind === 'point'
+      ? { kind: 'point', lat: e.geom[0], lon: e.geom[1], r: e.rayon || 0, z, test: !!e.test, nom: e.nom || '' }
+      : { kind: 'zone', ring: e.geom, z, test: !!e.test, nom: e.nom || '' };
+  });
+  store.set('roches', mesRoches); showGeoInfo();
+};
 function showGeoInfo() {
   const n = mesRoches.filter(f => !f.test).length, t = mesRoches.filter(f => f.test).length;
   $('geoInfo').textContent = mesRoches.length ? `${n} élément(s), ${t} de test` : 'aucun';
