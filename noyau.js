@@ -242,11 +242,14 @@ function tone(f0, f1, t, dur, vol = 0.9, type = 'square') {
   g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.01); g.gain.setValueAtTime(vol, t + dur - 0.02); g.gain.linearRampToValueAtTime(0, t + dur);
   o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + 0.02);
 }
-function motif(rel, lvl, t) { // devant / tribord / bâbord ; plus aigu si émergé
+// Motif : devant (1 note) / tribord (2 notes montantes) / bâbord (2 notes descendantes) ; plus aigu si émergé.
+// periode = intervalle jusqu'au motif suivant : les notes raccourcissent avec la cadence pour laisser ~1/3 de silence.
+function motif(rel, lvl, t, periode = 1) {
   const up = lvl === 3 ? 300 : 0;
-  if (Math.abs(rel) < 15) tone(700 + up, 700 + up, t, 0.14);
-  else if (rel > 0) { tone(600 + up, 600 + up, t, 0.09); tone(1000 + up, 1000 + up, t + 0.12, 0.09); }
-  else { tone(1000 + up, 1000 + up, t, 0.09); tone(600 + up, 600 + up, t + 0.12, 0.09); }
+  const note = Math.min(0.09, 0.28 * periode), blanc = Math.min(0.03, 0.1 * periode);
+  if (Math.abs(rel) < 15) tone(700 + up, 700 + up, t, Math.min(0.14, 0.6 * periode));
+  else if (rel > 0) { tone(600 + up, 600 + up, t, note); tone(1000 + up, 1000 + up, t + note + blanc, note); }
+  else { tone(1000 + up, 1000 + up, t, note); tone(600 + up, 600 + up, t + note + blanc, note); }
 }
 function continu(on, f = 1100) {
   if (on && !contOsc) {
@@ -276,10 +279,14 @@ function sonnerMenace(b, horizon, armed, pre) {
     }
     continu(false);
     if (!bipsActifs || voixEnCours()) return;
-    const period = 0.18 + 1.1 * Math.min(1, b.d / horizon);
-    if (APPLI && document.hidden) { // écran éteint : bips planifiés d'avance, au cas où le calcul ralentit
-      if (at > nextBeep - 0.3) { let tb = Math.max(nextBeep, at); while (tb < at + 1) { motif(b.rel, b.lvl, tb); tb += period; } nextBeep = tb; }
-    } else if (at > nextBeep) { motif(b.rel, b.lvl, at); nextBeep = at + period; }
+    // Cadence : 1 motif toutes les 1,2 s à la distance d'alerte, jusqu'à 7 par seconde à 10 m (puis son continu).
+    // Courbe accentuée près du danger pour que l'accélération finale traduise l'imminence.
+    const f = Math.max(0, Math.min(1, (b.d - 10) / Math.max(1, horizon - 10)));
+    const period = 0.14 + 1.06 * Math.pow(f, 1.5);
+    // Bips programmés d'avance sur l'horloge audio (rythme régulier même si le calcul tourne à 10 Hz ou ralentit écran éteint)
+    const avance = APPLI && document.hidden ? 1 : 0.25;
+    if (nextBeep < at) nextBeep = at;
+    while (nextBeep < at + avance) { motif(b.rel, b.lvl, nextBeep, period); nextBeep += period; }
     return;
   }
   continu(false);
@@ -305,7 +312,9 @@ let idNotif = 1;
 async function notifier(titre, texte) {
   if (surMontre) surMontre(titre, texte);
   if (APPLI) {
-    try { await Natif.notifs.schedule({ notifications: [{ id: idNotif++, title: titre, body: texte }] }); return true; } catch { return false; }
+    // Toujours le même numéro : chaque notification remplace la précédente (comme l'étiquette « radar » de la version web),
+    // sinon la montre les empile et affiche des grilles périmées.
+    try { await Natif.notifs.schedule({ notifications: [{ id: idNotif, title: titre, body: texte }] }); return true; } catch { return false; }
   }
   if (!('Notification' in window) || Notification.permission !== 'granted') return false;
   try {
