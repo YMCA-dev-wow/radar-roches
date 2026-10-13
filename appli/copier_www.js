@@ -1,14 +1,19 @@
 // Copie les pages web du radar (dossier parent) dans www/, que Capacitor embarque dans l'APK.
 const fs = require('fs'), path = require('path');
 const src = path.resolve(__dirname, '..'), dst = path.join(__dirname, 'www');
-const FICHIERS = ['index.html', 'radar.html', 'rejeu.html', 'noyau.js', 'diagnostic.js', 'editeur_zones.html',
-  'donnees/meta.json', 'donnees/tetes_auto.geojson', 'donnees/maree/saint_malo.json', 'donnees/maree/saint_malo.bin'];
+const FICHIERS = ['index.html', 'radar.html', 'rejeu.html', 'noyau.js', 'diagnostic.js', 'editeur_zones.html', 'donnees/zones.json'];
+// données de chaque zone décrite dans donnees/zones.json : méta, têtes de roche, marées, tuiles
+const ZONES = JSON.parse(fs.readFileSync(path.join(src, 'donnees', 'zones.json'), 'utf8'));
+for (const z of ZONES) {
+  FICHIERS.push(z.dossier + '/meta.json', ...z.jauges.flatMap(j => ['json', 'bin'].map(e => `${z.dossier}/maree/${j.fichier}.${e}`)));
+  if (fs.existsSync(path.join(src, z.dossier, 'tetes_auto.geojson'))) FICHIERS.push(z.dossier + '/tetes_auto.geojson');
+}
 fs.rmSync(dst, { recursive: true, force: true });
 for (const f of FICHIERS) {
   fs.mkdirSync(path.dirname(path.join(dst, f)), { recursive: true });
   fs.copyFileSync(path.join(src, f), path.join(dst, f));
 }
-fs.cpSync(path.join(src, 'donnees', 'tuiles'), path.join(dst, 'donnees', 'tuiles'), { recursive: true });
+for (const z of ZONES) fs.cpSync(path.join(src, z.dossier, 'tuiles'), path.join(dst, z.dossier, 'tuiles'), { recursive: true });
 // bibliothèque Capacitor (registerPlugin…), chargée avant noyau.js dans les pages de l'appli seulement
 fs.copyFileSync(path.join(__dirname, 'node_modules', '@capacitor', 'core', 'dist', 'capacitor.js'), path.join(dst, 'capacitor.js'));
 for (const page of ['radar.html', 'rejeu.html']) {

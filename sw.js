@@ -1,9 +1,9 @@
 // Service worker du radar : fonctionnement hors ligne.
 // Tuiles Litto3D : cache dédié, « cache d'abord » (elles ne changent pas, et survivent aux mises à jour de l'appli).
 // Pages, noyau et marée : réseau d'abord, cache en secours. Le marégraphe (autre domaine) passe toujours par le réseau.
-const APP = 'radar-app-v2';
+const APP = 'radar-app-v3';
 const TUILES = 'radar-tuiles';
-const BASE = ['radar.html', 'rejeu.html', 'noyau.js', 'donnees/meta.json', 'donnees/maree/saint_malo.json', 'donnees/maree/saint_malo.bin'];
+const BASE = ['radar.html', 'rejeu.html', 'noyau.js', 'donnees/zones.json']; // les données de chaque zone se mettent en cache à la première lecture
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -16,7 +16,7 @@ self.addEventListener('activate', e => e.waitUntil(
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (url.origin !== location.origin || e.request.method !== 'GET') return;
-  if (url.pathname.includes('/donnees/tuiles/')) {
+  if (/\/donnees[^/]*\/tuiles\//.test(url.pathname)) { // tuiles de toutes les zones (donnees/, donnees_22/…)
     e.respondWith(caches.open(TUILES).then(async c => {
       const hit = await c.match(e.request);
       if (hit) return hit;

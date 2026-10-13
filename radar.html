@@ -185,13 +185,13 @@ function opts(affichage = true) {
 }
 async function recalageDirect() {
   if (!$('live').checked) { surge = 0; $('liveInfo').textContent = ''; return; }
-  $('liveInfo').textContent = 'Lecture du marégraphe…';
+  $('liveInfo').textContent = `Lecture du marégraphe de ${zone.jauges[0].nom}…`;
   try {
     const data = await lireMaregraphe(Date.now() - 12 * 3600e3, Date.now());
     if (data.length < 24) throw new Error('trop peu de mesures');
     surge = data.reduce((a, m) => a + m.h - hMaloModel(m.t), 0) / data.length;
     const last = data[data.length - 1];
-    const info = `Effet météo du jour : ${surge >= 0 ? '+' : ''}${surge.toFixed(2)} m (moyenne sur ${(data.length / 6).toFixed(0)} h, dernière mesure ${last.h.toFixed(2)} m à ${new Date(last.t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}).`;
+    const info = `${zone.jauges[0].nom} : effet météo du jour ${surge >= 0 ? '+' : ''}${surge.toFixed(2)} m (moyenne sur ${(data.length / 6).toFixed(0)} h, dernière mesure ${last.h.toFixed(2)} m à ${new Date(last.t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}).`;
     store.set('surge', { v: surge, t: Date.now() });
     $('liveInfo').innerHTML = '<span class="okc">✓</span> ' + info;
   } catch (err) {
@@ -202,7 +202,7 @@ async function recalageDirect() {
 }
 
 // ---------- Recalage annuaire ----------
-PORTS.forEach(p => $('offPort').add(new Option(p.nom, p.id)));
+function remplirPorts() { $('offPort').innerHTML = ''; PORTS.forEach(p => $('offPort').add(new Option(p.nom, p.id))); }
 function offRow(v = {}) {
   const d = document.createElement('div'); d.className = 'ext';
   d.innerHTML = `<select><option>PM</option><option>BM</option></select><input type="time"><input type="number" step="0.01" placeholder="m"><button title="Retirer">✕</button>`;
@@ -214,6 +214,7 @@ function offRow(v = {}) {
 }
 function applyRecal() {
   const port = PORTS.find(p => p.id === $('offPort').value);
+  if (!port) return;
   const rows = [...$('offRows').children].map(d => ({ type: d.children[0].value, heure: d.children[1].value, h: d.children[2].value }));
   store.set('recal', { jour: new Date().toDateString(), port: port.id, rows });
   const ok = rows.filter(r => r.heure && r.h !== '');
@@ -400,6 +401,7 @@ function tick() {
   const t = Date.now();
   const gpsAge = fix ? (t - fix.t) / 1000 : Infinity;
   if (fix && (!analysis || now - analysis.at > 500)) {
+    activerZone(zonePour(fix.lat, fix.lon)); // changement de zone : évènement « zone » (marée, ports, tuiles)
     const W = niveauCourant(fix.lon, t);
     analysis = analyser(fix, fix.course, fix.speed, W, opts()); analysis.at = now; analysis.W = W;
     const W30 = niveauCourant(fix.lon, t + 30 * 60000);
@@ -482,7 +484,7 @@ function saveSettings() { SETTINGS.forEach(k => store.set(k, $(k).type === 'chec
 function loadSettings() { SETTINGS.forEach(k => { const v = store.get(k, null); if (v != null) $(k).type === 'checkbox' ? ($(k).checked = v) : ($(k).value = v); }); }
 function updHNow() {
   if (!tide) return;
-  const h = niveauEau(MALO.lon, Date.now());
+  const h = niveauEau(fix ? fix.lon : MALO.lon, Date.now());
   $('hNow').textContent = isNaN(h) ? 'hors table' : h.toFixed(2) + ' m';
 }
 $('testH').oninput = () => $('testHTxt').textContent = (+$('testH').value).toFixed(1) + ' m';
@@ -514,15 +516,15 @@ async function surveillerBatterie() { // API absente de Firefox : simplement ign
 }
 
 // ---------- Hors ligne ----------
-const CACHE_TUILES = 'radar-tuiles', CACHE_APP = 'radar-app-v2';
+const CACHE_TUILES = 'radar-tuiles', CACHE_APP = 'radar-app-v3';
 if ('serviceWorker' in navigator && !APPLI) navigator.serviceWorker.register('sw.js').catch(() => {});
 if (APPLI) { const c = $('offline').closest('.card'); c.hidden = true; c.insertAdjacentHTML('afterend', '<div class="card sub">Appli : toute la zone est déjà dans l’appli, rien à télécharger.</div>'); }
 async function offlineCount() {
   if (!meta || !('caches' in window)) return;
   try {
     const c = await caches.open(CACHE_TUILES), keys = await c.keys();
-    const n = keys.filter(r => r.url.includes('/donnees/tuiles/')).length;
-    $('offlineInfo').textContent = `${n} / ${meta.tuiles.length} tuiles disponibles hors ligne`;
+    const n = keys.filter(r => r.url.includes(`/${zone.dossier}/tuiles/`)).length;
+    $('offlineInfo').textContent = `${zone.nom} : ${n} / ${meta.tuiles.length} tuiles disponibles hors ligne`;
   } catch {}
 }
 $('offline').onclick = async () => {
@@ -531,27 +533,39 @@ $('offline').onclick = async () => {
   try {
     const c = await caches.open(CACHE_TUILES);
     const have = new Set((await c.keys()).map(r => new URL(r.url).pathname));
-    const todo = meta.tuiles.map(t => `donnees/tuiles/${meta.zoom}/${t[0]}/${t[1]}.png`).filter(u => !have.has(new URL(u, location.href).pathname));
+    const todo = meta.tuiles.map(t => `${zone.dossier}/tuiles/${meta.zoom}/${t[0]}/${t[1]}.png`).filter(u => !have.has(new URL(u, location.href).pathname));
     let done = meta.tuiles.length - todo.length;
     for (let i = 0; i < todo.length; i += 12) {
       await Promise.all(todo.slice(i, i + 12).map(u => c.add(u).catch(() => {})));
       done = Math.min(meta.tuiles.length, done + 12);
       $('offlineInfo').textContent = `${done} / ${meta.tuiles.length}…`;
     }
-    await (await caches.open(CACHE_APP)).addAll(['radar.html', 'rejeu.html', 'noyau.js', 'donnees/meta.json', 'donnees/maree/saint_malo.json', 'donnees/maree/saint_malo.bin']);
+    await (await caches.open(CACHE_APP)).addAll(['radar.html', 'rejeu.html', 'noyau.js', 'donnees/zones.json',
+      ...ZONES.flatMap(z => [z.dossier + '/meta.json', ...z.jauges.flatMap(j => [`${z.dossier}/maree/${j.fichier}.json`, `${z.dossier}/maree/${j.fichier}.bin`])])]);
   } catch (err) { $('offlineInfo').textContent = 'Échec : ' + err.message; }
   b.disabled = false; offlineCount();
 };
 
+// ---------- Zone ----------
+// Zone active (suit la position) : ports du recalage annuaire, informations sur les données, recalage en direct
+window.addEventListener('zone', async () => {
+  remplirPorts();
+  if (!PORTS.some(p => p.id === (store.get('recal', null) || {}).port)) $('offRows').innerHTML = '';
+  const tj = tide.info;
+  $('dataInfo').textContent = `Zone ${zone.nom} (${ZONES.length > 1 ? 'choisie selon la position, ' : ''}${ZONES.map(z => z.nom).join(' / ')}) · ${meta.tuiles.length} tuiles Litto3D · ` +
+    `marée prédite jusqu'au ${new Date(tide.t0 + tide.h.length * tide.step).toLocaleDateString('fr-FR')} (écart-type ${tj.validation_2026.ecart_type_m} m sur 2026).`;
+  offlineCount();
+  if (running) { await recalageDirect(); updHNow(); }
+});
+
 // ---------- Démarrage ----------
 (async () => {
   loadSettings(); styleMontre = $('styleMontre').value; $('testH').oninput(); $('simMode').onchange(); showGeoInfo();
-  const r = store.get('recal', null);
-  if (r && r.jour === new Date().toDateString()) { $('offPort').value = r.port; r.rows.forEach(offRow); }
   try {
-    await chargerDonnees(); const m = meta, tj = tide.info;
-    $('dataInfo').textContent = `${m.tuiles.length} tuiles Litto3D · marée prédite jusqu'au ${new Date(tide.t0 + tide.h.length * tide.step).toLocaleDateString('fr-FR')} (écart-type ${tj.validation_2026.ecart_type_m} m sur 2026).`;
-    applyRecal(); $('start').disabled = false; offlineCount();
+    await chargerDonnees();
+    const r = store.get('recal', null);
+    if (r && r.jour === new Date().toDateString() && PORTS.some(p => p.id === r.port)) { $('offPort').value = r.port; r.rows.forEach(offRow); }
+    applyRecal(); $('start').disabled = false;
     await recalageDirect(); updHNow(); setInterval(updHNow, 60000);
   } catch (err) {
     $('dataInfo').innerHTML = '<span class="err">' + (location.protocol === 'file:'

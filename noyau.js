@@ -18,31 +18,40 @@ const Natif = APPLI ? {
 } : null;
 
 // =====================================================================
-// Marée
+// Zones et marée
 // =====================================================================
-// Références altimétriques maritimes (Shom) : NM, PMVE, BMVE au-dessus du zéro hydro local, et cote de ce zéro dans IGN69.
-const PORTS = [
-  { id: 'cast',    nom: 'Saint-Cast',  lon: -2.2433, nm: 6.64, pmve: 12.10, bmve: 1.60, zh: -6.264 },
-  { id: 'briac',   nom: 'Saint-Briac', lon: -2.1685, nm: 6.68, pmve: 12.05, bmve: 1.50, zh: -6.219 },
-  { id: 'malo',    nom: 'Saint-Malo',  lon: -2.0275, nm: 6.78, pmve: 12.20, bmve: 1.50, zh: -6.289 },
-  { id: 'cancale', nom: 'Cancale',     lon: -1.8267, nm: 7.20, pmve: 13.05, bmve: 1.60, zh: -6.774 },
-];
-const MALO = PORTS[2];
-let tide = null;          // { t0 (ms), step (ms), h: Int16Array (cm), info }
+// donnees/zones.json (généré par outils/zones.py) décrit chaque zone : dossier des données Litto3D, zéro hydro de
+// référence des tuiles (zh_ref, m IGN69), marégraphes de prédiction (d'ouest en est, références RAM nm / pmve / bmve,
+// identifiant REFMAR ; le premier sert au recalage en direct), retard (s) du second sur le premier, et ports
+// (références RAM, zéro hydro IGN69, poids w du second marégraphe selon la longitude).
+// La marée d'un port = marée normalisée des marégraphes (mélangée selon w, chaque courbe décalée vers l'heure du port)
+// × marnage du port ; les niveaux sont ensuite ramenés au zéro hydro de référence et interpolés selon la longitude.
+// La zone active suit la position (activerZone(zonePour(lat, lon))).
+let ZONES = [];
+let zone = null;          // zone active
+let PORTS = [];           // ports de la zone active
+let MALO = null;          // port central de la zone active (position par défaut, affichages)
+let jauges = [];          // prédictions des marégraphes de la zone : [{ t0 (ms), step (ms), h: Int16Array (cm), info }]
+let tide = null;          // prédiction du premier marégraphe (recalage en direct)
 let surge = 0;            // effet météo (m), ajouté partout
 let recal = null;         // { port, pts: [{te, dt, dh}] } recalage annuaire
 
-// Hauteur prédite à Saint-Malo (m, zéro hydro de Saint-Malo)
-function hMaloModel(t) {
-  const x = (t - tide.t0) / tide.step, i = Math.floor(x);
-  if (i < 0 || i + 1 >= tide.h.length) return NaN;
-  return (tide.h[i] + (x - i) * (tide.h[i + 1] - tide.h[i])) / 100;
+const marnage = o => o.pmve - o.bmve;
+// Hauteur prédite au marégraphe g de la zone active (m, zéro hydro du marégraphe)
+function hJauge(g, t) {
+  const T = jauges[g], x = (t - T.t0) / T.step, i = Math.floor(x);
+  if (i < 0 || i + 1 >= T.h.length) return NaN;
+  return (T.h[i] + (x - i) * (T.h[i + 1] - T.h[i])) / 100;
 }
-// Hauteur au port P (zéro hydro local) déduite de Saint-Malo : même forme, amplitude et niveau moyen du port
-function mapPort(P, hMalo) {
-  const k = (P.pmve - P.bmve) / (MALO.pmve - MALO.bmve);
-  return P.nm + (hMalo - MALO.nm) * k;
+function hMaloModel(t) { return hJauge(0, t); } // premier marégraphe (nom historique)
+// Marée normalisée (0 = niveau moyen, ±0,5 = demi-marnage de vives-eaux) pour un poids w ; hFn(g, t) remplace la prédiction
+function normale(w, t, hFn = hJauge) {
+  const J = zone.jauges, n0 = (hFn(0, t + w * zone.retard * 1000) - J[0].nm) / marnage(J[0]);
+  if (J.length < 2 || w <= 0) return n0;
+  return (1 - w) * n0 + w * (hFn(1, t - (1 - w) * zone.retard * 1000) - J[1].nm) / marnage(J[1]);
 }
+// Hauteur au port P (zéro hydro local)
+function hauteurPort(P, t, hFn) { return P.nm + normale(P.w, t, hFn) * marnage(P); }
 function corrAt(t) { // décalage horaire et correction de hauteur interpolés entre les extrêmes saisis
   const p = recal.pts;
   if (t <= p[0].te) return p[0];
@@ -52,16 +61,17 @@ function corrAt(t) { // décalage horaire et correction de hauteur interpolés e
     return { dt: p[i].dt + f * (p[i + 1].dt - p[i].dt), dh: p[i].dh + f * (p[i + 1].dh - p[i].dh) };
   }
 }
-function hPortPredit(P, t) { // prédiction (sans météo) au port P, recalée sur l'annuaire si saisi
-  if (recal && recal.port === P.id) { const c = corrAt(t); return mapPort(P, hMaloModel(t - c.dt)) + c.dh; }
-  if (recal && recal.port === 'malo') { const c = corrAt(t); return mapPort(P, hMaloModel(t - c.dt) + c.dh); }
-  return mapPort(P, hMaloModel(t));
+function hPortPredit(P, t) { // prédiction (sans météo) au port P, recalée sur l'annuaire si saisi (correction proportionnelle au marnage)
+  const R = recal && PORTS.find(p => p.id === recal.port);
+  if (!R) return hauteurPort(P, t);
+  const c = corrAt(t);
+  return hauteurPort(P, t - c.dt) + c.dh * marnage(P) / marnage(R);
 }
-// Niveau de l'eau exprimé dans le zéro hydro de Saint-Malo (même référence que les tuiles), à la longitude lon.
-// hMaloFn permet de remplacer la prédiction de Saint-Malo (ex. hauteur mesurée pour rejouer une ancienne session).
-function niveauEau(lon, t, hMaloFn) {
-  const W = P => (hMaloFn ? mapPort(P, hMaloFn(t)) : hPortPredit(P, t)) + P.zh - MALO.zh;
-  const add = hMaloFn ? 0 : surge;
+// Niveau de l'eau exprimé dans le zéro hydro de référence de la zone (celui des tuiles), à la longitude lon.
+// hFn(g, t) permet de remplacer la prédiction des marégraphes (ex. hauteurs mesurées pour rejouer une ancienne session).
+function niveauEau(lon, t, hFn) {
+  const W = P => (hFn ? hauteurPort(P, t, hFn) : hPortPredit(P, t)) + P.zh - zone.zh_ref;
+  const add = hFn ? 0 : surge;
   if (lon <= PORTS[0].lon) return W(PORTS[0]) + add;
   for (let i = 0; i < PORTS.length - 1; i++) {
     const a = PORTS[i], b = PORTS[i + 1];
@@ -73,18 +83,18 @@ function niveauEau(lon, t, hMaloFn) {
 function extremeModele(P, t, type) {
   let best = null;
   for (let s = -180; s <= 180; s++) {
-    const tt = t + s * 60000, h = mapPort(P, hMaloModel(tt));
+    const tt = t + s * 60000, h = hauteurPort(P, tt);
     if (!best || (type === 'PM' ? h > best.h : h < best.h)) best = { t: tt, h };
   }
   return best;
 }
-// Mesures du marégraphe de Saint-Malo (REFMAR, Shom) entre deux dates (ms) : [{t, h}] ; tranches de 31 jours max
-async function lireMaregraphe(debut, fin, pasMin = 10) {
+// Mesures du marégraphe g de la zone active (REFMAR, Shom) entre deux dates (ms) : [{t, h}] ; tranches de 31 jours max
+async function lireMaregraphe(debut, fin, pasMin = 10, g = 0) {
   const iso = d => new Date(d).toISOString().slice(0, 19) + 'Z';
   const out = [];
   for (let a = debut; a < fin; a += 30 * 86400e3) {
     const b = Math.min(fin, a + 30 * 86400e3);
-    const r = await fetch(`https://services.data.shom.fr/maregraphie/observation/json/410?sources=1&dtStart=${iso(a)}&dtEnd=${iso(b)}&interval=${pasMin}`,
+    const r = await fetch(`https://services.data.shom.fr/maregraphie/observation/json/${zone.jauges[g].refmar}?sources=1&dtStart=${iso(a)}&dtEnd=${iso(b)}&interval=${pasMin}`,
       { signal: AbortSignal.timeout(10000) }); // sans réseau : abandon au bout de 10 s
     for (const m of (await r.json()).data) if (m.value != null) out.push({ t: Date.parse(m.timestamp.replace(/\//g, '-').replace(' ', 'T') + 'Z'), h: m.value });
   }
@@ -92,10 +102,10 @@ async function lireMaregraphe(debut, fin, pasMin = 10) {
 }
 
 // =====================================================================
-// Données Litto3D (tuiles z16 : R = cote, G = relief)
+// Données Litto3D (tuiles z16 : R = cote, G = relief) et marées, par zone
 // =====================================================================
 let meta = null;
-const tiles = new Map(); // 'x/y' -> Uint8ClampedArray | null | Promise
+const tiles = new Map(); // 'x/y' -> Uint8ClampedArray | null | Promise (zone active)
 // chargementEnAttente : fichiers pas encore reçus (affichés par le diagnostic si le chargement traîne)
 const chargementEnAttente = new Set();
 async function chargerDonnees() {
@@ -103,27 +113,56 @@ async function chargerDonnees() {
     chargementEnAttente.add(f);
     return fetch(f).then(r => { if (!r.ok) throw new Error(f + ' : HTTP ' + r.status); return r[type](); }).finally(() => chargementEnAttente.delete(f));
   };
-  const [m, tj, tb] = await Promise.all([
-    lire('donnees/meta.json', 'json'),
-    lire('donnees/maree/saint_malo.json', 'json'),
-    lire('donnees/maree/saint_malo.bin', 'arrayBuffer'),
-  ]);
-  meta = m; meta.set = new Set(m.tuiles.map(t => t[0] + '/' + t[1]));
-  tide = { t0: Date.parse(tj.debut_utc), step: tj.pas_min * 60000, h: new Int16Array(tb), info: tj };
+  ZONES = await lire('donnees/zones.json', 'json');
+  await Promise.all(ZONES.map(async z => {
+    const [m, ...tables] = await Promise.all([lire(z.dossier + '/meta.json', 'json'),
+      ...z.jauges.flatMap(j => [lire(`${z.dossier}/maree/${j.fichier}.json`, 'json'), lire(`${z.dossier}/maree/${j.fichier}.bin`, 'arrayBuffer')])]);
+    z.meta = m; m.set = new Set(m.tuiles.map(t => t[0] + '/' + t[1]));
+    z.tables = z.jauges.map((j, g) => {
+      const tj = tables[2 * g];
+      return { t0: Date.parse(tj.debut_utc), step: tj.pas_min * 60000, h: new Int16Array(tables[2 * g + 1]), info: tj };
+    });
+  }));
+  let z0 = null;
+  try { z0 = ZONES.find(z => z.id === localStorage.getItem('radar.zone')); } catch {}
+  activerZone(z0 || ZONES[0]);
+}
+// Zone contenant la position (bornes des données, marge de 3 km), sinon la plus proche
+function zonePour(lat, lon) {
+  let best = null, bd = Infinity;
+  for (const z of ZONES) {
+    const [la0, lo0, la1, lo1] = z.bornes;
+    const dla = Math.max(0, la0 - lat, lat - la1) * 111, dlo = Math.max(0, lo0 - lon, lon - lo1) * 111 * Math.cos(lat * Math.PI / 180);
+    const d = Math.hypot(dla, dlo);
+    if (d < bd) { bd = d; best = z; }
+  }
+  return best;
+}
+// Change de zone active (renvoie vrai si elle a changé) ; les pages écoutent l'évènement « zone »
+function activerZone(z) {
+  if (!z || z === zone) return false;
+  zone = z; PORTS = z.ports; MALO = PORTS[Math.floor(PORTS.length / 2)];
+  meta = z.meta; jauges = z.tables; tide = jauges[0];
+  surge = 0; recal = null; tiles.clear();
+  try { localStorage.setItem('radar.zone', z.id); } catch {}
+  window.dispatchEvent(new Event('zone'));
+  return true;
 }
 function loadTile(x, y) {
   const k = x + '/' + y;
   if (tiles.has(k)) return tiles.get(k) instanceof Promise ? tiles.get(k) : Promise.resolve();
   if (!meta.set.has(k)) { tiles.set(k, null); return Promise.resolve(); }
+  const zt = zone;
   const p = new Promise(res => {
     const img = new Image();
     img.onload = () => {
+      if (zone !== zt) return res(); // la zone a changé pendant le chargement
       const c = document.createElement('canvas'); c.width = c.height = 256;
       const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
       tiles.set(k, g.getImageData(0, 0, 256, 256).data); res();
     };
-    img.onerror = () => { tiles.set(k, null); res(); };
-    img.src = 'donnees/tuiles/' + meta.zoom + '/' + k + '.png';
+    img.onerror = () => { if (zone === zt) tiles.set(k, null); res(); };
+    img.src = zt.dossier + '/tuiles/' + meta.zoom + '/' + k + '.png';
   });
   tiles.set(k, p);
   return p;

@@ -189,7 +189,7 @@ const boat = L.circleMarker([0, 0], { radius: 7, color: '#fff', weight: 2, fillC
 // Trace
 // =====================================================================
 let pts = [], dernierGPX = null, notifs = [];       // { t, lat, lon, v (m/s), cap (°), W, lvl, best }
-let tMeasured = null; // fonction hauteur mesurée à Saint-Malo, si disponible
+let tMeasured = null; // fonction (marégraphe g, t) -> hauteur mesurée, si disponible
 
 let sansHeure = false;
 function lireGPX(txt, nom) {
@@ -283,25 +283,28 @@ function hauteurAt(p) {
 async function chargerMaree() {
   tMeasured = null;
   if (!pts.length) return;
+  activerZone(zonePour(pts[0].lat, pts[0].lon)); // zone de la trace : marée, ports et tuiles
   const a = pts[0].t - 3600e3, b = pts[pts.length - 1].t + 3600e3;
   const mode = $('tideMode').value;
   $('forceRow').hidden = mode !== 'forcee';
   if (mode === 'mesure') {
-    try {
-      const m = await lireMaregraphe(a, b, 10);
-      if (m.length < 6) throw new Error('pas de mesures');
-      tMeasured = t => { // interpolation linéaire
-        let lo = 0, hi = m.length - 1;
-        if (t <= m[0].t) return m[0].h; if (t >= m[hi].t) return m[hi].h;
-        while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (m[mid].t <= t) lo = mid; else hi = mid; }
-        return m[lo].h + (t - m[lo].t) / (m[hi].t - m[lo].t) * (m[hi].h - m[lo].h);
-      };
-      const ecart = m.reduce((s, x) => s + x.h - hMaloModel(x.t), 0) / m.length;
-      $('tideInfo').textContent = `Hauteurs mesurées au marégraphe de Saint-Malo (${m.length} mesures). Écart moyen avec la prédiction : ${ecart >= 0 ? '+' : ''}${ecart.toFixed(2)} m.`;
-    } catch (err) {
-      $('tideInfo').textContent = 'Marégraphe injoignable : prédiction utilisée.';
-    }
-  } else $('tideInfo').textContent = mode === 'prevue' ? 'Prédiction du modèle (sans effet météo).' : '';
+    // mesures de chaque marégraphe de la zone ; un marégraphe sans mesure reprend sa prédiction corrigée de l'écart des autres
+    const series = await Promise.all(zone.jauges.map((j, g) => lireMaregraphe(a, b, 10, g).catch(() => [])));
+    const ok = series.map(m => m.length >= 6);
+    if (!ok.some(Boolean)) { $('tideInfo').textContent = 'Marégraphe injoignable : prédiction utilisée.'; return; }
+    const ecarts = series.map((m, g) => ok[g] ? m.reduce((s, x) => s + x.h - hJauge(g, x.t), 0) / m.length : null);
+    const vus = ecarts.filter(e => e != null), ecartMoyen = vus.reduce((s, e) => s + e, 0) / vus.length;
+    const interp = (m, t) => { // interpolation linéaire
+      let lo = 0, hi = m.length - 1;
+      if (t <= m[0].t) return m[0].h; if (t >= m[hi].t) return m[hi].h;
+      while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (m[mid].t <= t) lo = mid; else hi = mid; }
+      return m[lo].h + (t - m[lo].t) / (m[hi].t - m[lo].t) * (m[hi].h - m[lo].h);
+    };
+    tMeasured = (g, t) => ok[g] ? interp(series[g], t) : hJauge(g, t) + ecartMoyen;
+    $('tideInfo').textContent = 'Hauteurs mesurées (zone ' + zone.nom + ') : ' + zone.jauges.map((j, g) => ok[g]
+      ? `${j.nom} ${series[g].length} mesures, écart moyen avec la prédiction ${ecarts[g] >= 0 ? '+' : ''}${ecarts[g].toFixed(2)} m`
+      : `${j.nom} sans mesure (prédiction corrigée)`).join(' ; ') + '.';
+  } else $('tideInfo').textContent = mode === 'prevue' ? `Prédiction du modèle (zone ${zone.nom}, sans effet météo).` : '';
 }
 
 function opts(affichage) {
