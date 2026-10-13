@@ -54,6 +54,7 @@
   .montre span { white-space: pre-line; }
   .montre b { font-size: 17px; color: #ffd60a; border-bottom: 1px dotted #888; padding-bottom: 3px; }
   #lock { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  #black, #lock { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; } /* appui long : pas de sélection de texte */
   #lockRing { width: 130px; height: 130px; border-radius: 50%; border: 3px solid #444; display: flex; align-items: center; justify-content: center; color: #666; font-size: 13px; text-align: center; padding: 10px; }
 </style>
 </head>
@@ -446,6 +447,9 @@ function longPress(el, ms, fn) {
   ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => el.addEventListener(ev, () => clearTimeout(timer)));
 }
 longPress($('black'), 1200, () => { $('black').hidden = true; });
+['black', 'lock'].forEach(id => $(id).addEventListener('contextmenu', e => e.preventDefault()));
+// Appli : le radar fonctionne écran éteint, l'écran noir et le verrouillage ne servent plus (navigateur seulement)
+if (APPLI) { $('bBlack').hidden = true; $('bLock').hidden = true; }
 longPress($('lock'), 2000, () => { $('lock').hidden = true; });
 $('bStop').onclick = () => {
   running = false; window.radarEnCours = false; continu(false); clearInterval(tickTimer);
@@ -560,7 +564,10 @@ window.addEventListener('zone', async () => {
 
 // ---------- Démarrage ----------
 (async () => {
-  loadSettings(); styleMontre = $('styleMontre').value; $('testH').oninput(); $('simMode').onchange(); showGeoInfo();
+  loadSettings();
+  // sécurité : chaque démarrage repart sur la vraie marée et le vrai GPS (mode test et simulation désactivés)
+  $('testMode').checked = false; $('simMode').checked = false; saveSettings();
+  styleMontre = $('styleMontre').value; $('testH').oninput(); $('simMode').onchange(); showGeoInfo();
   try {
     await chargerDonnees();
     const r = store.get('recal', null);

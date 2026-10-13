@@ -22,24 +22,26 @@
     ecrire('maj.publiee', { t: Date.now(), n });
     return n;
   }
-  // zone : élément où écrire l'état (facultatif) ; force : ignore le délai de 6 h
-  window.verifierMaj = async function (zone, force = false) {
-    if (!appli) { if (zone) zone.textContent = ''; return; }
+  // alerte : élément du bandeau « nouvelle version » (en haut) ; zone : ligne discrète d'état (pied de page) ;
+  // force : ignore le délai de 6 h
+  window.verifierMaj = async function (alerte, zone, force = false) {
+    if (!appli) return;
+    if (!zone) zone = alerte;
     const ici = await versionLocale();
     let n;
     try { n = await versionPubliee(force); }
     catch (err) { if (zone) zone.textContent = `Construction ${ici}. Vérification impossible (réseau ?).`; return; }
-    if (!zone) return;
-    zone.innerHTML = '';
+    zone.innerHTML = ''; if (alerte) alerte.innerHTML = '';
     if (n > ici) {
       const b = document.createElement('div');
       b.style.cssText = 'background:#1f6f3a;color:#fff;border-radius:12px;padding:12px 14px;margin:8px 0';
       b.innerHTML = `<b>Nouvelle version disponible</b> (construction ${n}, tu as la ${ici}).<br>`;
       const a = document.createElement('a');
       a.href = APK; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Télécharger et installer la mise à jour';
-      a.style.cssText = 'color:#fff;font-weight:600;display:inline-block;margin-top:6px';
+      a.style.cssText = 'color:#fff;font-weight:600;display:inline-block;margin:6px 0 0;padding:0;background:none;border:0';
       b.append(a);
-      zone.append(b);
+      (alerte || zone).append(b);
+      if (zone !== alerte) zone.textContent = `Construction ${ici}.`;
       if ((lire('maj.notifiee') || 0) < n) { // notification Android, une fois par version
         ecrire('maj.notifiee', n);
         try {
@@ -50,9 +52,10 @@
       }
     } else {
       const s = document.createElement('span');
-      s.textContent = `Appli à jour (construction ${ici}). `;
+      s.textContent = `Version : construction ${ici} (à jour) · `;
       const a = document.createElement('a'); a.href = '#'; a.textContent = 'Vérifier maintenant';
-      a.onclick = e => { e.preventDefault(); zone.textContent = 'Vérification…'; window.verifierMaj(zone, true); };
+      a.style.cssText = 'display:inline;margin:0;padding:0;background:none;border:0;color:#5d8fc0';  // l'accueil met ses liens en cartes
+      a.onclick = e => { e.preventDefault(); zone.textContent = 'Vérification…'; window.verifierMaj(alerte, zone, true); };
       zone.append(s, a);
     }
   };
