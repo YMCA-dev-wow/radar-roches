@@ -1,0 +1,68 @@
+[
+ {
+  "id": "saint_malo",
+  "nom": "Radar roches",
+  "zone": "Saint-Malo",
+  "partie": "St-Malo",
+  "bbox": [
+   48.5875,
+   -2.3047,
+   48.7334,
+   -1.8182
+  ],
+  "fichier": "montre/radar_roches.prg",
+  "url": "https://ymca-dev-wow.github.io/radar-roches/montre/radar_roches.prg",
+  "taille": 1933788,
+  "date": "2026-10-13",
+  "montres": [
+   "Forerunner 255",
+   "255 Music",
+   "255S",
+   "255S Music"
+  ]
+ },
+ {
+  "id": "cotes_armor:ouest",
+  "nom": "Radar roches 22 O",
+  "zone": "Trégor - Goëlo",
+  "partie": "Tregor",
+  "bbox": [
+   48.6989,
+   -3.6924,
+   48.9445,
+   -3.23
+  ],
+  "fichier": "montre/radar_roches_22_ouest.prg",
+  "url": "https://ymca-dev-wow.github.io/radar-roches/montre/radar_roches_22_ouest.prg",
+  "taille": 3649324,
+  "date": "2026-10-13",
+  "montres": [
+   "Forerunner 255",
+   "255 Music",
+   "255S",
+   "255S Music"
+  ]
+ },
+ {
+  "id": "cotes_armor:est",
+  "nom": "Radar roches 22 E",
+  "zone": "Trégor - Goëlo",
+  "partie": "Goelo-Brehat",
+  "bbox": [
+   48.6989,
+   -3.27,
+   48.9445,
+   -2.9207
+  ],
+  "fichier": "montre/radar_roches_22_est.prg",
+  "url": "https://ymca-dev-wow.github.io/radar-roches/montre/radar_roches_22_est.prg",
+  "taille": 4218060,
+  "date": "2026-10-13",
+  "montres": [
+   "Forerunner 255",
+   "255 Music",
+   "255S",
+   "255S Music"
+  ]
+ }
+]

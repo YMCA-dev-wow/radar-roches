@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carte et téléchargements</title>
+<script src="diagnostic.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root { --bg: #0b0f14; --panel: #151b23; --text: #e8edf3; --muted: #8a96a6; --line: #2a3441;
+    --accent: #3d9bf0; --danger: #ff3b30; --warn: #ff9f0a; --ok: #30d158; --montre: #bf5af2; --partage: #ff9f0a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px system-ui, sans-serif; }
+  a { color: var(--accent); }
+  button, .bouton { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 9px 13px; text-decoration: none; display: inline-block; cursor: pointer; }
+  button.primary, .bouton.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  input, select, textarea { font: inherit; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px; width: 100%; }
+  header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 18px; margin: 0; flex: 1; }
+  #map { height: 58vh; min-height: 300px; background: #0e1620; }
+  .couches { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 10px 16px; font-size: 14px; color: var(--muted); border-bottom: 1px solid var(--line); }
+  .couches label { display: inline-flex; align-items: center; gap: 6px; }
+  .couches input { width: auto; }
+  .pastille { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
+  main { padding: 6px 16px 40px; max-width: 760px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 18px 0 8px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+  .card h3 { margin: 0 0 4px; font-size: 16px; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .vide { color: var(--muted); font-size: 14px; }
+  .desc { white-space: pre-wrap; font-size: 14px; margin-top: 6px; }
+  .err { color: var(--danger); } .okc { color: var(--ok); }
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 14px; width: min(560px, calc(100vw - 32px)); padding: 16px; }
+  dialog::backdrop { background: rgba(0, 0, 0, .6); }
+  dialog label { display: block; margin: 10px 0 4px; font-size: 14px; color: var(--muted); }
+  .choix label { display: flex; gap: 8px; align-items: center; color: var(--text); margin: 6px 0; }
+  .choix input { width: auto; }
+  .leaflet-tooltip.etiquette { background: rgba(21, 27, 35, .85); color: var(--text); border: 1px solid var(--line); font-size: 12px; }
+</style>
+</head>
+<body>
+<header><a href="index.html">← Accueil</a><h1>Carte et téléchargements</h1></header>
+<div id="map"></div>
+<div class="couches">
+  <label><input type="checkbox" id="cCouv" checked><span class="pastille" style="background:#30d15866;border:1px solid #30d158"></span>Appli téléphone (Litto3D)</label>
+  <label><input type="checkbox" id="cMontre" checked><span class="pastille" style="border:2px dashed var(--montre)"></span>Applis montre</label>
+  <label><input type="checkbox" id="cMes" checked><span class="pastille" style="background:#3d9bf0"></span>Mes roches</label>
+  <label><input type="checkbox" id="cPartage" checked><span class="pastille" style="border:2px solid var(--partage)"></span>Jeux partagés</label>
+  <label><input type="checkbox" id="cShom"> Carte marine</label>
+</div>
+<main>
+  <h2>Dans la vue</h2>
+  <div id="couvInfo" class="sub"></div>
+  <h2>Applis montre</h2>
+  <div id="listeMontres"></div>
+  <p class="sub">Installation : télécharge le fichier .prg, puis branche la montre à un ordinateur en USB et copie-le dans le dossier
+    <b>GARMIN\Apps</b>. L'appli apparaît dans la liste des activités (bouton START). Une appli par zone ; elles peuvent cohabiter.</p>
+  <h2>Jeux de roches partagés</h2>
+  <div id="listePartages"></div>
+  <h2>Mes roches</h2>
+  <div class="card">
+    <div id="mesInfo" class="sub"></div>
+    <div class="actions">
+      <button class="primary" id="partager">Partager mes roches…</button>
+      <a class="bouton" href="editeur_zones.html">Ouvrir l'éditeur</a>
+    </div>
+  </div>
+  <p class="sub">Relevé Litto3D® Shom – IGN 2024 (Licence Ouverte 2.0). Les jeux partagés sont saisis par des utilisateurs et
+    vérifiés avant publication, sans garantie : ils complètent la vigilance, ils ne la remplacent pas.</p>
+</main>
+
+<dialog id="dlgPartage">
+  <form method="dialog" id="formPartage">
+    <h3 style="margin-top:0">Partager mes roches</h3>
+    <div class="sub">Tes roches seront visibles par tous après vérification. Les éléments marqués « test » ne sont jamais envoyés.</div>
+    <label for="pNom">Nom du jeu de données *</label>
+    <input id="pNom" required minlength="2" maxlength="80" placeholder="ex. Roches de l'anse de Trestraou">
+    <label for="pDep">Département *</label>
+    <input id="pDep" required minlength="2" maxlength="40" list="departements" placeholder="ex. 22 - Côtes-d'Armor">
+    <datalist id="departements"></datalist>
+    <label for="pDesc">Description</label>
+    <textarea id="pDesc" rows="4" maxlength="2000" placeholder="Zone annotée, source (carte SHOM, observation à marée basse…), date, précision…"></textarea>
+    <label for="pAuteur">Déposé par (facultatif)</label>
+    <input id="pAuteur" maxlength="60" placeholder="prénom ou pseudo">
+    <div class="choix">
+      <label><input type="radio" name="pPortee" value="vue" checked> Seulement les roches visibles sur la carte</label>
+      <label><input type="radio" name="pPortee" value="toutes"> Toutes mes roches</label>
+    </div>
+    <div id="pResume" class="sub"></div>
+    <div id="pEtat" class="sub"></div>
+    <div class="actions">
+      <button type="button" class="primary" id="pEnvoyer">Envoyer</button>
+      <button type="button" id="pFermer">Fermer</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+'use strict';
+// Dépôt partagé (Supabase) : adresse du projet et clé publique « anon » (faites pour être publiques ; les règles de la base
+// n'autorisent que la lecture des jeux validés et le dépôt de nouveaux jeux « en attente »).
+const PARTAGE = { url: '', cle: '' };
+
+const $ = id => document.getElementById(id);
+const EDITEUR = 'roches-sillon-v1';
+const DEPARTEMENTS = ['22 - Côtes-d\'Armor', '29 - Finistère', '35 - Ille-et-Vilaine', '56 - Morbihan', '44 - Loire-Atlantique', '50 - Manche',
+  '14 - Calvados', '76 - Seine-Maritime', '85 - Vendée', '17 - Charente-Maritime', '33 - Gironde', '40 - Landes', '64 - Pyrénées-Atlantiques',
+  '62 - Pas-de-Calais', '80 - Somme', '59 - Nord', '66 - Pyrénées-Orientales', '11 - Aude', '34 - Hérault', '30 - Gard',
+  '13 - Bouches-du-Rhône', '83 - Var', '06 - Alpes-Maritimes', '2A - Corse-du-Sud', '2B - Haute-Corse'];
+DEPARTEMENTS.forEach(d => $('departements').append(new Option(d)));
+
+// ---------- Carte ----------
+const map = L.map('map', { maxZoom: 19, preferCanvas: true });
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+const shom = L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.COASTALMAPS' +
+  '&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png', { maxZoom: 19, maxNativeZoom: 16, attribution: '© IGN / SHOM' });
+L.control.scale({ imperial: false }).addTo(map);
+let vue = null;
+try { vue = JSON.parse(localStorage.getItem('carte.vue')); } catch {}
+if (vue) map.setView([vue.lat, vue.lon], vue.z); else map.setView([48.75, -2.8], 9);
+map.on('moveend', () => { const c = map.getCenter(); try { localStorage.setItem('carte.vue', JSON.stringify({ lat: c.lat, lon: c.lng, z: map.getZoom() })); } catch {} listes(); });
+
+const couches = { couv: L.layerGroup().addTo(map), montre: L.layerGroup().addTo(map), mes: L.layerGroup().addTo(map), partage: L.layerGroup().addTo(map) };
+[['cCouv', 'couv'], ['cMontre', 'montre'], ['cMes', 'mes'], ['cPartage', 'partage']].forEach(([c, k]) =>
+  $(c).onchange = e => e.target.checked ? couches[k].addTo(map) : map.removeLayer(couches[k]));
+$('cShom').onchange = e => e.target.checked ? shom.addTo(map) : map.removeLayer(shom);
+const dansVue = b => map.getBounds().intersects(L.latLngBounds([b[0], b[1]], [b[2], b[3]]));
+const texte = (tag, t, cls) => { const e = document.createElement(tag); e.textContent = t; if (cls) e.className = cls; return e; };
+const taille = o => o > 1e6 ? (o / 1e6).toFixed(1) + ' Mo' : Math.round(o / 1e3) + ' ko';
+
+// ---------- Couverture de l'appli téléphone : tuiles Litto3D de chaque zone ----------
+let zones = [];
+const tuile2lat = (y, z) => Math.atan(Math.sinh(Math.PI * (1 - 2 * y / 2 ** z))) * 180 / Math.PI;
+async function chargerZones() {
+  zones = await (await fetch('donnees/zones.json')).json();
+  for (const z of zones) {
+    const m = await (await fetch(z.dossier + '/meta.json')).json();
+    // tuiles regroupées en bandes horizontales (moins de rectangles à dessiner)
+    const lignes = new Map();
+    for (const [x, y] of m.tuiles) { if (!lignes.has(y)) lignes.set(y, []); lignes.get(y).push(x); }
+    for (const [y, xs] of lignes) {
+      xs.sort((a, b) => a - b);
+      for (let i = 0; i < xs.length;) {
+        let j = i; while (j + 1 < xs.length && xs[j + 1] === xs[j] + 1) j++;
+        const lon0 = xs[i] / 2 ** m.zoom * 360 - 180, lon1 = (xs[j] + 1) / 2 ** m.zoom * 360 - 180;
+        L.rectangle([[tuile2lat(y + 1, m.zoom), lon0], [tuile2lat(y, m.zoom), lon1]], { stroke: false, fillColor: '#30d158', fillOpacity: .28 }).addTo(couches.couv);
+        i = j + 1;
+      }
+    }
+  }
+}
+
+// ---------- Applis montre ----------
+let montres = [];
+async function chargerMontres() {
+  montres = await (await fetch('donnees/montres.json')).json();
+  for (const a of montres) {
+    L.rectangle([[a.bbox[0], a.bbox[1]], [a.bbox[2], a.bbox[3]]], { color: '#bf5af2', weight: 2, dashArray: '6 6', fill: false })
+      .bindTooltip(a.nom, { className: 'etiquette' }).addTo(couches.montre);
+  }
+}
+function carteMontre(a) {
+  const c = document.createElement('div'); c.className = 'card';
+  c.append(texte('h3', a.nom), texte('div', `${a.zone}${a.partie && a.partie !== a.zone ? ' — ' + a.partie : ''} · ${taille(a.taille)} · ${a.date}`, 'sub'),
+    texte('div', 'Pour ' + a.montres.join(', '), 'sub'));
+  const act = document.createElement('div'); act.className = 'actions';
+  // dans l'appli Android, le lien s'ouvre dans le navigateur, qui enregistre le fichier dans Téléchargements
+  const dl = document.createElement('a'); dl.className = 'bouton primary'; dl.textContent = 'Télécharger (.prg)';
+  dl.href = window.androidBridge ? a.url : a.fichier; dl.target = '_blank'; dl.rel = 'noopener'; dl.download = a.fichier.split('/').pop();
+  const voir = document.createElement('button'); voir.textContent = 'Voir sur la carte';
+  voir.onclick = () => map.fitBounds([[a.bbox[0], a.bbox[1]], [a.bbox[2], a.bbox[3]]]);
+  act.append(dl, voir); c.append(act);
+  return c;
+}
+
+// ---------- Mes roches (éditeur, même mémoire) ----------
+let mes = [];
+function chargerMes() {
+  try { mes = JSON.parse(localStorage.getItem(EDITEUR)) || []; } catch { mes = []; }
+  couches.mes.clearLayers();
+  for (const f of mes) {
+    const style = { color: f.test ? '#8a96a6' : '#3d9bf0', weight: 2, fillOpacity: .35 };
+    (f.kind === 'point' ? L.circle(f.geom, { ...style, radius: Math.max(3, f.rayon || 0) }) : L.polygon(f.geom, style))
+      .bindTooltip((f.nom || 'sans nom') + (f.test ? ' (test)' : ''), { className: 'etiquette' }).addTo(couches.mes);
+  }
+}
+const enVue = f => { const b = map.getBounds(); return f.kind === 'point' ? b.contains(f.geom) : f.geom.some(p => b.contains(p)); };
+
+// ---------- Jeux partagés (Supabase) ----------
+let partages = [], partageErreur = '';
+const api = (chemin, opts = {}) => fetch(PARTAGE.url + '/rest/v1/' + chemin, { ...opts,
+  headers: { apikey: PARTAGE.cle, Authorization: 'Bearer ' + PARTAGE.cle, 'Content-Type': 'application/json', ...(opts.headers || {}) } });
+async function chargerPartages() {
+  couches.partage.clearLayers(); partages = [];
+  if (!PARTAGE.url) { partageErreur = 'Partage pas encore configuré.'; return; }
+  try {
+    const r = await api('jeux?select=id,cree_le,nom,departement,description,auteur,bbox,nb_elements&order=cree_le.desc', { signal: AbortSignal.timeout(10000) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    partages = await r.json(); partageErreur = '';
+  } catch (err) { partageErreur = 'Jeux partagés indisponibles (réseau ?) : ' + err.message; return; }
+  for (const j of partages) {
+    L.rectangle([[j.bbox[0], j.bbox[1]], [j.bbox[2], j.bbox[3]]], { color: '#ff9f0a', weight: 2, fillOpacity: .08 })
+      .bindTooltip(j.nom, { className: 'etiquette' }).addTo(couches.partage);
+  }
+}
+function cartePartage(j) {
+  const c = document.createElement('div'); c.className = 'card';
+  c.append(texte('h3', j.nom), texte('div', `${j.departement} · ${j.nb_elements} élément(s) · déposé le ${new Date(j.cree_le).toLocaleDateString('fr-FR')}` +
+    (j.auteur ? ' par ' + j.auteur : ''), 'sub'));
+  if (j.description) c.append(texte('div', j.description, 'desc'));
+  const act = document.createElement('div'); act.className = 'actions';
+  const imp = document.createElement('button'); imp.className = 'primary'; imp.textContent = 'Importer dans mes roches';
+  imp.onclick = () => importer(j, imp);
+  const voir = document.createElement('button'); voir.textContent = 'Voir sur la carte';
+  voir.onclick = () => map.fitBounds([[j.bbox[0], j.bbox[1]], [j.bbox[2], j.bbox[3]]], { maxZoom: 17 });
+  act.append(imp, voir); c.append(act);
+  return c;
+}
+// Jeu partagé -> roches de l'éditeur (mêmes champs que l'export GeoJSON de l'éditeur) et du radar
+async function importer(j, bouton) {
+  bouton.disabled = true; bouton.textContent = 'Import…';
+  try {
+    const r = await api(`jeux?id=eq.${j.id}&select=geojson`);
+    const gj = (await r.json())[0].geojson;
+    const deja = new Set(mes.map(f => f.id));
+    const nouveaux = (gj.features || []).map(ft => {
+      const p = ft.properties || {}, g = ft.geometry, pt = g.type === 'Point';
+      let ring = pt ? null : g.coordinates[0].map(c => [c[1], c[0]]);
+      if (ring && ring.length > 1 && ring[0][0] === ring.at(-1)[0] && ring[0][1] === ring.at(-1)[1]) ring.pop();
+      return { id: 'p' + j.id + '_' + (p.id || Math.random().toString(36).slice(2, 8)), kind: pt ? 'point' : 'zone', geom: pt ? [g.coordinates[1], g.coordinates[0]] : ring,
+        nom: String(p.nom || '').slice(0, 80), ref: p.ref === 'sonde' ? 'sonde' : 'decouvre', valeur: Math.abs(+p.valeur || +p.z || 0),
+        rayon: pt ? Math.min(200, Math.max(0, +p.rayon || 0)) : 0, test: false, note: ('Jeu partagé « ' + j.nom + ' » (n° ' + j.id + ')').slice(0, 200) };
+    }).filter(f => !deja.has(f.id));
+    mes = mes.concat(nouveaux);
+    localStorage.setItem(EDITEUR, JSON.stringify(mes));
+    // le radar lit ses roches sous radar.roches : on les met à jour aussi
+    localStorage.setItem('radar.roches', JSON.stringify(mes.map(f => {
+      const z = f.ref === 'decouvre' ? +f.valeur : -f.valeur;
+      return f.kind === 'point' ? { kind: 'point', lat: f.geom[0], lon: f.geom[1], r: f.rayon || 0, z, test: !!f.test, nom: f.nom || '' }
+        : { kind: 'zone', ring: f.geom, z, test: !!f.test, nom: f.nom || '' };
+    })));
+    chargerMes(); listes();
+    bouton.textContent = nouveaux.length ? `${nouveaux.length} élément(s) importé(s)` : 'Déjà importé';
+  } catch (err) { bouton.disabled = false; bouton.textContent = 'Échec : ' + err.message; }
+}
+
+// ---------- Listes de ce qui est dans la vue ----------
+function listes() {
+  const zv = zones.filter(z => dansVue(z.bornes));
+  $('couvInfo').textContent = zv.length ? 'Appli téléphone : données Litto3D de la zone ' + zv.map(z => z.nom).join(', ') + ' (vert sur la carte).'
+    : 'Aucune zone de l’appli téléphone dans la vue.';
+  const lm = $('listeMontres'); lm.innerHTML = '';
+  const mv = montres.filter(a => dansVue(a.bbox));
+  mv.forEach(a => lm.append(carteMontre(a)));
+  if (!mv.length) lm.append(texte('div', montres.length ? 'Aucune appli montre dans la vue (dézoome pour les voir toutes).' : 'Catalogue indisponible.', 'vide'));
+  const lp = $('listePartages'); lp.innerHTML = '';
+  const pv = partages.filter(j => dansVue(j.bbox));
+  pv.forEach(j => lp.append(cartePartage(j)));
+  if (!pv.length) lp.append(texte('div', partageErreur || 'Aucun jeu partagé dans la vue.', partageErreur ? 'err' : 'vide'));
+  const n = mes.filter(f => !f.test).length, nv = mes.filter(f => !f.test && enVue(f)).length;
+  $('mesInfo').textContent = mes.length ? `${n} roche(s) ou zone(s) sur cet appareil, dont ${nv} dans la vue.` : 'Aucune roche saisie sur cet appareil (éditeur).';
+}
+
+// ---------- Partager ----------
+function selection() {
+  const portee = document.querySelector('input[name=pPortee]:checked').value;
+  return mes.filter(f => !f.test && (portee === 'toutes' || enVue(f)));
+}
+function majResume() {
+  const s = selection();
+  $('pResume').textContent = s.length ? `${s.length} élément(s) seront envoyés.` : 'Aucun élément à envoyer (les éléments de test sont exclus).';
+}
+$('partager').onclick = () => {
+  if (!PARTAGE.url) { alert('Le partage n’est pas encore configuré.'); return; }
+  chargerMes(); majResume(); $('pEtat').textContent = ''; $('dlgPartage').showModal();
+};
+document.querySelectorAll('input[name=pPortee]').forEach(e => e.onchange = majResume);
+$('pFermer').onclick = () => $('dlgPartage').close();
+$('pEnvoyer').onclick = async () => {
+  const nom = $('pNom').value.trim(), dep = $('pDep').value.trim(), s = selection();
+  if (nom.length < 2 || dep.length < 2) { $('pEtat').innerHTML = '<span class="err">Renseigne le nom et le département.</span>'; return; }
+  if (!s.length) { $('pEtat').innerHTML = '<span class="err">Aucun élément à envoyer.</span>'; return; }
+  if (s.length > 5000) { $('pEtat').innerHTML = '<span class="err">Trop d’éléments (5000 au plus).</span>'; return; }
+  const pts = s.flatMap(f => f.kind === 'point' ? [f.geom] : f.geom);
+  const bbox = [Math.min(...pts.map(p => p[0])), Math.min(...pts.map(p => p[1])), Math.max(...pts.map(p => p[0])), Math.max(...pts.map(p => p[1]))];
+  const geojson = { type: 'FeatureCollection', properties: { format: 'roches-sillon', version: 1, reference: 'zero hydrographique SHOM' },
+    features: s.map(f => ({ type: 'Feature',
+      geometry: f.kind === 'point' ? { type: 'Point', coordinates: [f.geom[1], f.geom[0]] } : { type: 'Polygon', coordinates: [[...f.geom, f.geom[0]].map(p => [p[1], p[0]])] },
+      properties: { id: f.id, nom: f.nom || '', ref: f.ref, valeur: +f.valeur, z: f.ref === 'decouvre' ? +f.valeur : -f.valeur, rayon: f.kind === 'point' ? f.rayon || 0 : 0, note: f.note || '' } })) };
+  $('pEnvoyer').disabled = true; $('pEtat').textContent = 'Envoi…';
+  try {
+    const r = await api('jeux', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+      nom, departement: dep, description: $('pDesc').value.trim() || null, auteur: $('pAuteur').value.trim() || null,
+      bbox, nb_elements: s.length, geojson }) });
+    if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + (await r.text()).slice(0, 200));
+    $('pEtat').innerHTML = '<span class="okc">✓ Envoyé, merci !</span> Il sera visible par tous après vérification.';
+  } catch (err) { $('pEtat').innerHTML = '<span class="err">Échec de l’envoi :</span> ' + err.message.replace(/</g, '&lt;'); }
+  $('pEnvoyer').disabled = false;
+};
+
+// ---------- Démarrage ----------
+(async () => {
+  chargerMes();
+  await Promise.allSettled([chargerZones(), chargerMontres(), chargerPartages()]);
+  listes();
+})();
+</script>
+</body>
+</html>
