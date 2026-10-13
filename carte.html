@@ -37,6 +37,8 @@
   dialog label { display: block; margin: 10px 0 4px; font-size: 14px; color: var(--muted); }
   .choix label { display: flex; gap: 8px; align-items: center; color: var(--text); margin: 6px 0; }
   .choix input { width: auto; }
+  .statut { display: inline-block; font-size: 12px; border-radius: 6px; padding: 1px 7px; margin-left: 6px; vertical-align: 2px; }
+  .statut.en_attente { background: #ff3b30; color: #fff; } .statut.valide { background: #30d158; color: #000; } .statut.refuse { background: #555; color: #ddd; }
   .leaflet-tooltip.etiquette { background: rgba(21, 27, 35, .85); color: var(--text); border: 1px solid var(--line); font-size: 12px; }
 </style>
 </head>
@@ -67,6 +69,11 @@
       <a class="bouton" href="editeur_zones.html">Ouvrir l'éditeur</a>
     </div>
   </div>
+  <h2>Modération</h2>
+  <div class="card" id="modCarte">
+    <div id="modInfo" class="sub">Réservé aux modérateurs : validation des jeux déposés.</div>
+    <div class="actions" id="modActions"><button id="modConnexion">Mode modérateur…</button></div>
+  </div>
   <p class="sub">Relevé Litto3D® Shom – IGN 2024 (Licence Ouverte 2.0). Les jeux partagés sont saisis par des utilisateurs et
     vérifiés avant publication, sans garantie : ils complètent la vigilance, ils ne la remplacent pas.</p>
 </main>
@@ -94,6 +101,16 @@
       <button type="button" class="primary" id="pEnvoyer">Envoyer</button>
       <button type="button" id="pFermer">Fermer</button>
     </div>
+  </form>
+</dialog>
+
+<dialog id="dlgMod">
+  <form method="dialog" id="formMod">
+    <h3 style="margin-top:0">Connexion modérateur</h3>
+    <label for="mEmail">E-mail</label><input id="mEmail" type="email" autocomplete="username">
+    <label for="mMdp">Mot de passe</label><input id="mMdp" type="password" autocomplete="current-password">
+    <div id="mEtat" class="sub"></div>
+    <div class="actions"><button type="button" class="primary" id="mValider">Se connecter</button><button type="button" id="mFermer">Fermer</button></div>
   </form>
 </dialog>
 
@@ -192,24 +209,46 @@ const enVue = f => { const b = map.getBounds(); return f.kind === 'point' ? b.co
 
 // ---------- Jeux partagés (Supabase) ----------
 let partages = [], partageErreur = '';
-const api = (chemin, opts = {}) => fetch(PARTAGE.url + '/rest/v1/' + chemin, { ...opts,
-  headers: { apikey: PARTAGE.cle, Authorization: 'Bearer ' + PARTAGE.cle, 'Content-Type': 'application/json', ...(opts.headers || {}) } });
+// Modérateur : session Supabase (connexion par e-mail et mot de passe) ; la base ne lui ouvre les jeux en attente et la
+// modification du statut que si son e-mail figure dans la table moderateurs.
+let session = null;
+try { session = JSON.parse(localStorage.getItem('moderation.session')); } catch {}
+const ecrireSession = s => { session = s; try { s ? localStorage.setItem('moderation.session', JSON.stringify(s)) : localStorage.removeItem('moderation.session'); } catch {} };
+async function auth(type, corps) {
+  const r = await fetch(PARTAGE.url + '/auth/v1/token?grant_type=' + type, { method: 'POST', headers: { apikey: PARTAGE.cle, 'Content-Type': 'application/json' }, body: JSON.stringify(corps) });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error_description || d.msg || d.error || 'HTTP ' + r.status);
+  ecrireSession({ jeton: d.access_token, renouv: d.refresh_token, expire: Date.now() + d.expires_in * 1000, email: d.user && d.user.email });
+}
+async function jeton() {
+  if (!session) return PARTAGE.cle;
+  if (Date.now() > session.expire - 60000) {
+    try { await auth('refresh_token', { refresh_token: session.renouv }); } catch { ecrireSession(null); majModeration(); return PARTAGE.cle; }
+  }
+  return session.jeton;
+}
+const api = async (chemin, opts = {}) => fetch(PARTAGE.url + '/rest/v1/' + chemin, { ...opts,
+  headers: { apikey: PARTAGE.cle, Authorization: 'Bearer ' + await jeton(), 'Content-Type': 'application/json', ...(opts.headers || {}) } });
 async function chargerPartages() {
   couches.partage.clearLayers(); partages = [];
   if (!PARTAGE.url) { partageErreur = 'Partage pas encore configuré.'; return; }
   try {
-    const r = await api('jeux?select=id,cree_le,nom,departement,description,auteur,bbox,nb_elements&order=cree_le.desc', { signal: AbortSignal.timeout(10000) });
+    const r = await api('jeux?select=id,cree_le,nom,departement,description,auteur,bbox,nb_elements,statut&order=cree_le.desc', { signal: AbortSignal.timeout(10000) });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     partages = await r.json(); partageErreur = '';
   } catch (err) { partageErreur = 'Jeux partagés indisponibles (réseau ?) : ' + err.message; return; }
   for (const j of partages) {
-    L.rectangle([[j.bbox[0], j.bbox[1]], [j.bbox[2], j.bbox[3]]], { color: '#ff9f0a', weight: 2, fillOpacity: .08 })
-      .bindTooltip(j.nom, { className: 'etiquette' }).addTo(couches.partage);
+    const st = { valide: { color: '#ff9f0a' }, en_attente: { color: '#ff3b30', dashArray: '5 5' }, refuse: { color: '#777', dashArray: '2 6' } }[j.statut] || {};
+    L.rectangle([[j.bbox[0], j.bbox[1]], [j.bbox[2], j.bbox[3]]], { weight: 2, fillOpacity: .08, ...st })
+      .bindTooltip(j.nom + (j.statut !== 'valide' ? ' (' + j.statut.replace('_', ' ') + ')' : ''), { className: 'etiquette' }).addTo(couches.partage);
   }
+  majModeration();
 }
 function cartePartage(j) {
   const c = document.createElement('div'); c.className = 'card';
-  c.append(texte('h3', j.nom), texte('div', `${j.departement} · ${j.nb_elements} élément(s) · déposé le ${new Date(j.cree_le).toLocaleDateString('fr-FR')}` +
+  const titre = texte('h3', j.nom);
+  if (session && j.statut) titre.append(texte('span', j.statut.replace('_', ' '), 'statut ' + j.statut));
+  c.append(titre, texte('div', `${j.departement} · ${j.nb_elements} élément(s) · déposé le ${new Date(j.cree_le).toLocaleDateString('fr-FR')}` +
     (j.auteur ? ' par ' + j.auteur : ''), 'sub'));
   if (j.description) c.append(texte('div', j.description, 'desc'));
   const act = document.createElement('div'); act.className = 'actions';
@@ -217,9 +256,73 @@ function cartePartage(j) {
   imp.onclick = () => importer(j, imp);
   const voir = document.createElement('button'); voir.textContent = 'Voir sur la carte';
   voir.onclick = () => map.fitBounds([[j.bbox[0], j.bbox[1]], [j.bbox[2], j.bbox[3]]], { maxZoom: 17 });
-  act.append(imp, voir); c.append(act);
+  act.append(imp, voir);
+  if (session) {
+    const ap = document.createElement('button'); ap.textContent = 'Aperçu des roches';
+    ap.onclick = () => apercu(j, ap);
+    act.append(ap);
+    for (const [st, lib] of [['valide', 'Valider'], ['refuse', 'Refuser'], ['en_attente', 'Remettre en attente']]) {
+      if (st === j.statut) continue;
+      const b = document.createElement('button'); b.textContent = lib; if (st === 'valide') b.className = 'primary';
+      b.onclick = () => changerStatut(j, st, b);
+      act.append(b);
+    }
+  }
+  c.append(act);
   return c;
 }
+// ---------- Modération ----------
+const apercus = L.layerGroup().addTo(map);
+async function apercu(j, bouton) {
+  bouton.disabled = true;
+  try {
+    const gj = (await (await api(`jeux?id=eq.${j.id}&select=geojson`)).json())[0].geojson;
+    apercus.clearLayers();
+    L.geoJSON(gj, { style: { color: '#ff3b30', weight: 2, fillOpacity: .3 },
+      pointToLayer: (ft, ll) => L.circle(ll, { radius: Math.max(3, +(ft.properties || {}).rayon || 0), color: '#ff3b30', weight: 2, fillOpacity: .3 }),
+      onEachFeature: (ft, l) => { const p = ft.properties || {}; l.bindTooltip(`${String(p.nom || 'sans nom').slice(0, 80)} · ${p.ref === 'sonde' ? 'sonde' : 'découvre'} ${(+p.valeur || 0).toFixed(1)} m`, { className: 'etiquette' }); },
+    }).addTo(apercus);
+    map.fitBounds([[j.bbox[0], j.bbox[1]], [j.bbox[2], j.bbox[3]]], { maxZoom: 17, padding: [20, 20] });
+    bouton.textContent = 'Aperçu affiché (rouge)';
+  } catch (err) { bouton.textContent = 'Échec : ' + err.message; }
+  bouton.disabled = false;
+}
+async function changerStatut(j, statut, bouton) {
+  bouton.disabled = true;
+  try {
+    const r = await api(`jeux?id=eq.${j.id}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ statut }) });
+    const d = await r.json();
+    if (!r.ok || !d.length) throw new Error(r.ok ? 'refusé par la base (e-mail absent de la table moderateurs ?)' : 'HTTP ' + r.status);
+    await chargerPartages(); listes();
+  } catch (err) { bouton.disabled = false; bouton.textContent = 'Échec : ' + err.message; }
+}
+function majModeration() {
+  const act = $('modActions'); act.innerHTML = '';
+  if (!session) {
+    $('modInfo').textContent = 'Réservé aux modérateurs : validation des jeux déposés.';
+    const b = document.createElement('button'); b.textContent = 'Mode modérateur…'; b.onclick = () => { $('mEtat').textContent = ''; $('dlgMod').showModal(); };
+    act.append(b); return;
+  }
+  const att = partages.filter(j => j.statut === 'en_attente');
+  $('modInfo').textContent = `Connecté : ${session.email || 'modérateur'} · ${att.length} jeu(x) en attente de validation (rouge pointillé sur la carte).`;
+  if (att.length) {
+    const b = document.createElement('button'); b.className = 'primary'; b.textContent = 'Voir le plus ancien en attente';
+    b.onclick = () => { const j = att[att.length - 1]; map.fitBounds([[j.bbox[0], j.bbox[1]], [j.bbox[2], j.bbox[3]]], { maxZoom: 16, padding: [20, 20] }); };
+    act.append(b);
+  }
+  const q = document.createElement('button'); q.textContent = 'Quitter le mode modérateur';
+  q.onclick = async () => { ecrireSession(null); apercus.clearLayers(); await chargerPartages(); listes(); };
+  act.append(q);
+}
+$('mFermer').onclick = () => $('dlgMod').close();
+$('mValider').onclick = async () => {
+  $('mEtat').textContent = 'Connexion…';
+  try {
+    await auth('password', { email: $('mEmail').value.trim(), password: $('mMdp').value });
+    $('mMdp').value = ''; $('dlgMod').close();
+    await chargerPartages(); listes();
+  } catch (err) { $('mEtat').innerHTML = '<span class="err">Échec : </span>' + String(err.message).replace(/</g, '&lt;'); }
+};
 // Jeu partagé -> roches de l'éditeur (mêmes champs que l'export GeoJSON de l'éditeur) et du radar
 async function importer(j, bouton) {
   bouton.disabled = true; bouton.textContent = 'Import…';
@@ -306,7 +409,7 @@ $('pEnvoyer').onclick = async () => {
 (async () => {
   chargerMes();
   await Promise.allSettled([chargerZones(), chargerMontres(), chargerPartages()]);
-  listes();
+  majModeration(); listes();
 })();
 </script>
 </body>

@@ -1,7 +1,7 @@
 // Copie les pages web du radar (dossier parent) dans www/, que Capacitor embarque dans l'APK.
 const fs = require('fs'), path = require('path');
 const src = path.resolve(__dirname, '..'), dst = path.join(__dirname, 'www');
-const FICHIERS = ['index.html', 'radar.html', 'rejeu.html', 'carte.html', 'noyau.js', 'diagnostic.js', 'editeur_zones.html', 'donnees/zones.json',
+const FICHIERS = ['index.html', 'maj.js', 'radar.html', 'rejeu.html', 'carte.html', 'noyau.js', 'diagnostic.js', 'editeur_zones.html', 'donnees/zones.json',
   'donnees/montres.json']; // applis montre (.prg) : téléchargées depuis le site, pas embarquées dans l'APK
 // données de chaque zone décrite dans donnees/zones.json : méta, têtes de roche, marées, tuiles
 const ZONES = JSON.parse(fs.readFileSync(path.join(src, 'donnees', 'zones.json'), 'utf8'));
@@ -17,10 +17,10 @@ for (const f of FICHIERS) {
 for (const z of ZONES) fs.cpSync(path.join(src, z.dossier, 'tuiles'), path.join(dst, z.dossier, 'tuiles'), { recursive: true });
 // bibliothèque Capacitor (registerPlugin…), chargée avant noyau.js dans les pages de l'appli seulement
 fs.copyFileSync(path.join(__dirname, 'node_modules', '@capacitor', 'core', 'dist', 'capacitor.js'), path.join(dst, 'capacitor.js'));
-for (const page of ['radar.html', 'rejeu.html']) {
-  const p = path.join(dst, page), html = fs.readFileSync(p, 'utf8');
-  if (!html.includes('<script src="noyau.js"></script>')) throw new Error(page + ' : balise noyau.js introuvable');
-  fs.writeFileSync(p, html.replace('<script src="noyau.js"></script>', '<script src="capacitor.js"></script>\n<script src="noyau.js"></script>'));
+for (const [page, script] of [['radar.html', 'noyau.js'], ['rejeu.html', 'noyau.js'], ['index.html', 'maj.js']]) {
+  const p = path.join(dst, page), html = fs.readFileSync(p, 'utf8'), balise = `<script src="${script}"></script>`;
+  if (!html.includes(balise)) throw new Error(page + ' : balise ' + script + ' introuvable');
+  fs.writeFileSync(p, html.replace(balise, '<script src="capacitor.js"></script>\n' + balise));
 }
 fs.writeFileSync(path.join(dst, 'version.txt'), process.env.GITHUB_RUN_NUMBER || 'locale');
 console.log('www prêt');
