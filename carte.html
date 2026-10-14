@@ -182,15 +182,20 @@ async function chargerMontres() {
 }
 function carteMontre(a) {
   const c = document.createElement('div'); c.className = 'card';
-  c.append(texte('h3', a.nom), texte('div', `${a.zone}${a.partie && a.partie !== a.zone ? ' — ' + a.partie : ''} · ${taille(a.taille)} · ${a.date}`, 'sub'),
-    texte('div', 'Pour ' + a.montres.join(', '), 'sub'));
+  const v0 = Object.values(a.versions)[0];
+  c.append(texte('h3', a.nom), texte('div', `${a.zone}${a.partie && a.partie !== a.zone ? ' — ' + a.partie : ''} · ${taille(v0.taille)} · ${v0.date}`, 'sub'));
   const act = document.createElement('div'); act.className = 'actions';
-  // dans l'appli Android, le lien s'ouvre dans le navigateur, qui enregistre le fichier dans Téléchargements
-  const dl = document.createElement('a'); dl.className = 'bouton primary'; dl.textContent = 'Télécharger (.prg)';
-  dl.href = window.androidBridge ? a.url : a.fichier; dl.target = '_blank'; dl.rel = 'noopener'; dl.download = a.fichier.split('/').pop();
+  // un fichier par modèle de montre ; dans l'appli Android, le lien s'ouvre dans le navigateur, qui l'enregistre dans Téléchargements
+  for (const [modele, v] of Object.entries(a.versions)) {
+    const dl = document.createElement('a'); dl.className = 'bouton primary'; dl.textContent = 'Télécharger pour ' + modele;
+    dl.title = v.montres.join(', ');
+    dl.href = window.androidBridge ? v.url : v.fichier; dl.target = '_blank'; dl.rel = 'noopener'; dl.download = v.fichier.split('/').pop();
+    act.append(dl);
+  }
   const voir = document.createElement('button'); voir.textContent = 'Voir sur la carte';
   voir.onclick = () => map.fitBounds([[a.bbox[0], a.bbox[1]], [a.bbox[2], a.bbox[3]]]);
-  act.append(dl, voir); c.append(act);
+  act.append(voir); c.append(act);
+  c.append(texte('div', Object.entries(a.versions).map(([m, v]) => m + ' : ' + v.montres.join(', ')).join(' · '), 'sub'));
   return c;
 }
 

@@ -10,16 +10,30 @@
    48.7334,
    -1.8182
   ],
-  "fichier": "montre/radar_roches.prg",
-  "url": "https://ymca-dev-wow.github.io/radar-roches/montre/radar_roches.prg",
-  "taille": 1933820,
-  "date": "2026-10-13",
-  "montres": [
-   "Forerunner 255",
-   "255 Music",
-   "255S",
-   "255S Music"
-  ]
+  "versions": {
+   "Forerunner 255": {
+    "fichier": "montre/radar_roches.prg",
+    "url": "https://ymca-dev-wow.github.io/radar-roches/montre/radar_roches.prg",
+    "taille": 1934108,
+    "date": "2026-10-14",
+    "montres": [
+     "Forerunner 255",
+     "255 Music",
+     "255S",
+     "255S Music"
+    ]
+   },
+   "Fenix 8": {
+    "fichier": "montre/radar_roches_fenix8.prg",
+    "url": "https://ymca-dev-wow.github.io/radar-roches/montre/radar_roches_fenix8.prg",
+    "taille": 1942908,
+    "date": "2026-10-14",
+    "montres": [
+     "Fenix 8 AMOLED 47 et 51 mm",
+     "tactix 8 et quatix 8 AMOLED 47 et 51 mm"
+    ]
+   }
+  }
  },
  {
   "id": "cotes_armor:ouest",
@@ -32,16 +46,30 @@
    48.9445,
    -3.23
   ],
-  "fichier": "montre/radar_roches_22_ouest.prg",
-  "url": "https://ymca-dev-wow.github.io/radar-roches/montre/radar_roches_22_ouest.prg",
-  "taille": 3649356,
-  "date": "2026-10-13",
-  "montres": [
-   "Forerunner 255",
-   "255 Music",
-   "255S",
-   "255S Music"
-  ]
+  "versions": {
+   "Forerunner 255": {
+    "fichier": "montre/radar_roches_22_ouest.prg",
+    "url": "https://ymca-dev-wow.github.io/radar-roches/montre/radar_roches_22_ouest.prg",
+    "taille": 3649644,
+    "date": "2026-10-14",
+    "montres": [
+     "Forerunner 255",
+     "255 Music",
+     "255S",
+     "255S Music"
+    ]
+   },
+   "Fenix 8": {
+    "fichier": "montre/radar_roches_22_ouest_fenix8.prg",
+    "url": "https://ymca-dev-wow.github.io/radar-roches/montre/radar_roches_22_ouest_fenix8.prg",
+    "taille": 3658444,
+    "date": "2026-10-14",
+    "montres": [
+     "Fenix 8 AMOLED 47 et 51 mm",
+     "tactix 8 et quatix 8 AMOLED 47 et 51 mm"
+    ]
+   }
+  }
  },
  {
   "id": "cotes_armor:est",
@@ -54,15 +82,29 @@
    48.9445,
    -2.9207
   ],
-  "fichier": "montre/radar_roches_22_est.prg",
-  "url": "https://ymca-dev-wow.github.io/radar-roches/montre/radar_roches_22_est.prg",
-  "taille": 4218076,
-  "date": "2026-10-13",
-  "montres": [
-   "Forerunner 255",
-   "255 Music",
-   "255S",
-   "255S Music"
-  ]
+  "versions": {
+   "Forerunner 255": {
+    "fichier": "montre/radar_roches_22_est.prg",
+    "url": "https://ymca-dev-wow.github.io/radar-roches/montre/radar_roches_22_est.prg",
+    "taille": 4218380,
+    "date": "2026-10-14",
+    "montres": [
+     "Forerunner 255",
+     "255 Music",
+     "255S",
+     "255S Music"
+    ]
+   },
+   "Fenix 8": {
+    "fichier": "montre/radar_roches_22_est_fenix8.prg",
+    "url": "https://ymca-dev-wow.github.io/radar-roches/montre/radar_roches_22_est_fenix8.prg",
+    "taille": 4227180,
+    "date": "2026-10-14",
+    "montres": [
+     "Fenix 8 AMOLED 47 et 51 mm",
+     "tactix 8 et quatix 8 AMOLED 47 et 51 mm"
+    ]
+   }
+  }
  }
 ]
