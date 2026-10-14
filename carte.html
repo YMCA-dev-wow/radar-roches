@@ -6,49 +6,48 @@
 <title>Carte et téléchargements</title>
 <script src="diagnostic.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<meta name="theme-color" content="#071318">
+<link rel="icon" href="logo.svg">
+<link rel="stylesheet" href="theme.css">
+<script src="nav.js"></script>
 <style>
-  :root { --bg: #0b0f14; --panel: #151b23; --text: #e8edf3; --muted: #8a96a6; --line: #2a3441;
-    --accent: #3d9bf0; --danger: #ff3b30; --warn: #ff9f0a; --ok: #30d158; --montre: #bf5af2; --partage: #ff9f0a; }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px system-ui, sans-serif; }
-  a { color: var(--accent); }
-  button, .bouton { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
-    padding: 9px 13px; text-decoration: none; display: inline-block; cursor: pointer; }
-  button.primary, .bouton.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
-  input, select, textarea { font: inherit; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px; width: 100%; }
-  header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
-  header h1 { font-size: 18px; margin: 0; flex: 1; }
-  #map { height: 58vh; min-height: 300px; background: #0e1620; }
-  .couches { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 10px 16px; font-size: 14px; color: var(--muted); border-bottom: 1px solid var(--line); }
+  :root { --partage: #ff9f0a; }
+  .bouton { font: inherit; color: var(--tx); background: var(--p2); border: 1px solid var(--ln); border-radius: 12px; padding: 10px 14px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  .bouton.primary { background: var(--ac); border-color: var(--ac); color: var(--ac-on); font-weight: 650; }
+  input, select, textarea { width: 100%; }
+  header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
+  header h1 { flex: 1; }
+  #map { height: 46vh; min-height: 260px; background: #0e1620; }
+  .couches { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 10px 16px; font-size: 13px; color: var(--mu); border-bottom: 1px solid var(--ln); }
   .couches label { display: inline-flex; align-items: center; gap: 6px; }
   .couches input { width: auto; }
   .pastille { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
-  main { padding: 6px 16px 40px; max-width: 760px; }
-  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 18px 0 8px; }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+  main { padding: 6px 16px 96px; max-width: 760px; margin: 0 auto; }
+  .card { margin-bottom: 10px; }
   .card h3 { margin: 0 0 4px; font-size: 16px; }
-  .sub { color: var(--muted); font-size: 13px; }
   .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-  .vide { color: var(--muted); font-size: 14px; }
+  .vide { color: var(--mu); font-size: 14px; }
   .desc { white-space: pre-wrap; font-size: 14px; margin-top: 6px; }
-  .err { color: var(--danger); } .okc { color: var(--ok); }
-  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 14px; width: min(560px, calc(100vw - 32px)); padding: 16px; }
+  .maMontre { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .maMontre select { flex: 1; }
+  dialog { background: var(--p1); color: var(--tx); border: 1px solid var(--ln); border-radius: 16px; width: min(560px, calc(100vw - 32px)); padding: 16px; }
   dialog::backdrop { background: rgba(0, 0, 0, .6); }
-  dialog label { display: block; margin: 10px 0 4px; font-size: 14px; color: var(--muted); }
-  .choix label { display: flex; gap: 8px; align-items: center; color: var(--text); margin: 6px 0; }
+  dialog label { display: block; margin: 10px 0 4px; font-size: 14px; color: var(--mu); }
+  .choix label { display: flex; gap: 8px; align-items: center; color: var(--tx); margin: 6px 0; }
   .choix input { width: auto; }
   .statut { display: inline-block; font-size: 12px; border-radius: 6px; padding: 1px 7px; margin-left: 6px; vertical-align: 2px; }
   .statut.en_attente { background: #ff3b30; color: #fff; } .statut.valide { background: #30d158; color: #000; } .statut.refuse { background: #555; color: #ddd; }
-  .leaflet-tooltip.etiquette { background: rgba(21, 27, 35, .85); color: var(--text); border: 1px solid var(--line); font-size: 12px; }
+  .leaflet-tooltip.etiquette { background: rgba(7, 19, 24, .88); color: var(--tx); border: 1px solid var(--ln); font-size: 12px; }
+  .leaflet-bar a { background: var(--p2) !important; color: var(--tx) !important; border-color: var(--ln) !important; }
 </style>
 </head>
-<body>
-<header><a href="index.html">← Accueil</a><h1>Carte et téléchargements</h1></header>
+<body data-onglet="plus">
+<header><a class="retour" href="index.html" id="retour">‹</a><h1>Carte et téléchargements</h1></header>
 <div id="map"></div>
 <div class="couches">
   <label><input type="checkbox" id="cCouv" checked><span class="pastille" style="background:#30d15866;border:1px solid #30d158"></span>Appli téléphone (Litto3D)</label>
   <label><input type="checkbox" id="cMontre" checked><span class="pastille" style="border:2px dashed var(--montre)"></span>Applis montre</label>
-  <label><input type="checkbox" id="cMes" checked><span class="pastille" style="background:#3d9bf0"></span>Mes roches</label>
+  <label><input type="checkbox" id="cMes" checked><span class="pastille" style="background:#5ee6d6"></span>Mes roches</label>
   <label><input type="checkbox" id="cPartage" checked><span class="pastille" style="border:2px solid var(--partage)"></span>Jeux partagés</label>
   <label><input type="checkbox" id="cShom"> Carte marine</label>
 </div>
@@ -56,6 +55,7 @@
   <h2>Dans la vue</h2>
   <div id="couvInfo" class="sub"></div>
   <h2>Applis montre</h2>
+  <div class="maMontre"><span class="mu">Ma montre</span><select id="maMontre"></select></div>
   <div id="listeMontres"></div>
   <p class="sub">Installation : télécharge le fichier .prg, puis branche la montre à un ordinateur en USB et copie-le dans le dossier
     <b>GARMIN\Apps</b>. L'appli apparaît dans la liste des activités (bouton START). Une appli par zone ; elles peuvent cohabiter.</p>
@@ -123,6 +123,7 @@ const PARTAGE = { url: 'https://ydhuisrpkqylxknibnsl.supabase.co',
   cle: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkaHVpc3Jwa3F5bHhrbmlibnNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MDg4MDYsImV4cCI6MjEwNzQ4NDgwNn0.dMDnwFBq3guFMM5Knw-P83QMoN3_MslyPvI-a-70nM8' };
 
 const $ = id => document.getElementById(id);
+if (window.androidBridge) $('retour').href = 'plus.html';
 const EDITEUR = 'roches-sillon-v1';
 const DEPARTEMENTS = ['22 - Côtes-d\'Armor', '29 - Finistère', '35 - Ille-et-Vilaine', '56 - Morbihan', '44 - Loire-Atlantique', '50 - Manche',
   '14 - Calvados', '76 - Seine-Maritime', '85 - Vendée', '17 - Charente-Maritime', '33 - Gironde', '40 - Landes', '64 - Pyrénées-Atlantiques',
@@ -147,7 +148,7 @@ const couches = { couv: L.layerGroup().addTo(map), montre: L.layerGroup().addTo(
 $('cShom').onchange = e => e.target.checked ? shom.addTo(map) : map.removeLayer(shom);
 const dansVue = b => map.getBounds().intersects(L.latLngBounds([b[0], b[1]], [b[2], b[3]]));
 const texte = (tag, t, cls) => { const e = document.createElement(tag); e.textContent = t; if (cls) e.className = cls; return e; };
-const taille = o => o > 1e6 ? (o / 1e6).toFixed(1) + ' Mo' : Math.round(o / 1e3) + ' ko';
+const taille = o => o > 1e6 ? (o / 1e6).toFixed(1).replace('.', ',') + ' Mo' : Math.round(o / 1e3) + ' ko';
 
 // ---------- Couverture de l'appli téléphone : tuiles Litto3D de chaque zone ----------
 let zones = [];
@@ -180,22 +181,32 @@ async function chargerMontres() {
       .bindTooltip(a.nom, { className: 'etiquette' }).addTo(couches.montre);
   }
 }
+function modeles() { return [...new Set(montres.flatMap(a => Object.keys(a.versions)))]; }
+function remplirMontres() {
+  const sel = $('maMontre'), ms = modeles(); let choix = null;
+  try { choix = localStorage.getItem('carte.montre'); } catch {}
+  sel.innerHTML = '';
+  for (const m of ms) {
+    const v = montres.map(a => a.versions[m]).find(Boolean);
+    const o = new Option(v ? v.montres[0] + (v.montres.length > 1 ? ' et variantes' : '') : m, m); if (v) o.title = v.montres.join(', ');
+    sel.add(o);
+  }
+  if (ms.includes(choix)) sel.value = choix;
+  sel.onchange = () => { try { localStorage.setItem('carte.montre', sel.value); } catch {} listes(); };
+}
 function carteMontre(a) {
   const c = document.createElement('div'); c.className = 'card';
-  const v0 = Object.values(a.versions)[0];
-  c.append(texte('h3', a.nom), texte('div', `${a.zone}${a.partie && a.partie !== a.zone ? ' — ' + a.partie : ''} · ${taille(v0.taille)} · ${v0.date}`, 'sub'));
+  const v = a.versions[$('maMontre').value];
+  c.append(texte('h3', a.nom), texte('div', `${a.zone}${a.partie && a.partie !== a.zone ? ' — ' + a.partie : ''}` + (v ? ` · ${taille(v.taille)} · ${v.date}` : ''), 'sub'));
   const act = document.createElement('div'); act.className = 'actions';
-  // un fichier par modèle de montre ; dans l'appli Android, le lien s'ouvre dans le navigateur, qui l'enregistre dans Téléchargements
-  for (const [modele, v] of Object.entries(a.versions)) {
-    const dl = document.createElement('a'); dl.className = 'bouton primary'; dl.textContent = 'Télécharger pour ' + modele;
-    dl.title = v.montres.join(', ');
+  if (v) { // dans l'appli Android, le lien s'ouvre dans le navigateur, qui l'enregistre dans Téléchargements
+    const dl = document.createElement('a'); dl.className = 'bouton primary'; dl.textContent = 'Télécharger pour ma montre';
     dl.href = window.androidBridge ? v.url : v.fichier; dl.target = '_blank'; dl.rel = 'noopener'; dl.download = v.fichier.split('/').pop();
     act.append(dl);
-  }
+  } else act.append(texte('span', 'Pas encore disponible pour cette montre.', 'mu'));
   const voir = document.createElement('button'); voir.textContent = 'Voir sur la carte';
   voir.onclick = () => map.fitBounds([[a.bbox[0], a.bbox[1]], [a.bbox[2], a.bbox[3]]]);
   act.append(voir); c.append(act);
-  c.append(texte('div', Object.entries(a.versions).map(([m, v]) => m + ' : ' + v.montres.join(', ')).join(' · '), 'sub'));
   return c;
 }
 
@@ -205,7 +216,7 @@ function chargerMes() {
   try { mes = JSON.parse(localStorage.getItem(EDITEUR)) || []; } catch { mes = []; }
   couches.mes.clearLayers();
   for (const f of mes) {
-    const style = { color: f.test ? '#8a96a6' : '#3d9bf0', weight: 2, fillOpacity: .35 };
+    const style = { color: f.test ? '#bf5af2' : '#5ee6d6', weight: 2, fillOpacity: .35 };
     (f.kind === 'point' ? L.circle(f.geom, { ...style, radius: Math.max(3, f.rayon || 0) }) : L.polygon(f.geom, style))
       .bindTooltip((f.nom || 'sans nom') + (f.test ? ' (test)' : ''), { className: 'etiquette' }).addTo(couches.mes);
   }
@@ -414,7 +425,10 @@ $('pEnvoyer').onclick = async () => {
 (async () => {
   chargerMes();
   await Promise.allSettled([chargerZones(), chargerMontres(), chargerPartages()]);
-  majModeration(); listes();
+  remplirMontres(); majModeration(); listes();
+  // accès direct depuis les autres écrans : #partager (éditeur de roches), #moderation (menu Plus)
+  if (location.hash === '#partager') $('partager').click();
+  if (location.hash === '#moderation') $('modCarte').scrollIntoView({ block: 'center' });
 })();
 </script>
 </body>

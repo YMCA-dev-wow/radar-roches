@@ -552,7 +552,7 @@ function annoncer(b, pre, armed, now = Date.now(), horizon = 40) {
 // =====================================================================
 function drawRadar(cv, analysis, fix) {
   const ctx = cv.getContext('2d'), k = devicePixelRatio || 1, Wd = cv.width, Hd = cv.height;
-  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#0b0f14'; ctx.fillRect(0, 0, Wd, Hd);
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#071318'; ctx.fillRect(0, 0, Wd, Hd);
   if (!analysis || !fix) return;
   const cx = Wd / 2, cy = Hd * 0.62, R = analysis.R, sc = Math.min(Wd / 2, Hd * 0.6) / R;
   ctx.translate(cx, cy); ctx.rotate(-fix.course * Math.PI / 180);
@@ -567,7 +567,7 @@ function drawRadar(cv, analysis, fix) {
     ctx.closePath(); ctx.fill(); ctx.stroke();
   }
   ctx.setTransform(1, 0, 0, 1, cx, cy);
-  ctx.strokeStyle = '#2a3441'; ctx.lineWidth = k; ctx.fillStyle = '#8a96a6'; ctx.font = `${11 * k}px system-ui`;
+  ctx.strokeStyle = '#14403f'; ctx.lineWidth = k; ctx.fillStyle = '#7fb8b2'; ctx.font = `${11 * k}px system-ui`;
   for (const r of [50, 100, 200]) if (r <= R) { ctx.beginPath(); ctx.arc(0, 0, r * sc, 0, 2 * Math.PI); ctx.stroke(); ctx.fillText(r + ' m', 4 * k, -r * sc - 3 * k); }
   const cone = (r, deg, fill, stroke) => {
     ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, r, -Math.PI / 2 - deg * Math.PI / 180, -Math.PI / 2 + deg * Math.PI / 180); ctx.closePath();
@@ -580,12 +580,12 @@ function drawRadar(cv, analysis, fix) {
     ctx.closePath(); ctx.fillStyle = 'rgba(90,200,250,0.06)'; ctx.fill(); ctx.setLineDash([4 * k, 4 * k]); ctx.strokeStyle = 'rgba(90,200,250,0.5)'; ctx.lineWidth = k; ctx.stroke(); ctx.setLineDash([]);
   }
   if (analysis.preH) cone(analysis.preH * sc, CONE_PRE, 'rgba(255,214,10,0.10)', 'rgba(255,214,10,0.75)');
-  cone(h, CONE_ALERTE, 'rgba(61,155,240,0.12)', 'rgba(61,155,240,0.6)');
+  cone(h, CONE_ALERTE, 'rgba(94,230,214,0.12)', 'rgba(94,230,214,0.6)');
   ctx.font = `bold ${12 * k}px system-ui`; ctx.textAlign = 'center';
-  ctx.fillStyle = '#3d9bf0'; ctx.fillText(Math.round(analysis.horizon) + ' m', Math.sin(a) * h + 20 * k, -Math.cos(a) * h);
+  ctx.fillStyle = '#5ee6d6'; ctx.fillText(Math.round(analysis.horizon) + ' m', Math.sin(a) * h + 20 * k, -Math.cos(a) * h);
   if (analysis.preH) { ctx.fillStyle = '#ffd60a'; ctx.fillText(Math.round(analysis.preH) + ' m', 0, -analysis.preH * sc - 6 * k); }
   ctx.textAlign = 'left';
   const nr = -fix.course * Math.PI / 180, rr = Math.min(Wd / 2, Hd * 0.6) - 14 * k;
-  ctx.fillStyle = '#e8edf3'; ctx.font = `bold ${14 * k}px system-ui`; ctx.textAlign = 'center'; ctx.fillText('N', Math.sin(nr) * rr, -Math.cos(nr) * rr + 5 * k); ctx.textAlign = 'left';
-  ctx.fillStyle = '#3d9bf0'; ctx.beginPath(); ctx.moveTo(0, -14 * k); ctx.lineTo(8 * k, 10 * k); ctx.lineTo(0, 5 * k); ctx.lineTo(-8 * k, 10 * k); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#d6f3f1'; ctx.font = `bold ${14 * k}px system-ui`; ctx.textAlign = 'center'; ctx.fillText('N', Math.sin(nr) * rr, -Math.cos(nr) * rr + 5 * k); ctx.textAlign = 'left';
+  ctx.fillStyle = '#5ee6d6'; ctx.beginPath(); ctx.moveTo(0, -14 * k); ctx.lineTo(8 * k, 10 * k); ctx.lineTo(0, 5 * k); ctx.lineTo(-8 * k, 10 * k); ctx.closePath(); ctx.fill();
 }

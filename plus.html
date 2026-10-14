@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<script src="diagnostic.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#071318">
+<title>Plus – Radar roches</title>
+<link rel="icon" href="logo.svg">
+<link rel="stylesheet" href="theme.css">
+<script src="nav.js"></script>
+<style>
+  footer { text-align: center; color: #4f7a76; font-size: 13px; margin-top: 26px; }
+</style>
+</head>
+<body data-onglet="plus">
+<div class="page">
+  <div class="entete"><img src="logo.svg" width="30" height="30" alt=""><h1>Plus</h1></div>
+  <nav class="menu" id="menu"></nav>
+  <footer id="maj"></footer>
+</div>
+<script>
+const ENTREES = [
+  ['carte', 'carte.html', 'Carte et téléchargements', 'zones couvertes, applis montre, roches partagées'],
+  ['rejeu', 'rejeu.html', 'Rejeu de session', 'rejouer un fichier FIT ou GPX'],
+  ['profils', 'radar.html#profils', 'Profils de navigation', 'créer, modifier, dupliquer'],
+  ['reglages', 'radar.html#avance', 'Réglages avancés et essais', 'marée, sons, montre, mode test, simulation'],
+  ['moderation', 'carte.html#moderation', 'Modération', 'jeux de roches partagés à valider'],
+  ['notice', 'notice.html', 'Notice', 'installation, réglages, dépannage'],
+];
+for (const [ic, href, titre, sous] of ENTREES) {
+  const a = document.createElement('a'); a.href = href;
+  a.innerHTML = `<span class="ic">${icone(ic)}</span><span><span class="t"></span><small></small></span>`;
+  a.querySelector('.t').textContent = titre; a.querySelector('small').textContent = sous;
+  document.getElementById('menu').append(a);
+}
+</script>
+<script src="maj.js"></script>
+<script>verifierMaj(document.getElementById('maj'));</script>
+</body>
+</html>

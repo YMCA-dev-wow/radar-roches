@@ -4,169 +4,181 @@
 <script src="diagnostic.js"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#071318">
 <title>Radar roches</title>
+<link rel="icon" href="logo.svg">
+<link rel="stylesheet" href="theme.css">
+<script src="nav.js"></script>
 <style>
-  :root { --bg: #0b0f14; --panel: #151b23; --text: #e8edf3; --muted: #8a96a6; --line: #2a3441;
-    --accent: #3d9bf0; --danger: #ff3b30; --warn: #ff9f0a; --emerge: #b0302a; --ok: #30d158; }
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  [hidden] { display: none !important; }
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
-    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
-  button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
-  input, select { font: inherit; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
-  input[type=number] { width: 84px; }
-  input[type=range] { width: 100%; }
-  label { display: flex; gap: 8px; align-items: center; }
-
-  /* ---------- Réglages ---------- */
-  #setup { position: fixed; inset: 0; overflow-y: auto; padding: 16px 16px 120px; }
-  #setup h1 { font-size: 22px; margin: 0 0 4px; }
-  #setup h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 22px 0 8px; }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
-  .row { display: flex; gap: 10px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
-  .sub { color: var(--muted); font-size: 13px; }
-  .grow { flex: 1; }
-  #startBar { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px 16px; background: linear-gradient(transparent, var(--bg) 30%); }
-  #startBar button { width: 100%; font-size: 20px; padding: 16px; }
-  .ext { display: grid; grid-template-columns: 70px 1fr 90px 30px; gap: 6px; align-items: center; margin: 6px 0; }
+  html, body { height: 100%; }
+  body.navigation { overflow: hidden; }
+  body.navigation .barre-nav { display: none; }
+  .big { font-size: 38px; font-weight: 650; line-height: 1; }
+  .centre { text-align: center; }
+  #setup .carte { margin-bottom: 12px; }
+  #carteProfil { cursor: pointer; }
+  #courbe { width: 100%; height: 54px; margin-top: 8px; display: block; }
+  .verifs { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 6px; }
+  .demarrer { display: flex; align-items: center; justify-content: center; width: 168px; height: 168px; margin: 14px auto 10px; border-radius: 50%;
+    border: 2px solid var(--ac); outline: 12px solid var(--p1); background: var(--p2); color: var(--ac); font-size: 23px; font-weight: 650; }
+  .demarrer:disabled { opacity: .45; }
+  .ligne input[type=number] { width: 78px; text-align: right; }
+  .unite { color: var(--mu); font-size: 13px; margin-left: 4px; }
+  .prof { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 14px; border: 1px solid var(--ln); margin-bottom: 8px; cursor: pointer; }
+  .prof.sel { border-color: var(--ac); background: var(--p2); }
+  .prof .n { font-weight: 650; }
+  .prof .rond { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--ac); flex: none; }
+  .prof.sel .rond { background: var(--ac); box-shadow: inset 0 0 0 3px var(--p2); }
+  .prof .crayon { color: var(--mu); padding: 4px 8px; font-size: 18px; }
+  .ext { display: grid; grid-template-columns: 70px 1fr 90px 36px; gap: 6px; align-items: center; margin: 6px 0; }
   .ext input, .ext select { width: 100%; }
-  .err { color: var(--danger); }
-  .okc { color: var(--ok); }
-
-  /* ---------- Radar ---------- */
-  #run { position: fixed; inset: 0; display: flex; flex-direction: column; }
-  #top { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 8px 10px; }
-  .stat { text-align: center; }
-  .stat b { display: block; font-size: 26px; font-variant-numeric: tabular-nums; line-height: 1.1; }
-  .stat span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-  #msg { text-align: center; font-size: 14px; color: var(--muted); min-height: 20px; padding: 0 10px; }
-  #msg.alert { color: var(--warn); font-weight: 600; }
-  #cv { flex: 1; width: 100%; min-height: 0; touch-action: none; }
-  #bottom { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 8px 10px 14px; }
-  #bottom button { padding: 14px 4px; font-size: 14px; }
-  #bottom button.on { background: var(--danger); border-color: var(--danger); }
-  #sim { position: absolute; right: 10px; bottom: 90px; display: grid; grid-template-columns: repeat(3, 52px); gap: 6px; }
-  #sim button { padding: 10px 0; }
-  #black { position: fixed; inset: 0; background: #000; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 30px; color: #333; font-size: 13px; }
-  .montre { font: 15px/1.25 system-ui, sans-serif; padding: 22px; gap: 4px; overflow: hidden; background: #000; color: #e8edf3; border: 2px solid #444; border-radius: 50%; width: 150px; height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; margin: 8px auto; }
+  .montre { font: 15px/1.25 system-ui, sans-serif; padding: 22px; gap: 4px; overflow: hidden; background: #000; color: #e8edf3; border: 2px solid #444; border-radius: 50%;
+    width: 150px; height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; margin: 8px auto; }
   .montre span { white-space: pre-line; }
   .montre b { font-size: 17px; color: #ffd60a; border-bottom: 1px dotted #888; padding-bottom: 3px; }
-  #lock { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
-  #black, #lock { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; } /* appui long : pas de sélection de texte */
-  #lockRing { width: 130px; height: 130px; border-radius: 50%; border: 3px solid #444; display: flex; align-items: center; justify-content: center; color: #666; font-size: 13px; text-align: center; padding: 10px; }
+  /* ---------- Navigation ---------- */
+  #run { position: fixed; inset: 0; display: flex; flex-direction: column; padding: 8px 10px 12px; gap: 6px; background: var(--bg); }
+  #top { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .stat b { display: block; font-size: 34px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.05; }
+  .stat span { font-size: 11px; color: var(--mu); text-transform: uppercase; letter-spacing: .05em; }
+  .stat:nth-child(2) { text-align: center; } .stat:nth-child(3) { text-align: right; }
+  #msg { text-align: center; font-size: 15px; color: var(--mu); min-height: 22px; border-radius: 12px; padding: 4px 8px; }
+  #msg.alerte { background: var(--dan); color: #fff; font-size: 21px; font-weight: 700; padding: 10px; }
+  #msg.pre { background: #3a3108; color: #ffd60a; font-weight: 650; }
+  #msg.veille { background: #0d2a3a; color: var(--veille); }
+  #gpsEtat { text-align: center; font-size: 11px; color: var(--mu); }
+  #cv { flex: 1; width: 100%; min-height: 0; touch-action: none; }
+  #bas { display: flex; gap: 10px; align-items: center; }
+  #bMute.on { background: var(--dan); border-color: var(--dan); color: #fff; }
+  .glisse { position: relative; flex: 1; height: 58px; border-radius: 29px; background: var(--p2); border: 1px solid var(--ln); overflow: hidden;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; }
+  .glisse span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--mu); font-size: 14px; pointer-events: none; }
+  .glisse .pouce { position: absolute; left: 4px; top: 4px; width: 50px; height: 48px; border-radius: 24px; background: var(--dan); color: #fff;
+    display: flex; align-items: center; justify-content: center; font-size: 20px; cursor: grab; }
+  #sim { position: absolute; right: 10px; bottom: 90px; display: grid; grid-template-columns: repeat(3, 52px); gap: 6px; }
+  #sim button { padding: 10px 0; justify-content: center; }
 </style>
 </head>
-<body>
+<body data-onglet="radar">
 
-<!-- ================= Réglages ================= -->
-<div id="setup">
-  <a href="index.html" style="color:var(--accent);text-decoration:none;font-size:14px">← Accueil</a>
-  <h1>Radar roches</h1>
-  <div class="sub">Alerte sonore à l'approche des roches et hauts-fonds, selon la marée. Relevé Litto3D (Shom – IGN). <b>Ne remplace pas ta vigilance.</b></div>
+<!-- ================= Accueil : prêt à partir ================= -->
+<div id="setup" class="page">
+  <div class="entete"><img src="logo.svg" width="30" height="30" alt=""><h1>RADAR ROCHES</h1><span class="chip" id="chipZone">…</span></div>
+  <div class="bandeau bandeauTest" hidden style="margin-bottom:12px">⚠ Mode test actif : hauteur d'eau forcée à <span class="testHVal"></span></div>
+
+  <div class="carte">
+    <div class="row"><span class="mu">Eau maintenant · <span id="zoneNom">…</span></span><span id="sens" style="color:var(--ac);font-size:13px"></span></div>
+    <div class="row" style="margin-top:6px"><span class="big num" id="hNow">…</span><span class="mu num" id="extremes" style="text-align:right"></span></div>
+    <svg id="courbe" viewBox="0 0 300 54" preserveAspectRatio="none" aria-hidden="true"></svg>
+    <div class="mu" id="liveInfo" style="margin-top:4px"></div>
+  </div>
+
+  <div class="carte" id="carteProfil" role="button" tabindex="0">
+    <div class="row"><span class="mu">Profil</span><b id="nomProfil" style="color:var(--ac)">…</b></div>
+    <div id="resumeProfil" style="margin-top:4px"></div>
+  </div>
+
+  <div class="verifs" id="verifs"></div>
+  <button id="start" class="demarrer" disabled>Démarrer</button>
+  <div class="mu centre" id="dataInfo">Chargement des données…</div>
+</div>
+
+<!-- ================= Réglages avancés (#avance) ================= -->
+<div id="avance" class="page" hidden>
+  <div class="entete"><a class="retour" href="plus.html" id="retourAvance">‹</a><h1>Réglages avancés</h1></div>
 
   <h2>Marée</h2>
-  <div class="card">
-    <div class="row"><span class="grow">Hauteur d'eau maintenant (<span id="zoneNom">…</span>)</span><b id="hNow">…</b></div>
-    <div class="row"><label><input type="checkbox" id="live" checked> Recalage en direct sur le marégraphe de la zone (réseau requis au départ)</label></div>
-    <div class="sub" id="liveInfo"></div>
-    <details style="margin-top:10px">
-      <summary>Recaler sur l'annuaire officiel (facultatif)</summary>
-      <div class="sub" style="margin:6px 0">Saisis les pleines et basses mers du jour (heure locale, hauteur en m) lues dans l'annuaire du port de ton choix.</div>
-      <div class="row">
-        <select id="offPort"></select>
-        <button id="offAdd">＋ Ligne</button>
-        <button id="offClear">Effacer</button>
-      </div>
+  <div class="carte">
+    <label class="ligne"><span>Recalage en direct sur le marégraphe<small>réseau requis au départ</small></span><input type="checkbox" id="live" checked></label>
+    <details style="padding-top:8px">
+      <summary>Recaler sur l'annuaire officiel</summary>
+      <div class="mu" style="margin:6px 0">Saisis les pleines et basses mers du jour (heure locale, hauteur en m) lues dans l'annuaire du port de ton choix.</div>
+      <div class="row" style="justify-content:flex-start;flex-wrap:wrap"><select id="offPort"></select><button id="offAdd">＋ Ligne</button><button id="offClear">Effacer</button></div>
       <div id="offRows"></div>
-      <div class="sub" id="offInfo"></div>
+      <div class="mu" id="offInfo"></div>
     </details>
   </div>
 
-  <h2>Alertes</h2>
-  <div class="card">
-    <div class="row"><span class="grow">Eau minimale sous la planche (m)</span><input type="number" id="seuil" step="0.1" min="0.5" value="2.0"></div>
-    <div class="row"><span class="grow">Alertes à partir de (km/h)</span><input type="number" id="vmin" step="1" min="0" value="8"></div>
-    <div class="row"><span class="grow">Anticipation (secondes de navigation)</span><input type="number" id="antic" step="1" min="3" value="7"></div>
-    <div class="row"><label><input type="checkbox" id="preAlerte" checked> Pré-alerte : danger droit devant (±10°) jusqu'à 2× la distance d'alerte</label></div>
-    <div class="row"><label><input type="checkbox" id="bips" checked> Bips d'alerte (rythme selon la distance, tintement de pré-alerte)</label></div>
-    <div class="row"><label><input type="checkbox" id="voix" checked> Annonces vocales : pré-alerte et première alerte (« Roche à tribord, 40 mètres »), puis les bips. Sans bips : « Impact imminent, tribord » à mi-distance</label></div>
-    <div class="row"><label><input type="checkbox" id="veille" checked> Veille latérale : annonce une fois les dangers proches hors de ta route (jusqu'à 110° de chaque côté), avant une manœuvre</label></div>
-    <div class="row"><label><input type="checkbox" id="smooth"> Alerter aussi sur les fonds lisses (sable, vase)</label></div>
-    <div class="row"><button id="testSound">🔊 Écouter les sons</button></div>
-    <div class="sub">Tintement doux descendant = pré-alerte (danger droit devant, encore loin) · 1 bip grave = devant · 2 bips montants = tribord · 2 bips descendants = bâbord · les bips accélèrent en approchant · son continu = moins de 10 m · 3 bips très graves = GPS perdu.</div>
+  <h2>Sons</h2>
+  <div class="carte">
+    <button id="testSound">Écouter les sons</button>
+    <div class="mu" style="margin-top:8px">Tintement doux descendant = pré-alerte · 1 bip = devant · 2 bips montants = tribord · 2 bips descendants = bâbord · les bips accélèrent en approchant · son continu = moins de 10 m · 3 bips très graves = GPS perdu.</div>
   </div>
 
   <h2>Montre (notifications)</h2>
-  <div class="card">
-    <div class="row"><label><input type="checkbox" id="relais"> Relayer sur la montre : démarrage, dangers signalés et leur déplacement d'un secteur à l'autre (grille 3×3, au plus toutes les 5 s), GPS perdu, batterie faible</label></div>
-    <div class="row"><span class="grow">Format des directions</span><select id="styleMontre"><option value="grille">Grille 3×3 (Ambit 3)</option><option value="mots">Mots (Tribord 60)</option><option value="heures">Heures (2h 60)</option><option value="fleches">Flèches (&gt; 60)</option></select></div>
-    <div class="row"><button id="testMontre">⌚ Tester la montre</button><span class="sub" id="montreInfo"></span></div>
-    <div class="sub">Le test envoie 5 essais (A à E, 8 s d'intervalle) pour tenter d'obtenir une grille 3×3 sur l'Ambit 3 : photographie chacun.</div>
+  <div class="carte">
+    <label class="ligne"><span>Relayer sur la montre<small>démarrage, dangers et leur déplacement, GPS perdu, batterie faible — inutile avec l'appli montre Garmin</small></span><input type="checkbox" id="relais"></label>
+    <div class="ligne"><span>Format des directions</span><select id="styleMontre"><option value="grille">Grille 3×3 (Ambit 3)</option><option value="mots">Mots (Tribord 60)</option><option value="heures">Heures (2h 60)</option><option value="fleches">Flèches (&gt; 60)</option></select></div>
+    <div class="row" style="padding-top:10px"><button id="testMontre">Tester la montre</button><span class="mu" id="montreInfo"></span></div>
     <div class="montre" id="apercu"><b>aperçu</b>–</div>
   </div>
 
-  <h2>Mes roches (fichier de l'éditeur)</h2>
-  <div class="card">
-    <div class="row"><button id="editeurBtn">↺ Reprendre les roches de l'éditeur</button></div>
-    <div class="row"><button id="geoBtn">Importer un GeoJSON…</button><input type="file" id="geoFile" accept=".geojson,.json,application/json" hidden><span class="sub" id="geoInfo"></span></div>
+  <h2>Mes roches</h2>
+  <div class="carte">
+    <div class="row" style="justify-content:flex-start;flex-wrap:wrap"><button id="editeurBtn">Reprendre les roches de l'éditeur</button><button id="geoBtn">Importer un GeoJSON…</button></div>
+    <input type="file" id="geoFile" accept=".geojson,.json,application/json" hidden>
+    <div class="mu" id="geoInfo" style="margin-top:6px"></div>
   </div>
 
   <h2>Essais</h2>
-  <div class="card">
-    <div class="row"><button id="testGps">📡 Tester le GPS (30 s)</button></div>
-    <div class="sub" id="gpsInfo">À faire à terre avant d'aller à l'eau : il faut environ 1 position par seconde.</div>
-    <div class="row"><label><input type="checkbox" id="testMode"> <b>Mode test : hauteur d'eau forcée</b></label></div>
-    <div class="row"><input type="range" id="testH" min="0" max="14" step="0.1" value="6"><b id="testHTxt" style="min-width:60px;text-align:right">6.0 m</b></div>
-    <div class="row"><label><input type="checkbox" id="testNoL3d"> Ignorer le relevé Litto3D (essai sur un parking avec mes éléments de test)</label></div>
-    <div class="row"><label><input type="checkbox" id="simMode"> Simulation (sans GPS, flèches à l'écran)</label></div>
-    <div class="row" id="simStartRow"><span class="grow">Départ de la simulation</span><select id="simStart"></select></div>
+  <div class="carte">
+    <div class="ligne"><span><button id="testGps">Tester le GPS (30 s)</button><small id="gpsInfo" style="margin-top:6px">À faire à terre avant d'aller à l'eau : il faut environ 1 position par seconde.</small></span></div>
+    <label class="ligne"><span><b>Mode test : hauteur d'eau forcée</b><small>désactivé à chaque démarrage</small></span><input type="checkbox" id="testMode"></label>
+    <div class="ligne"><input type="range" id="testH" min="0" max="14" step="0.1" value="6" style="flex:1"><b id="testHTxt" class="num" style="min-width:60px;text-align:right">6.0 m</b></div>
+    <label class="ligne"><span>Ignorer le relevé Litto3D<small>essai sur un parking avec mes roches de test</small></span><input type="checkbox" id="testNoL3d"></label>
+    <label class="ligne"><span>Simulation sans GPS<small>flèches à l'écran ; désactivée à chaque démarrage</small></span><input type="checkbox" id="simMode"></label>
+    <div class="ligne" id="simStartRow"><span>Départ de la simulation</span><select id="simStart"></select></div>
   </div>
 
-  <h2>Hors ligne</h2>
-  <div class="card">
-    <div class="row"><button id="offline">Télécharger toute la zone</button><span class="sub" id="offlineInfo"></span></div>
-    <div class="sub">≈ 45 Mo, à faire une fois en wifi. Sinon, les secteurs déjà parcourus restent disponibles sans réseau.</div>
+  <h2 id="titreHorsLigne">Hors ligne</h2>
+  <div class="carte">
+    <div class="row" style="justify-content:flex-start"><button id="offline">Télécharger toute la zone</button><span class="mu" id="offlineInfo"></span></div>
+    <div class="mu">À faire une fois en wifi. Sinon, les secteurs déjà parcourus restent disponibles sans réseau.</div>
   </div>
-
-  <div class="sub" style="margin-top:16px" id="dataInfo">Chargement des données…</div>
-  <div class="sub" style="margin-top:6px;font-size:11px" id="diagInfo"></div>
-  <script>
-    addEventListener('load', () => diagEtat().then(t => document.getElementById('diagInfo').textContent = t));
-    setTimeout(() => { // chargement anormalement long : dire ce qui manque
-      try {
-        if (chargementEnAttente.size) document.getElementById('dataInfo').textContent = 'Chargement bloqué sur : ' + [...chargementEnAttente].join(', ');
-        else if (!meta) document.getElementById('dataInfo').textContent += ' (échec : voir le bandeau rouge)';
-      } catch { document.getElementById('dataInfo').textContent += ' (le script ne s’est pas lancé : voir le bandeau rouge)'; }
-    }, 8000);
-  </script>
+  <div class="mu" style="margin-top:16px;font-size:11px" id="diagInfo"></div>
 </div>
-<div id="startBar"><button class="primary" id="start" disabled>Démarrer</button></div>
 
-<!-- ================= Radar ================= -->
+<!-- ================= Profils de navigation ================= -->
+<div class="feuille" id="fProfils"><div class="in">
+  <div class="row"><b style="font-size:17px">Profils de navigation</b><button id="nouveauProfil">＋ Nouveau</button></div>
+  <div class="mu" style="margin:6px 0 12px">Touche un profil pour l'utiliser, le crayon pour le modifier.</div>
+  <div id="listeProfils"></div>
+  <div id="editeurProfil" hidden>
+    <h2>Modifier le profil</h2>
+    <div class="ligne"><span>Nom</span><input type="text" id="pNom" maxlength="30" style="width:170px"></div>
+    <div class="ligne"><span>Eau minimale sous la planche<small>pense au mât et à l'aile du foil</small></span><span><input type="number" id="seuil" step="0.1" min="0.5" value="2.0"><span class="unite">m</span></span></div>
+    <div class="ligne"><span>Anticipation<small>secondes de navigation avant le danger</small></span><span><input type="number" id="antic" step="1" min="3" value="7"><span class="unite">s</span></span></div>
+    <div class="ligne"><span>Alertes à partir de</span><span><input type="number" id="vmin" step="1" min="0" value="8"><span class="unite">km/h</span></span></div>
+    <label class="ligne"><span>Pré-alerte<small>danger droit devant, jusqu'à 2 × la distance d'alerte</small></span><input type="checkbox" id="preAlerte" checked></label>
+    <label class="ligne"><span>Veille latérale<small>dangers proches sur les côtés, avant une manœuvre</small></span><input type="checkbox" id="veille" checked></label>
+    <label class="ligne"><span>Bips d'alerte</span><input type="checkbox" id="bips" checked></label>
+    <label class="ligne"><span>Annonces vocales<small>pré-alerte et première alerte, puis les bips</small></span><input type="checkbox" id="voix" checked></label>
+    <label class="ligne"><span>Fonds lisses aussi<small>sable et vase peu profonds</small></span><input type="checkbox" id="smooth"></label>
+    <div class="row" style="margin-top:14px"><button id="dupliquerProfil">Dupliquer</button><button id="supprimerProfil" class="danger">Supprimer</button></div>
+  </div>
+  <button class="prim" id="fermerProfils" style="width:100%;margin-top:16px">OK</button>
+</div></div>
+
+<!-- ================= Navigation ================= -->
 <div id="run" hidden>
+  <div class="bandeau bandeauTest" hidden>⚠ Mode test actif : hauteur d'eau forcée à <span class="testHVal"></span></div>
   <div id="top">
-    <div class="stat"><b id="sH">–</b><span>eau (m) <span id="sTrend"></span></span></div>
-    <div class="stat"><b id="sV">–</b><span>km/h</span></div>
-    <div class="stat"><b id="sGps">–</b><span>GPS (m)</span></div>
+    <div class="stat"><span>eau (m) <span id="sTrend"></span></span><b id="sH">–</b></div>
+    <div class="stat"><span>km/h</span><b id="sV">–</b></div>
+    <div class="stat"><span>GPS (m)</span><b id="sGps">–</b></div>
   </div>
   <div id="msg"></div>
-  <div id="gpsEtat" class="sub" style="text-align:center;font-size:11px"></div>
+  <div id="gpsEtat"></div>
   <canvas id="cv"></canvas>
   <div id="sim" hidden>
     <span></span><button data-a="faster">▲</button><span></span>
     <button data-a="left">◀</button><button data-a="slower">▼</button><button data-a="right">▶</button>
   </div>
-  <div id="bottom">
+  <div id="bas">
     <button id="bMute">Muet</button>
-    <button id="bBlack">Écran noir</button>
-    <button id="bLock">Verrouiller</button>
-    <button id="bStop">Arrêter</button>
+    <div class="glisse" id="glisse"><span>Glisser pour arrêter</span><div class="pouce" id="bStop">■</div></div>
   </div>
 </div>
-<div id="black" hidden>appui long pour rallumer</div>
-<div id="lock" hidden><div id="lockRing">appui long 2 s pour déverrouiller</div></div>
 
 <script src="noyau.js"></script>
 <script>
@@ -184,22 +196,24 @@ function opts(affichage = true) {
   return { seuil: +$('seuil').value, smooth: $('smooth').checked, antic: +$('antic').value, roches: mesRoches, affichage, preAlerte: $('preAlerte').checked, veille: $('veille').checked,
     useL3d: !($('testMode').checked && $('testNoL3d').checked), inclTest: $('testMode').checked };
 }
+let etatRecal = 'attente'; // 'ok' | 'hors' (recalage récent réutilisé) | 'ko' | 'off'
 async function recalageDirect() {
-  if (!$('live').checked) { surge = 0; $('liveInfo').textContent = ''; return; }
+  if (!$('live').checked) { surge = 0; etatRecal = 'off'; $('liveInfo').textContent = ''; majVerifs(); return; }
   $('liveInfo').textContent = `Lecture du marégraphe de ${zone.jauges[0].nom}…`;
   try {
     const data = await lireMaregraphe(Date.now() - 12 * 3600e3, Date.now());
     if (data.length < 24) throw new Error('trop peu de mesures');
     surge = data.reduce((a, m) => a + m.h - hMaloModel(m.t), 0) / data.length;
     const last = data[data.length - 1];
-    const info = `${zone.jauges[0].nom} : effet météo du jour ${surge >= 0 ? '+' : ''}${surge.toFixed(2)} m (moyenne sur ${(data.length / 6).toFixed(0)} h, dernière mesure ${last.h.toFixed(2)} m à ${new Date(last.t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}).`;
+    const info = `Recalé sur le marégraphe de ${zone.jauges[0].nom} : effet météo ${surge >= 0 ? '+' : '−'}${Math.abs(surge).toFixed(2).replace('.', ',')} m (mesure de ${new Date(last.t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}).`;
     store.set('surge', { v: surge, t: Date.now() });
-    $('liveInfo').innerHTML = '<span class="okc">✓</span> ' + info;
+    $('liveInfo').innerHTML = '<span class="okc">✓</span> ' + info; etatRecal = 'ok';
   } catch (err) {
     const s = store.get('surge', null);
-    if (s && Date.now() - s.t < 6 * 3600e3) { surge = s.v; $('liveInfo').textContent = 'Hors ligne : recalage de ' + new Date(s.t).toLocaleTimeString('fr-FR') + ' réutilisé (' + (surge >= 0 ? '+' : '') + surge.toFixed(2) + ' m).'; }
-    else { surge = 0; $('liveInfo').innerHTML = '<span class="err">Marégraphe injoignable</span> : prédiction seule (écart possible ±0,5 m, garde de la marge).'; }
+    if (s && Date.now() - s.t < 6 * 3600e3) { surge = s.v; etatRecal = 'hors'; $('liveInfo').textContent = 'Hors ligne : recalage de ' + new Date(s.t).toLocaleTimeString('fr-FR') + ' réutilisé (' + (surge >= 0 ? '+' : '') + surge.toFixed(2) + ' m).'; }
+    else { surge = 0; etatRecal = 'ko'; $('liveInfo').innerHTML = '<span class="err">Marégraphe injoignable</span> : prédiction seule (écart possible ±0,5 m, garde de la marge).'; }
   }
+  majVerifs();
 }
 
 // ---------- Recalage annuaire ----------
@@ -429,39 +443,41 @@ function tick() {
     relaisPas(t, analysis, fix.course, armed, tt => niveauCourant(fix.lon, tt), true);
   }
   if (gpsAge > 5 && fix) relaisPas(t, analysis, 0, false, tt => niveauCourant(fix.lon, tt), false);
-  $('msg').textContent = message; $('msg').classList.toggle('alert', !!(analysis && analysis.best));
+  $('msg').textContent = message;
+  $('msg').className = gpsAge > 5 || !analysis ? '' : analysis.best ? 'alerte' : analysis.pre ? 'pre' : analysis.lat ? 'veille' : '';
 }
 function frame() {
   if (!running) return;
-  if ($('black').hidden) drawRadar(cv, analysis, fix);
+  drawRadar(cv, analysis, fix);
   requestAnimationFrame(frame);
 }
 
 // ---------- Boutons ----------
 $('bMute').onclick = () => { muted = !muted; $('bMute').classList.toggle('on', muted); $('bMute').textContent = muted ? 'Son coupé' : 'Muet'; if (muted) continu(false); };
-$('bBlack').onclick = () => { $('black').hidden = false; };
-$('bLock').onclick = () => { $('lock').hidden = false; };
-function longPress(el, ms, fn) {
-  let timer = null;
-  el.addEventListener('pointerdown', () => { timer = setTimeout(fn, ms); });
-  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => el.addEventListener(ev, () => clearTimeout(timer)));
-}
-longPress($('black'), 1200, () => { $('black').hidden = true; });
-['black', 'lock'].forEach(id => $(id).addEventListener('contextmenu', e => e.preventDefault()));
-// Appli : le radar fonctionne écran éteint, l'écran noir et le verrouillage ne servent plus (navigateur seulement)
-if (APPLI) { $('bBlack').hidden = true; $('bLock').hidden = true; }
-longPress($('lock'), 2000, () => { $('lock').hidden = true; });
-$('bStop').onclick = () => {
+// Arrêt : glisser le bouton rouge jusqu'au bout (pas d'arrêt par un simple toucher, pas de sélection de texte)
+(() => {
+  const g = $('glisse'), b = $('bStop'); let x0 = null;
+  const max = () => g.clientWidth - 54;
+  b.addEventListener('pointerdown', e => { x0 = e.clientX; b.setPointerCapture(e.pointerId); });
+  b.addEventListener('pointermove', e => { if (x0 != null) b.style.left = Math.max(4, Math.min(max(), 4 + e.clientX - x0)) + 'px'; });
+  b.addEventListener('pointerup', () => { if (x0 != null && parseFloat(b.style.left || 4) >= max() - 6) arreter(); b.style.left = '4px'; x0 = null; });
+  b.addEventListener('pointercancel', () => { b.style.left = '4px'; x0 = null; });
+  g.addEventListener('contextmenu', e => e.preventDefault());
+})();
+function arreter() {
   running = false; window.radarEnCours = false; continu(false); clearInterval(tickTimer);
   stopGps(); sim = null; $('sim').hidden = true;
   if (APPLI) Natif.veille.liberer().catch(() => {});
   if (wakeLock) wakeLock.release().catch(() => {}); wakeLock = null;
-  $('run').hidden = true; $('setup').hidden = false; $('startBar').hidden = false;
-};
+  $('run').hidden = true; document.body.classList.remove('navigation');
+  route(); demarrerGpsAccueil(); majMaree();
+}
 $('start').onclick = async () => {
   saveSettings();
   audio();
-  $('setup').hidden = true; $('startBar').hidden = true; $('run').hidden = false; resize();
+  arreterGpsAccueil(); majTest();
+  $('setup').hidden = true; $('avance').hidden = true; $('fProfils').classList.remove('on');
+  document.body.classList.add('navigation'); $('run').hidden = false; resize();
   fix = null; lastFixes = []; analysis = null; last = null; running = true; window.radarEnCours = true;
   if ($('simMode').checked) startSim(); else startGps();
   clearInterval(tickTimer); tickTimer = setInterval(tick, 100);
@@ -486,14 +502,12 @@ const veilleEtat = {};
 const SETTINGS = ['veille', 'bips', 'voix', 'relais', 'styleMontre', 'seuil', 'vmin', 'antic', 'preAlerte', 'smooth', 'live', 'testMode', 'testH', 'testNoL3d', 'simMode', 'simStart'];
 function saveSettings() { SETTINGS.forEach(k => store.set(k, $(k).type === 'checkbox' ? $(k).checked : $(k).value)); }
 function loadSettings() { SETTINGS.forEach(k => { const v = store.get(k, null); if (v != null) $(k).type === 'checkbox' ? ($(k).checked = v) : ($(k).value = v); }); }
-function updHNow() {
-  if (!tide) return;
-  const h = niveauEau(fix ? fix.lon : MALO.lon, Date.now());
-  $('hNow').textContent = isNaN(h) ? 'hors table' : h.toFixed(2) + ' m';
-}
-$('testH').oninput = () => $('testHTxt').textContent = (+$('testH').value).toFixed(1) + ' m';
+function updHNow() { majMaree(); }
+$('testH').oninput = () => { $('testHTxt').textContent = (+$('testH').value).toFixed(1) + ' m'; majTest(); };
+$('testMode').onchange = () => majTest();
+$('testNoL3d').onchange = () => saveSettings();
 $('live').onchange = async () => { await recalageDirect(); updHNow(); };
-$('simMode').onchange = () => $('simStartRow').hidden = !$('simMode').checked;
+$('simMode').onchange = () => { $('simStartRow').hidden = !$('simMode').checked; majVerifs(); };
 
 // ---------- Montre ----------
 surMontre = (ti, tx) => { $('apercu').innerHTML = '<b></b><span></span>'; $('apercu').firstChild.textContent = ti; $('apercu').lastChild.textContent = /__/.test(tx) ? tx.replace(/ /g, '\n') : tx; };
@@ -520,9 +534,9 @@ async function surveillerBatterie() { // API absente de Firefox : simplement ign
 }
 
 // ---------- Hors ligne ----------
-const CACHE_TUILES = 'radar-tuiles', CACHE_APP = 'radar-app-v3';
+const CACHE_TUILES = 'radar-tuiles', CACHE_APP = 'radar-app-v4';
 if ('serviceWorker' in navigator && !APPLI) navigator.serviceWorker.register('sw.js').catch(() => {});
-if (APPLI) { const c = $('offline').closest('.card'); c.hidden = true; c.insertAdjacentHTML('afterend', '<div class="card sub">Appli : toute la zone est déjà dans l’appli, rien à télécharger.</div>'); }
+if (APPLI) { $('offline').closest('.carte').hidden = true; $('titreHorsLigne').hidden = true; } // toute la zone est dans l'appli
 async function offlineCount() {
   if (!meta || !('caches' in window)) return;
   try {
@@ -553,7 +567,7 @@ $('offline').onclick = async () => {
 // ---------- Zone ----------
 // Zone active (suit la position) : ports du recalage annuaire, informations sur les données, recalage en direct
 window.addEventListener('zone', async () => {
-  remplirPorts(); $('zoneNom').textContent = zone.nom;
+  remplirPorts(); $('zoneNom').textContent = zone.nom; majChipZone(); majMaree();
   if (!PORTS.some(p => p.id === (store.get('recal', null) || {}).port)) $('offRows').innerHTML = '';
   const tj = tide.info;
   $('dataInfo').textContent = `Zone ${zone.nom} (${ZONES.length > 1 ? 'choisie selon la position, ' : ''}${ZONES.map(z => z.nom).join(' / ')}) · ${meta.tuiles.length} tuiles Litto3D · ` +
@@ -562,17 +576,156 @@ window.addEventListener('zone', async () => {
   if (running) { await recalageDirect(); updHNow(); }
 });
 
+// ---------- Accueil : marée, vérifications, mode test ----------
+const fr = (x, n = 1) => x.toFixed(n).replace('.', ',');
+function majChipZone() {
+  const g = gpsAccueil && Date.now() - gpsAccueil.t < 15000 ? ` · GPS ${Math.round(gpsAccueil.acc)} m` : '';
+  $('chipZone').textContent = (zone ? zone.nom.split(' ')[0] : '…') + g;
+}
+function majMaree() {
+  if (!tide || !zone) return;
+  const lon = fix ? fix.lon : gpsAccueil ? gpsAccueil.lon : MALO.lon, t = Date.now(), h = niveauCourant(lon, t);
+  $('hNow').textContent = isNaN(h) ? 'hors table' : fr(h) + ' m';
+  const svg = $('courbe');
+  if ($('testMode').checked) { $('sens').textContent = 'hauteur forcée'; $('extremes').textContent = ''; svg.innerHTML = ''; return; }
+  const f = tt => niveauEau(lon, tt);
+  $('sens').textContent = f(t + 600000) > h ? '↑ montante' : '↓ descendante';
+  const e1 = prochainExtreme(f, t), e2 = e1 && prochainExtreme(f, e1.t + 600000);
+  $('extremes').innerHTML = [e1, e2].filter(Boolean).map(e => `${e.type} ${hhmm(e.t)} · ${fr(e.h)} m`).join('<br>');
+  // courbe de -3 h à +9 h, repère « maintenant »
+  const t0 = t - 3 * 3600e3, n = 48, pts = [];
+  for (let k = 0; k <= n; k++) pts.push(f(t0 + k * 15 * 60000));
+  const lo = Math.min(...pts), hi = Math.max(...pts), X = k => k / n * 300, Y = v => 48 - (v - lo) / Math.max(0.1, hi - lo) * 42;
+  const xn = X(12);
+  svg.innerHTML = `<path d="${pts.map((v, k) => (k ? 'L' : 'M') + X(k).toFixed(1) + ' ' + Y(v).toFixed(1)).join(' ')}" fill="none" stroke="#5ee6d6" stroke-width="2.5" vector-effect="non-scaling-stroke"/>` +
+    `<line x1="${xn}" y1="0" x2="${xn}" y2="54" stroke="#14403f" vector-effect="non-scaling-stroke"/><circle cx="${xn}" cy="${Y(h).toFixed(1)}" r="4" fill="#5ee6d6"/>`;
+}
+function majTest() {
+  const t = $('testMode').checked;
+  document.querySelectorAll('.bandeauTest').forEach(b => b.hidden = !t);
+  document.querySelectorAll('.testHVal').forEach(e => e.textContent = fr(+$('testH').value) + ' m');
+  saveSettings(); majVerifs(); majMaree();
+}
+// GPS de l'accueil : se cale avant le départ et indique la précision (le radar prend ensuite le relais)
+let gpsAccueil = null, watchAccueil = null, gpsAccueilErreur = '';
+function demarrerGpsAccueil() {
+  if (watchAccueil != null || running || !navigator.geolocation) return;
+  watchAccueil = navigator.geolocation.watchPosition(p => {
+    gpsAccueil = { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, t: Date.now() }; gpsAccueilErreur = '';
+    if (ZONES.length) activerZone(zonePour(gpsAccueil.lat, gpsAccueil.lon));
+    majChipZone(); majVerifs();
+  }, e => { gpsAccueilErreur = e.code === 1 ? 'refusé' : 'indisponible'; majVerifs(); }, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+}
+function arreterGpsAccueil() { if (watchAccueil != null) navigator.geolocation.clearWatch(watchAccueil); watchAccueil = null; }
+let batterie = null;
+if (navigator.getBattery) navigator.getBattery().then(b => { batterie = b; b.onlevelchange = majVerifs; majVerifs(); }).catch(() => {});
+function majVerifs() {
+  const v = [], ch = (cls, txt) => v.push(`<span class="chip ${cls}">${txt}</span>`);
+  const g = gpsAccueil && Date.now() - gpsAccueil.t < 15000 ? gpsAccueil : null;
+  if ($('simMode').checked) ch('dan', '⚠ Simulation (sans GPS)');
+  else if (g) ch(g.acc <= 15 ? 'ok' : 'ko', (g.acc <= 15 ? '✓' : '…') + ' GPS ' + Math.round(g.acc) + ' m');
+  else ch('ko', gpsAccueilErreur ? '✗ GPS ' + gpsAccueilErreur : '… GPS en recherche');
+  ch({ ok: 'ok', hors: 'ko', ko: 'ko', off: 'ko', attente: 'ko' }[etatRecal],
+    { ok: '✓ Marée recalée', hors: '✓ Recalage récent', ko: '! Prédiction seule', off: '! Prédiction seule', attente: '… Marée' }[etatRecal]);
+  ch($('testMode').checked ? 'dan' : 'ok', $('testMode').checked ? '⚠ Mode test actif' : '✓ Mode test coupé');
+  if (batterie) { const pc = Math.round(batterie.level * 100); ch(pc > 30 || batterie.charging ? 'ok' : 'ko', (pc > 30 ? '✓' : '!') + ' Batterie ' + pc + ' %'); }
+  $('verifs').innerHTML = v.join('');
+}
+setInterval(() => { if (!running) { majVerifs(); majChipZone(); } }, 5000);
+
+// ---------- Profils de navigation ----------
+// Un profil regroupe les réglages d'alerte ; on en change d'un toucher, chacun reste modifiable, on peut en créer.
+// Les champs du profil actif sont les champs du radar eux-mêmes (seuil, antic, vmin…) : le calcul n'a pas changé.
+const CHAMPS = ['seuil', 'antic', 'vmin', 'preAlerte', 'veille', 'bips', 'voix', 'smooth'];
+const PROFILS_DEFAUT = [
+  { nom: 'Foil', seuil: 2, antic: 7, vmin: 8, preAlerte: true, veille: true, bips: true, voix: true, smooth: false },
+  { nom: 'Planche', seuil: 1.5, antic: 6, vmin: 10, preAlerte: true, veille: true, bips: true, voix: false, smooth: false },
+  { nom: 'Kite', seuil: 1, antic: 8, vmin: 12, preAlerte: true, veille: false, bips: true, voix: true, smooth: false },
+  { nom: 'Prudent', seuil: 3, antic: 12, vmin: 5, preAlerte: true, veille: true, bips: true, voix: true, smooth: true },
+];
+let profils = [], profilActif = 0, profilEdite = null;
+const valeur = id => $(id).type === 'checkbox' ? $(id).checked : +$(id).value;
+function initProfils() {
+  profils = store.get('profils', null);
+  if (!Array.isArray(profils) || !profils.length) { // première fois : le profil Foil reprend les réglages en place
+    profils = PROFILS_DEFAUT.map(p => ({ ...p }));
+    CHAMPS.forEach(k => { if (store.get(k, null) != null) profils[0][k] = valeur(k); });
+    store.set('profils', profils);
+  }
+  profilActif = Math.min(store.get('profilActif', 0), profils.length - 1);
+  appliquerProfil(profilActif);
+}
+function appliquerProfil(i) {
+  profilActif = i; const p = profils[i];
+  CHAMPS.forEach(k => { if ($(k).type === 'checkbox') $(k).checked = !!p[k]; else $(k).value = p[k]; });
+  store.set('profilActif', i); saveSettings(); majProfil();
+}
+function resumeProfil(p) {
+  return `${fr(+p.seuil)} m d'eau · ${p.antic} s · dès ${p.vmin} km/h · ` + [p.bips && 'bips', p.voix && 'voix', p.veille && 'veille', p.preAlerte && 'pré-alerte', p.smooth && 'fonds lisses'].filter(Boolean).join(', ');
+}
+function majProfil() { $('nomProfil').textContent = profils[profilActif].nom + ' ▾'; $('resumeProfil').textContent = resumeProfil(profils[profilActif]); }
+function rendreProfils() {
+  const l = $('listeProfils'); l.innerHTML = '';
+  profils.forEach((p, i) => {
+    const d = document.createElement('div'); d.className = 'prof' + (i === profilActif ? ' sel' : '');
+    d.innerHTML = '<span class="rond"></span><div class="grow"><div class="n"></div><div class="mu"></div></div><span class="crayon" title="Modifier">✎</span>';
+    d.querySelector('.n').textContent = p.nom; d.querySelector('.mu').textContent = resumeProfil(p);
+    d.onclick = e => { appliquerProfil(i); if (e.target.classList.contains('crayon')) editerProfil(i); else { profilEdite = null; $('editeurProfil').hidden = true; } rendreProfils(); };
+    l.append(d);
+  });
+}
+function editerProfil(i) {
+  appliquerProfil(i); profilEdite = i; $('pNom').value = profils[i].nom; $('editeurProfil').hidden = false;
+  setTimeout(() => $('editeurProfil').scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+}
+function enregistrerProfil() {
+  if (profilEdite == null) return;
+  const p = profils[profilEdite];
+  CHAMPS.forEach(k => p[k] = valeur(k)); p.nom = $('pNom').value.trim() || 'Sans nom';
+  store.set('profils', profils); saveSettings(); majProfil(); rendreProfils();
+}
+[...CHAMPS, 'pNom'].forEach(id => $(id).addEventListener('change', enregistrerProfil));
+$('pNom').addEventListener('input', enregistrerProfil);
+function ouvrirProfils() { rendreProfils(); $('fProfils').classList.add('on'); }
+function fermerProfils() { $('fProfils').classList.remove('on'); profilEdite = null; $('editeurProfil').hidden = true; if (location.hash === '#profils') history.replaceState(null, '', location.pathname); }
+$('carteProfil').onclick = ouvrirProfils;
+$('fermerProfils').onclick = fermerProfils;
+$('fProfils').onclick = e => { if (e.target === $('fProfils')) fermerProfils(); };
+$('nouveauProfil').onclick = () => { profils.push({ ...PROFILS_DEFAUT[0], nom: 'Nouveau profil' }); store.set('profils', profils); rendreProfils(); editerProfil(profils.length - 1); rendreProfils(); };
+$('dupliquerProfil').onclick = () => { if (profilEdite == null) return; profils.push({ ...profils[profilEdite], nom: profils[profilEdite].nom + ' (copie)' }); store.set('profils', profils); editerProfil(profils.length - 1); rendreProfils(); };
+$('supprimerProfil').onclick = () => {
+  if (profilEdite == null || profils.length < 2) return;
+  if (!confirm('Supprimer le profil « ' + profils[profilEdite].nom + ' » ?')) return;
+  profils.splice(profilEdite, 1); store.set('profils', profils); profilEdite = null; $('editeurProfil').hidden = true; appliquerProfil(0); rendreProfils();
+};
+
+// ---------- Routage : accueil, réglages avancés (#avance), profils (#profils) ----------
+function route() {
+  if (running) return;
+  const h = location.hash, av = h === '#avance';
+  $('setup').hidden = av; $('avance').hidden = !av;
+  if (h === '#profils') ouvrirProfils();
+  scrollTo(0, 0);
+}
+addEventListener('hashchange', route);
+
 // ---------- Démarrage ----------
 (async () => {
   loadSettings();
   // sécurité : chaque démarrage repart sur la vraie marée et le vrai GPS (mode test et simulation désactivés)
   $('testMode').checked = false; $('simMode').checked = false; saveSettings();
   styleMontre = $('styleMontre').value; $('testH').oninput(); $('simMode').onchange(); showGeoInfo();
+  initProfils(); route(); demarrerGpsAccueil(); majVerifs();
+  addEventListener('load', () => diagEtat().then(t => $('diagInfo').textContent = t));
+  setTimeout(() => { // chargement anormalement long : dire ce qui manque
+    if (chargementEnAttente.size) $('dataInfo').textContent = 'Chargement bloqué sur : ' + [...chargementEnAttente].join(', ');
+    else if (!meta) $('dataInfo').textContent += ' (échec : voir le bandeau rouge)';
+  }, 8000);
   try {
     await chargerDonnees();
     const r = store.get('recal', null);
     if (r && r.jour === new Date().toDateString() && PORTS.some(p => p.id === r.port)) { $('offPort').value = r.port; r.rows.forEach(offRow); }
-    applyRecal(); $('start').disabled = false;
+    applyRecal(); $('start').disabled = false; $('dataInfo').textContent = '';
     await recalageDirect(); updHNow(); setInterval(updHNow, 60000);
   } catch (err) {
     $('dataInfo').innerHTML = '<span class="err">' + (location.protocol === 'file:'

@@ -3,76 +3,98 @@
 <head>
 <script src="diagnostic.js"></script>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Éditeur de roches</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#071318">
+<title>Mes roches – Radar roches</title>
+<link rel="icon" href="logo.svg">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.css">
+<link rel="stylesheet" href="theme.css">
+<script src="nav.js"></script>
 <style>
-  :root {
-    --bg: #f6f7f9; --panel: #ffffff; --text: #1d2430; --muted: #667085; --line: #dde1e7;
-    --accent: #0b6bcb; --danger: #d92d20; --warn: #f79009; --ok: #12b76a; --emerge: #6b1d1d; --test: #7a5af8;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #12161c; --panel: #1b2129; --text: #e6e9ee; --muted: #98a2b3; --line: #2c3540; --accent: #4ea1f3; }
-  }
-  * { box-sizing: border-box; }
-  [hidden] { display: none !important; }
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
-    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  #app { display: grid; grid-template-columns: 1fr 360px; height: 100%; }
-  #map { height: 100%; }
-  aside { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 12px 14px; }
-  h1 { font-size: 17px; margin: 0 0 2px; }
-  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 18px 0 8px; }
-  .sub { color: var(--muted); font-size: 12px; }
-  .row { display: flex; gap: 8px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
-  label { font-size: 13px; }
-  input[type=number], input[type=text], select, textarea {
-    background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; font: inherit; }
-  input[type=number] { width: 80px; }
+  :root { --emerge: #b0302a; --test: #bf5af2; }
+  html, body { height: 100%; overflow: hidden; }
+  #app { position: fixed; inset: 0; }
+  #mapWrap { position: absolute; inset: 0; }
+  #map { height: 100%; background: #0e1620; }
+  h2 { margin: 18px 0 8px; }
+  .row { display: flex; gap: 8px; align-items: center; margin: 6px 0; flex-wrap: wrap; justify-content: flex-start; }
+  label { font-size: 14px; display: inline-flex; align-items: center; gap: 8px; }
   input[type=text], textarea { width: 100%; }
   input[type=range] { flex: 1; }
-  button { font: inherit; border: 1px solid var(--line); background: var(--bg); color: var(--text);
-    border-radius: 6px; padding: 6px 10px; cursor: pointer; }
-  button:hover { border-color: var(--accent); }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  button.on { outline: 2px solid var(--accent); }
-  button.del { color: var(--danger); }
-  .big { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 70px; text-align: right; }
-  .testbox { border: 2px dashed var(--test); border-radius: 8px; padding: 8px 10px; }
-  .testbox.off { border-color: var(--line); }
-  #list { list-style: none; padding: 0; margin: 0; }
-  #capList { list-style: none; padding: 0; margin: 0; }
-  #capList li { border-bottom: 1px solid var(--line); padding: 6px 0; }
-  #capList li.cal { background: var(--bg); }
+  button.on { outline: 2px solid var(--ac); }
+  button.del { color: var(--dan); }
+  .big { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; min-width: 70px; text-align: right; }
+  .testbox { border: 2px dashed var(--test); border-radius: 12px; padding: 8px 10px; }
+  .testbox.off { border-color: var(--ln); }
+  #list, #capList { list-style: none; padding: 0; margin: 0; }
+  #capList li { border-bottom: 1px solid var(--ln); padding: 6px 0; }
   .pairmk { width: 14px; height: 14px; border: 2px solid #d92d20; border-radius: 50%; background: rgba(255,255,255,.6); }
-  #list li { display: flex; gap: 8px; align-items: center; padding: 6px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
-  #list li:hover, #list li.sel { background: var(--bg); }
-  .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; border: 1px solid rgba(0,0,0,.3); }
+  #list li { display: flex; gap: 10px; align-items: center; padding: 10px 4px; border-bottom: 1px solid var(--ln); cursor: pointer; }
+  #list li.sel { background: var(--p2); }
+  .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; border: 1px solid rgba(0,0,0,.3); display: inline-block; }
   .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .tag { font-size: 11px; padding: 1px 5px; border-radius: 4px; background: var(--test); color: #fff; }
+  .tag { font-size: 11px; padding: 1px 6px; border-radius: 5px; background: var(--test); color: #fff; }
   .legend span { display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; font-size: 12px; }
-  #form { border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin-top: 8px; }
-  #hint { position: absolute; z-index: 1000; top: 10px; left: 50%; transform: translateX(-50%);
-    background: var(--text); color: var(--panel); padding: 6px 12px; border-radius: 6px; font-size: 13px; display: none; }
-  #coords { position: absolute; z-index: 1000; bottom: 18px; left: 10px; background: rgba(255,255,255,.85);
-    color: #1d2430; padding: 2px 6px; border-radius: 4px; font: 12px ui-monospace, monospace; }
-  .lbl { background: rgba(255,255,255,.85); border: none; box-shadow: none; padding: 0 3px; font-size: 11px; font-weight: 600; color: #1d2430; }
+  #form { border: 1px solid var(--ac); border-radius: 14px; padding: 10px 12px; margin: 8px 0; background: var(--p2); }
+  #hint { position: absolute; z-index: 1000; top: 12px; left: 50%; transform: translateX(-50%); max-width: 90%;
+    background: var(--ac); color: var(--ac-on); padding: 8px 14px; border-radius: 12px; font-size: 14px; font-weight: 600; display: none; text-align: center; }
+  #coords { position: absolute; z-index: 1000; top: 10px; left: 10px; background: rgba(7,19,24,.8); color: var(--mu); padding: 2px 6px; border-radius: 6px; font: 11px ui-monospace, monospace; }
+  .lbl { background: rgba(7,19,24,.85); border: none; box-shadow: none; padding: 0 4px; font-size: 11px; font-weight: 600; color: var(--tx); }
   .lbl::before { display: none; }
-  @media (max-width: 800px) { #app { grid-template-columns: 1fr; grid-template-rows: 55% 45%; } aside { border-left: none; border-top: 1px solid var(--line); } }
+  .leaflet-bar a, .leaflet-control-zoom a { background: var(--p2) !important; color: var(--tx) !important; border-color: var(--ln) !important; }
+  .leaflet-control-attribution { background: rgba(7,19,24,.7) !important; color: var(--mu) !important; }
+  .leaflet-control-attribution a { color: var(--mu) !important; }
+
+  /* Panneau : feuille qui monte du bas sur téléphone, panneau latéral sur ordinateur */
+  aside { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1001; background: var(--p1); border-top: 1px solid var(--ln);
+    border-radius: 20px 20px 0 0; padding: 0 14px 16px; overflow-y: auto; height: 152px; transition: height .2s; }
+  html.appli aside { bottom: 63px; }
+  aside.moyen { height: 50vh; } aside.ouvert { height: 80vh; }
+  html.appli aside.ouvert { height: calc(100vh - 140px); }
+  .poignee { position: sticky; top: 0; z-index: 2; background: var(--p1); padding: 8px 0 6px; }
+  .barrette { width: 44px; height: 5px; border-radius: 3px; background: var(--ln2); margin: 0 auto 8px; cursor: pointer; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .actions button, .actions a { padding: 9px 12px; }
+  #mapWrap .leaflet-bottom { bottom: 152px; }
+  html.appli #mapWrap .leaflet-bottom { bottom: 215px; }
+  @media (min-width: 900px) {
+    aside, aside.moyen, aside.ouvert { left: auto; top: 0; width: 380px; height: auto !important; border-radius: 0; border-top: 0; border-left: 1px solid var(--ln); }
+    html.appli aside { bottom: 63px; }
+    #mapWrap { right: 380px; }
+    .barrette { display: none; }
+    #mapWrap .leaflet-bottom { bottom: 0; }
+  }
 </style>
 </head>
-<body>
+<body data-onglet="roches">
 <div id="app">
-  <div style="position:relative;height:100%;min-height:0">
+  <div id="mapWrap">
     <div id="map"></div>
     <div id="hint"></div>
     <div id="coords"></div>
   </div>
-  <aside>
-    <a href="index.html" style="color:var(--accent);text-decoration:none;font-size:14px">← Accueil</a>
-    <h1>Roches du Sillon</h1>
-    <div class="sub">Déclare les roches et hauts-fonds lus sur la carte SHOM. Les cotes sont exprimées par rapport au zéro hydrographique.</div>
+  <aside id="panneau">
+    <div class="poignee">
+      <div class="barrette" id="barrette" title="Agrandir / réduire"></div>
+      <div class="row" style="justify-content:space-between;margin:0 0 8px">
+        <b style="font-size:16px">Mes roches <span id="count" class="mu" style="font-weight:400"></span></b>
+        <a class="btn" href="carte.html#partager" id="partager">Partager</a>
+      </div>
+      <div class="actions">
+        <button class="prim" id="addPoint">＋ Roche</button>
+        <button id="addZone">＋ Zone</button>
+        <button id="addIci" title="Poser une roche à ma position GPS">◎ Ici</button>
+        <label style="font-size:13px"><input type="checkbox" id="newIsTest"> test</label>
+      </div>
+    </div>
+
+    <div id="form" hidden></div>
+    <div class="mu" id="radarInfo" style="margin:4px 0 2px">Tes roches sont utilisées directement par le radar.</div>
+
+    <h2>Éléments déclarés</h2>
+    <div class="row"><label><input type="checkbox" id="showTest" checked> Afficher les éléments de <span class="tag">test</span></label></div>
+    <ul id="list"></ul>
 
     <h2>Fond de carte</h2>
     <div class="row">
@@ -83,12 +105,32 @@
       </select>
       <label><input type="checkbox" id="shomOn" checked> Carte SHOM</label>
     </div>
-    <div class="row"><label><input type="checkbox" id="lidarOn"> Relief Litto3D (lidar SHOM/IGN) — chaque tête de roche apparaît</label></div>
+    <div class="row"><label><input type="checkbox" id="lidarOn"> Relief Litto3D (chaque tête de roche apparaît)</label></div>
     <div class="row"><label style="width:110px">Opacité relief</label><input type="range" id="lidarOp" min="0" max="1" step="0.05" value="0.8"></div>
     <div class="row"><label style="width:110px">Opacité SHOM</label><input type="range" id="shomOp" min="0" max="1" step="0.05" value="1"></div>
 
-    <h2>Captures de carte (1:10 000…)</h2>
-    <div class="sub">Ajoute une capture d'écran de data.shom.fr, puis cale-la avec 2 repères ou plus (croisements de graticule, tourelles, balises).</div>
+    <h2>Dangers Litto3D (automatique)</h2>
+    <div class="row"><label><input type="checkbox" id="l3dOn"> Zones dangereuses à la hauteur d'eau ci-dessous</label></div>
+    <div class="row"><label><input type="checkbox" id="l3dSmooth" checked> Fonds lisses (sable, vase) en plus pâle</label></div>
+    <div class="row"><label><input type="checkbox" id="autoOn"> Têtes de roche détectées <span class="mu" id="autoCount"></span></label></div>
+    <div class="mu" id="l3dInfo">Calculé à partir du relevé laser Litto3D (Shom – IGN). Touche une tête de roche pour l'ajouter à tes roches.</div>
+
+    <h2>Hauteur d'eau (couleurs)</h2>
+    <div class="row"><label style="width:150px">Eau minimale (m)</label><input type="number" id="seuil" step="0.1" min="0" value="2.0"></div>
+    <div class="testbox" id="testbox">
+      <div class="row"><label><input type="checkbox" id="testMode"> <b>Colorer pour une hauteur d'eau</b></label></div>
+      <div class="row"><input type="range" id="hauteur" min="0" max="14" step="0.1" value="6"><span class="big" id="hauteurTxt">6.0 m</span></div>
+      <div class="mu">Hauteur de marée au-dessus du zéro des cartes, comme dans l'annuaire. Sans effet sur le radar.</div>
+    </div>
+    <div class="legend row" style="margin-top:8px">
+      <span><i class="dot" style="background:var(--emerge)"></i>émergé</span>
+      <span><i class="dot" style="background:var(--dan)"></i>&lt; eau min</span>
+      <span><i class="dot" style="background:var(--warn)"></i>+1 m</span>
+      <span><i class="dot" style="background:var(--ok)"></i>sûr</span>
+    </div>
+
+    <h2>Captures de carte</h2>
+    <div class="mu">Ajoute une capture d'écran de data.shom.fr (1:10 000…), puis cale-la avec 2 repères ou plus (croisements de graticule, tourelles, balises).</div>
     <div class="row">
       <button id="capAdd">＋ Ajouter une capture…</button>
       <input type="file" id="capFile" accept="image/*" hidden>
@@ -96,58 +138,25 @@
     <ul id="capList"></ul>
     <div id="capCal" class="testbox" hidden>
       <div class="row"><b style="flex:1" id="capCalTitle"></b></div>
-      <div class="sub" id="capCalInfo"></div>
+      <div class="mu" id="capCalInfo"></div>
       <div class="row" id="capCoordRow" hidden>
         <input type="text" id="capCoord" placeholder="48°39,50'N 2°00,00'W  ou  48.6583, -2.0">
         <button id="capCoordOk">Valider ces coordonnées</button>
       </div>
       <div class="row">
-        <button class="primary" id="capPairAdd">＋ Ajouter un repère</button>
+        <button class="prim" id="capPairAdd">＋ Ajouter un repère</button>
         <button id="capPairUndo">Retirer le dernier</button>
         <button id="capCalEnd">Terminer</button>
       </div>
     </div>
 
-    <h2>Hauteur d'eau</h2>
-    <div class="row"><label style="width:150px">Seuil de sécurité (m d'eau)</label><input type="number" id="seuil" step="0.1" min="0" value="2.0"></div>
-    <div class="testbox" id="testbox">
-      <div class="row"><label><input type="checkbox" id="testMode"> <b>Mode test : hauteur d'eau forcée</b></label></div>
-      <div class="row"><input type="range" id="hauteur" min="0" max="14" step="0.1" value="6"><span class="big" id="hauteurTxt">6.0 m</span></div>
-      <div class="sub">Hauteur de marée au-dessus du zéro hydro (comme dans l'annuaire des marées). Les couleurs montrent ce qui serait dangereux à cette hauteur.</div>
-    </div>
-    <div class="legend row" style="margin-top:8px">
-      <span><i class="dot" style="background:var(--emerge)"></i>émergé</span>
-      <span><i class="dot" style="background:var(--danger)"></i>&lt; seuil</span>
-      <span><i class="dot" style="background:var(--warn)"></i>seuil +1 m</span>
-      <span><i class="dot" style="background:var(--ok)"></i>sûr</span>
-    </div>
-
-    <h2>Dangers Litto3D (automatique)</h2>
-    <div class="row"><label><input type="checkbox" id="l3dOn"> Zones dangereuses à la hauteur d'eau ci-dessus</label></div>
-    <div class="row"><label><input type="checkbox" id="l3dSmooth" checked> Inclure les fonds lisses (sable, vase) en plus pâle</label></div>
-    <div class="row"><label><input type="checkbox" id="autoOn"> Têtes de roche détectées <span class="sub" id="autoCount"></span></label></div>
-    <div class="sub" id="l3dInfo">Calculé à partir du relevé laser Litto3D (Shom – IGN). Les couleurs suivent la hauteur d'eau et le seuil réglés plus haut, mode test coché ou non.</div>
-
-    <h2>Ajouter</h2>
-    <div class="row">
-      <button id="addPoint">＋ Roche (point)</button>
-      <button id="addZone">＋ Zone (polygone)</button>
-    </div>
-    <div class="row"><label><input type="checkbox" id="newIsTest"> Les nouveaux éléments sont des éléments de <span class="tag">test</span> (parking, vélo…)</label></div>
-
-    <div id="form" hidden></div>
-
-    <h2>Éléments déclarés <span id="count" class="sub"></span></h2>
-    <div class="row"><label><input type="checkbox" id="showTest" checked> Afficher les éléments de test</label></div>
-    <ul id="list"></ul>
-
     <h2>Fichier</h2>
     <div class="row">
-      <button class="primary" id="export">Exporter (GeoJSON)</button>
+      <button id="export">Exporter (GeoJSON)</button>
       <button id="importBtn">Importer…</button>
       <input type="file" id="importFile" accept=".geojson,.json,application/geo+json,application/json" hidden>
     </div>
-    <div class="sub">Sauvegarde automatique dans ce navigateur. Exporte régulièrement : c'est ce fichier que lira le radar.</div>
+    <div class="mu">Sauvegarde automatique sur cet appareil. L'export sert de sauvegarde ou à passer tes roches d'un appareil à l'autre.</div>
   </aside>
 </div>
 
@@ -173,10 +182,17 @@ function load() {
 }
 function save() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(features)); } catch {}
+  try { localStorage.setItem('radar.roches', JSON.stringify(versRadar())); } catch {} // le radar les prend directement
 }
 
 // ---------- Carte ----------
-const map = L.map('map', { maxZoom: 20 }).setView([48.6600, -2.003], 15);
+const map = L.map('map', { maxZoom: 20, zoomControl: !window.androidBridge });
+(() => {
+  let v = null; try { v = JSON.parse(localStorage.getItem('editeur.vue')); } catch {}
+  if (v) map.setView([v.lat, v.lon], v.z);
+  else map.setView(localStorage.getItem('radar.zone') === 'cotes_armor' ? [48.84, -3.3] : [48.66, -2.003], localStorage.getItem('radar.zone') === 'cotes_armor' ? 12 : 15);
+})();
+map.on('moveend', () => { const c = map.getCenter(); try { localStorage.setItem('editeur.vue', JSON.stringify({ lat: c.lat, lon: c.lng, z: map.getZoom() })); } catch {} });
 const geopf = (layer, fmt, maxNative) => L.tileLayer(
   'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=' + layer +
   '&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=' + fmt,
@@ -284,6 +300,12 @@ function zoomTo(f) {
   else map.fitBounds(L.latLngBounds(f.geom), { maxZoom: 18, padding: [40, 40] });
 }
 
+// ---------- Panneau (téléphone) : replié, mi-hauteur, ouvert ----------
+const panneau = $('panneau');
+function etatPanneau(e) { panneau.classList.toggle('moyen', e === 'moyen'); panneau.classList.toggle('ouvert', e === 'ouvert'); if (e === 'replie') panneau.scrollTop = 0; }
+$('barrette').onclick = () => etatPanneau(panneau.classList.contains('ouvert') || panneau.classList.contains('moyen') ? 'replie' : 'ouvert');
+$('count').onclick = $('barrette').onclick;
+
 // ---------- Sélection / formulaire ----------
 function select(id) {
   const prev = selectedId; selectedId = id;
@@ -294,6 +316,8 @@ function renderForm() {
   const f = features.find(g => g.id === selectedId), box = $('form');
   if (!f) { box.hidden = true; return; }
   box.hidden = false;
+  if (!panneau.classList.contains('ouvert')) etatPanneau('moyen');
+  panneau.scrollTop = 0;
   box.innerHTML = `
     <div class="row"><b style="flex:1">${f.kind === 'point' ? 'Roche' : 'Zone'}</b><button id="fClose">Fermer</button></div>
     <div class="row"><input type="text" id="fNom" placeholder="Nom (ex. Les Létruns)" value="${esc(f.nom || '')}"></div>
@@ -315,7 +339,7 @@ function renderForm() {
     save(); redraw([f]); renderList();
   };
   ['fNom', 'fRef', 'fVal', 'fRayon', 'fTest', 'fNote'].forEach(k => { const el = $(k); if (el) el.oninput = el.onchange = upd; });
-  $('fClose').onclick = () => select(null);
+  $('fClose').onclick = () => { select(null); etatPanneau('replie'); };
   $('fDel').onclick = () => {
     if (!confirm('Supprimer « ' + (f.nom || 'cet élément') + ' » ?')) return;
     removeLayer(f.id); features = features.filter(g => g.id !== f.id); selectedId = null; save(); renderForm(); renderList();
@@ -327,14 +351,27 @@ function renderForm() {
 function hint(t) { $('hint').textContent = t; $('hint').style.display = t ? 'block' : 'none'; }
 function setDrawBtn(which) { $('addPoint').classList.toggle('on', which === 'point'); $('addZone').classList.toggle('on', which === 'zone'); }
 $('addPoint').onclick = () => {
-  map.pm.disableDraw(); select(null); setDrawBtn('point');
+  if ($('addPoint').classList.contains('on')) { map.pm.disableDraw(); hint(''); setDrawBtn(null); return; } // second appui : annule
+  map.pm.disableDraw(); select(null); setDrawBtn('point'); etatPanneau('replie');
   map.pm.enableDraw('CircleMarker', { continueDrawing: false });
-  hint('Clique sur la roche · Échap pour annuler');
+  hint('Touche la carte à l\'endroit de la roche (re-touche « ＋ Roche » pour annuler)');
 };
 $('addZone').onclick = () => {
-  map.pm.disableDraw(); select(null); setDrawBtn('zone');
+  if ($('addZone').classList.contains('on')) { map.pm.disableDraw(); hint(''); setDrawBtn(null); return; }
+  map.pm.disableDraw(); select(null); setDrawBtn('zone'); etatPanneau('replie');
   map.pm.enableDraw('Polygon', { allowSelfIntersection: false, snappable: false });
-  hint('Clique les sommets de la zone, puis clique le premier point pour fermer · Échap pour annuler');
+  hint('Touche les sommets de la zone, puis le premier point pour la fermer');
+};
+// Roche à ma position GPS (sur l'eau, à marée basse, au parking pour un test…)
+$('addIci').onclick = () => {
+  if (!navigator.geolocation) { alert('Position indisponible.'); return; }
+  $('addIci').disabled = true; hint('Recherche de ta position…');
+  navigator.geolocation.getCurrentPosition(p => {
+    $('addIci').disabled = false; hint('');
+    const f = { id: uid(), kind: 'point', geom: [+p.coords.latitude.toFixed(7), +p.coords.longitude.toFixed(7)], nom: nextCode('R'), ref: 'decouvre', valeur: 0,
+      rayon: Math.max(15, Math.round(p.coords.accuracy)), test: $('newIsTest').checked, note: 'Posée à ma position (précision ' + Math.round(p.coords.accuracy) + ' m)' };
+    features.push(f); save(); justCreated = f.id; map.setView(f.geom, Math.max(map.getZoom(), 17)); select(f.id);
+  }, e => { $('addIci').disabled = false; hint(''); alert('Position indisponible : ' + e.message); }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
 };
 map.on('pm:drawend', () => { hint(''); setDrawBtn(null); });
 // Nom par défaut : R001, R002… pour les roches, Z001… pour les zones (numéro suivant le plus grand existant)
@@ -368,21 +405,22 @@ function refreshColors() {
 // ---------- Dangers Litto3D (tuiles produites par outils/construire.py) ----------
 // Tuile z16, PNG RVB : R = 255 sans mesure | 0 profond | 1..231 cote ZH = cote_min + (R−1)/10 | 254 terre
 //                      G = relief local en pas de 5 cm (rocher si ≥ 30 cm)
-let l3dMeta = null, autoFeats = null;
+let l3dMeta = null, autoFeats = null, l3dZones = [];
 const l3dData = new Map(); // 'x/y' -> Promise<Uint8ClampedArray | null>
 const ROCHE_RELIEF = 0.30;
 const L3D_COUL = [null, [247, 144, 9], [217, 45, 32], [107, 29, 29]]; // 1 vigilance, 2 danger, 3 émergé
 function l3dTile(x, y) {
   const k = x + '/' + y;
   if (!l3dData.has(k)) {
-    l3dData.set(k, !l3dMeta.set.has(k) ? Promise.resolve(null) : new Promise(res => {
+    const zt = l3dZones.find(z => z.meta.set.has(k));
+    l3dData.set(k, !zt ? Promise.resolve(null) : new Promise(res => {
       const img = new Image();
       img.onload = () => {
         const c = document.createElement('canvas'); c.width = c.height = 256;
         const g = c.getContext('2d'); g.drawImage(img, 0, 0); res(g.getImageData(0, 0, 256, 256).data);
       };
       img.onerror = () => res(null);
-      img.src = 'donnees/tuiles/' + l3dMeta.zoom + '/' + k + '.png';
+      img.src = zt.dossier + '/tuiles/' + zt.meta.zoom + '/' + k + '.png';
     }));
   }
   return l3dData.get(k);
@@ -485,9 +523,14 @@ function drawAuto() {
 }
 async function l3dInit() {
   try {
-    l3dMeta = await (await fetch('donnees/meta.json')).json();
-    l3dMeta.set = new Set(l3dMeta.tuiles.map(t => t[0] + '/' + t[1]));
-    autoFeats = (await (await fetch('donnees/tetes_auto.geojson')).json()).features;
+    l3dZones = await (await fetch('donnees/zones.json')).json();
+    autoFeats = [];
+    for (const z of l3dZones) {
+      z.meta = await (await fetch(z.dossier + '/meta.json')).json();
+      z.meta.set = new Set(z.meta.tuiles.map(t => t[0] + '/' + t[1]));
+      try { autoFeats.push(...(await (await fetch(z.dossier + '/tetes_auto.geojson')).json()).features); } catch {}
+    }
+    l3dMeta = l3dZones[0].meta; // zoom, pas de cote : identiques dans toutes les zones
     $('autoCount').textContent = '(' + autoFeats.length + ')';
   } catch (err) {
     $('l3dInfo').textContent = 'Données Litto3D introuvables : lance l\'éditeur avec lancer_outils.bat (un double-clic sur le fichier HTML ne permet pas de les lire).';
@@ -537,16 +580,12 @@ function versRadar() {
   });
 }
 $('export').onclick = () => {
-  if (window.androidBridge) { // appli : pas de téléchargement possible, on transmet directement au radar (même mémoire)
-    try { localStorage.setItem('radar.roches', JSON.stringify(versRadar())); } catch {}
-    alert(features.length + ' élément(s) transmis au radar de l’appli.\nIls seront utilisés au prochain démarrage du radar.');
-    return;
-  }
   const blob = new Blob([JSON.stringify(toGeoJSON(), null, 1)], { type: 'application/geo+json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = 'roches_sillon_' + new Date().toISOString().slice(0, 10) + '.geojson';
   a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 };
+if (window.androidBridge) $('export').hidden = true;
 $('importBtn').onclick = () => $('importFile').click();
 $('importFile').onchange = async e => {
   const file = e.target.files[0]; if (!file) return;
@@ -762,7 +801,7 @@ document.addEventListener('keydown', e => {
 });
 
 // ---------- Démarrage ----------
-load(); renderAll(); refreshColors();
+load(); if (features.length) save(); renderAll(); refreshColors(); // synchronise le radar avec les roches de l éditeur
 idb.all().then(list => { captures = list; captures.forEach(drawCapture); renderCaps(); }).catch(err => console.warn('captures indisponibles', err));
 if (features.length) map.fitBounds(L.featureGroup([...layers.values()].map(l => l.main)).getBounds(), { maxZoom: 17, padding: [40, 40] });
 </script>

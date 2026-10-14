@@ -6,14 +6,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rejeu de session</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<meta name="theme-color" content="#071318">
+<link rel="icon" href="logo.svg">
+<script src="nav.js"></script>
 <style>
-  :root { --bg: #0b0f14; --panel: #151b23; --text: #e8edf3; --muted: #8a96a6; --line: #2a3441;
-    --accent: #3d9bf0; --a1: #ff9f0a; --a2: #ff3b30; --a3: #d81b60; }
+  :root { --bg: #071318; --panel: #0b2024; --text: #d6f3f1; --muted: #7fb8b2; --line: #14403f;
+    --accent: #5ee6d6; --a1: #ff9f0a; --a2: #ff3b30; --a3: #d81b60; }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   button, select, input { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #04221f; font-weight: 650; }
+  .barre-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 3000; background: #061014; border-top: 1px solid var(--line); display: flex; justify-content: space-around; padding: 7px 4px 10px; }
+  .barre-nav a { color: var(--muted); font-size: 11px; text-align: center; text-decoration: none; flex: 1; max-width: 140px; }
+  .barre-nav a svg { display: block; margin: 0 auto 2px; } .barre-nav a.on { color: var(--accent); }
+  html.appli body { padding-bottom: 64px; }
+  html.appli footer { bottom: 63px !important; }
   button.on { outline: 2px solid var(--accent); }
   input[type=number] { width: 70px; }
   label { display: inline-flex; gap: 6px; align-items: center; }
@@ -56,16 +64,16 @@
   }
 </style>
 </head>
-<body>
+<body data-onglet="plus">
 <div id="app">
   <header>
-    <a href="index.html" style="color:var(--accent);text-decoration:none;font-size:14px">← Accueil</a>
+    <a href="index.html" id="retour" style="color:var(--muted);text-decoration:none;font-size:22px;line-height:1">‹</a>
+    <script>if (window.androidBridge) document.getElementById('retour').href = 'plus.html';</script>
     <h1>Rejeu de session</h1>
     <button class="primary" id="gpxBtn">Ouvrir une trace (FIT ou GPX)…</button>
     <input type="file" id="gpxFile" accept=".gpx,.fit,application/gpx+xml" hidden>
     <span class="sub" id="info">Charge une ancienne session (FIT de préférence : heures et vitesse exactes) pour rejouer les alertes du radar.</span>
     <span style="flex:1"></span>
-    <a href="radar.html" class="sub" style="color:var(--accent)">Radar →</a>
   </header>
   <main>
     <div id="map"></div>

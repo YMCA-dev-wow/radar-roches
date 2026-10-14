@@ -1,16 +1,54 @@
-<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Radar roches</title><style>body{margin:0;background:#0b0f14;color:#e8edf3;font:18px system-ui,sans-serif;padding:24px;min-height:100vh;box-sizing:border-box;display:flex;flex-direction:column}
-a{display:block;margin:14px 0;padding:18px;border-radius:12px;background:#151b23;border:1px solid #2a3441;color:#e8edf3;text-decoration:none}
-small{display:block;color:#8a96a6;font-size:14px;margin-top:4px}
-footer{margin-top:auto;padding-top:24px;text-align:center;color:#5d6878;font-size:13px}</style>
-<h1>Radar roches</h1>
-<a href="radar.html">Radar<small>Alertes sur l'eau</small></a>
-<a href="carte.html">Carte et téléchargements<small>Zones couvertes, applis montre, roches partagées</small></a>
-<a href="rejeu.html">Rejeu de session<small>Rejouer une trace GPX</small></a>
-<a href="editeur_zones.html">Éditeur de roches<small>Sur ordinateur</small></a>
-<a href="notice.html">Notice<small>Installation, réglages, montre, test, dépannage</small></a>
-<p style="color:#8a96a6;font-size:13px">Relevé Litto3D® Shom – IGN 2024 (Licence Ouverte 2.0). Marée : observations REFMAR (Shom). Ne remplace pas la vigilance.</p>
-<footer id="maj"></footer>
-<script src="maj.js"></script>
-<script>verifierMaj(document.getElementById('maj'));</script>
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#071318">
+<title>Radar roches – atelier</title>
+<link rel="icon" href="logo.svg">
+<link rel="stylesheet" href="theme.css">
+<script src="nav.js"></script>
+<style>
+  .web { max-width: 1040px; margin: 0 auto; padding: 32px 24px 48px; }
+  .tete { display: flex; align-items: center; gap: 18px; margin-bottom: 8px; }
+  .tete h1 { font-size: 28px; letter-spacing: .02em; }
+  .accroche { color: var(--mu); font-size: 16px; max-width: 720px; margin: 0 0 28px; }
+  .grille { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .tuile { display: flex; gap: 16px; align-items: flex-start; background: var(--p1); border: 1px solid var(--ln); border-radius: 18px; padding: 20px; color: var(--tx); text-decoration: none; transition: border-color .15s; }
+  .tuile:hover { border-color: var(--ac); }
+  .tuile .ic { color: var(--ac); flex: none; }
+  .tuile b { font-size: 18px; display: block; margin-bottom: 4px; }
+  .tuile span { color: var(--mu); font-size: 14px; }
+  .appli { margin-top: 28px; display: flex; gap: 18px; align-items: center; flex-wrap: wrap; background: var(--p2); border: 1px solid var(--ln2); border-radius: 18px; padding: 18px 20px; }
+  .appli div { flex: 1; min-width: 240px; }
+  footer { margin-top: 28px; color: #4f7a76; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="web">
+  <div class="tete"><img src="logo.svg" width="64" height="64" alt=""><h1>Radar roches · atelier</h1></div>
+  <p class="accroche">Sur l'eau, le radar tourne dans l'appli Android ou sur la montre Garmin. Ici, sur ordinateur, tu prépares et tu analyses :
+    tes roches, tes sessions, les programmes de ta montre.</p>
+  <div class="grille" id="grille"></div>
+  <div class="appli">
+    <div><b>L'appli Android</b><br><span class="mu">Le radar, avec alertes sonores écran éteint. À installer depuis le téléphone.</span></div>
+    <a class="btn prim" href="https://github.com/YMCA-dev-wow/radar-roches/releases/latest/download/radar-roches.apk">Télécharger l'appli (APK)</a>
+  </div>
+  <footer>Relevé Litto3D® Shom – IGN 2024 (Licence Ouverte 2.0). Marée : observations REFMAR (Shom). Ne remplace pas la vigilance.</footer>
+</div>
+<script>
+const TUILES = [
+  ['roches', 'editeur_zones.html', 'Éditeur de roches', 'Déclare tes roches et hauts-fonds sur la carte SHOM et le relief Litto3D, cale des captures de carte, exporte-les.'],
+  ['rejeu', 'rejeu.html', 'Rejeu de session', 'Ouvre le fichier .fit de ta montre ou un GPX et rejoue les alertes avec la marée mesurée.'],
+  ['montre', 'carte.html', 'Carte et téléchargements', 'Zones couvertes, programmes .prg pour ta montre, roches partagées, modération.'],
+  ['notice', 'notice.html', 'Notice', 'Installation, réglages, montre, test, dépannage.'],
+];
+for (const [ic, href, titre, texte] of TUILES) {
+  const a = document.createElement('a'); a.className = 'tuile'; a.href = href;
+  a.innerHTML = `<span class="ic">${icone(ic, 34)}</span><div><b></b><span></span></div>`;
+  a.querySelector('b').textContent = titre; a.querySelector('div span').textContent = texte;
+  document.getElementById('grille').append(a);
+}
+</script>
+</body>
 </html>

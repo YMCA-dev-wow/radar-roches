@@ -4,8 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Notice Radar roches</title>
+<meta name="theme-color" content="#071318">
+<link rel="icon" href="logo.svg">
+<script src="nav.js"></script>
 <style>
-  :root { --bg: #0b0f14; --panel: #151b23; --text: #e8edf3; --muted: #8a96a6; --line: #2a3441; --accent: #3d9bf0; --warn: #ff9f0a; }
+  :root { --bg: #071318; --panel: #0b2024; --text: #d6f3f1; --muted: #7fb8b2; --line: #14403f; --accent: #5ee6d6; --warn: #ff9f0a; }
+  .barre-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 40; background: #061014; border-top: 1px solid var(--line); display: flex; justify-content: space-around; padding: 7px 4px 10px; }
+  .barre-nav a { color: var(--muted); font-size: 11px; text-align: center; text-decoration: none; flex: 1; max-width: 140px; }
+  .barre-nav a svg { display: block; margin: 0 auto 2px; } .barre-nav a.on { color: var(--accent); }
+  html.appli main { padding-bottom: 90px; }
   * { box-sizing: border-box; }
   html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, sans-serif; }
   header { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
@@ -29,8 +36,9 @@
   @media print { header { position: static; } :root { --bg: #fff; --panel: #f3f5f8; --text: #111; --muted: #555; --line: #ccc; } p, li, h3, th { color: #111; } }
 </style>
 </head>
-<body>
-<header><a href="index.html">← Accueil</a><h1>Notice</h1></header>
+<body data-onglet="plus">
+<header><a href="index.html" id="retour" style="text-decoration:none;font-size:22px;color:var(--muted)">‹</a><h1>Notice</h1></header>
+<script>if (window.androidBridge) document.getElementById('retour').href = 'plus.html';</script>
 <main>
 <p><b>Radar roches</b> t'avertit par des sons (et sur la montre) quand tu te diriges vers une roche ou un haut-fond couvert de moins d'eau que ce que tu as choisi,
 en tenant compte de la marée du moment. Il fonctionne écran éteint, sans regarder le téléphone.</p>
@@ -43,12 +51,12 @@ Garde la carte marine en tête et ta vigilance : l'appli ne la remplace pas.</di
   <li><a href="#principe">Comment ça marche</a></li>
   <li><a href="#installation">Installer l'appli sur le téléphone</a></li>
   <li><a href="#radar">Utiliser le radar (téléphone)</a></li>
-  <li><a href="#reglages">Tous les réglages du radar</a></li>
+  <li><a href="#reglages">Profils et réglages</a></li>
   <li><a href="#alertes">Comprendre les alertes et les sons</a></li>
   <li><a href="#montre">Appli montre Garmin</a></li>
   <li><a href="#test">Utilisation en test (à terre)</a></li>
   <li><a href="#carte">Carte, téléchargements et roches partagées</a></li>
-  <li><a href="#editeur">Ajouter ses propres roches (éditeur)</a></li>
+  <li><a href="#editeur">Ajouter ses propres roches (onglet Roches)</a></li>
   <li><a href="#rejeu">Rejouer une session</a></li>
   <li><a href="#web">Version web (ordinateur)</a></li>
   <li><a href="#maj">Mises à jour</a></li>
@@ -83,41 +91,58 @@ Par défaut, seules les <b>roches</b> déclenchent une alerte ; les fonds lisses
 </ol>
 
 <h2 id="radar">3. Utiliser le radar (téléphone)</h2>
-<h3>Avant d'aller à l'eau</h3>
-<ol>
-  <li>Ouvre <b>Radar</b>. En haut : la zone, la hauteur d'eau actuelle et l'état du recalage sur le marégraphe.</li>
-  <li>Vérifie <b>Eau minimale</b>, <b>Anticipation</b> et que <b>Mode test</b> et <b>Simulation</b> sont décochés (ils le sont à chaque démarrage).</li>
-  <li>Touche <b>Démarrer</b> quelques minutes avant de partir : la précision GPS (en haut à droite, en mètres) doit descendre sous 10 m.</li>
+<p>L'appli s'ouvre sur le radar. En bas, trois onglets : <b>Radar</b>, <b>Roches</b> (tes roches, § 9) et <b>Plus</b>
+(carte et téléchargements, rejeu, profils, réglages avancés, modération, notice, version de l'appli).</p>
+<h3>L'accueil : prêt à partir</h3>
+<ul>
+  <li><b>Carte de marée</b> : hauteur d'eau maintenant, sens (montante ou descendante), deux prochaines pleines et basses mers, courbe des prochaines heures,
+    état du recalage sur le marégraphe.</li>
+  <li><b>Profil</b> : le profil de navigation utilisé et ses réglages en résumé ; touche-le pour en changer ou le modifier (§ 4).</li>
+  <li><b>Vérifications</b> avant de partir, en vert si tout va bien : GPS (précision en m), marée recalée, mode test coupé, batterie.
+    Un <b>bandeau rouge</b> s'affiche tant que le mode test est actif, sur l'accueil comme pendant la navigation.</li>
+  <li>Le GPS se cale déjà sur l'accueil : attends que la précision passe sous 15 m, puis touche <b>Démarrer</b>.</li>
   <li>Range le téléphone et <b>éteins l'écran</b> : le radar continue (sons, voix, notifications).</li>
-</ol>
-<h3>L'écran radar</h3>
+</ul>
+<h3>Pendant la navigation</h3>
 <ul>
   <li>En haut : <b>eau</b> (hauteur de marée en m, « test » si forcée), <b>vitesse</b> (km/h), <b>précision GPS</b> (m).</li>
-  <li>Au centre, cap vers le haut : la flèche bleue est ta planche ; le secteur bleu est la zone d'alerte (±50°) ; le trait jaune la pré-alerte ;
+  <li>Le bandeau sous les chiffres décrit le danger le plus proche : <b>rouge</b> pour une alerte, <b>jaune</b> pour une pré-alerte, <b>bleu</b> pour la veille latérale.</li>
+  <li>Au centre, cap vers le haut : la flèche turquoise est ta planche ; le secteur turquoise est la zone d'alerte (±50°) ; le trait jaune la pré-alerte ;
     les secteurs en pointillés la veille latérale. Les dangers apparaissent en couleur : orange = peu d'eau (moins de l'eau minimale + 1 m),
     rouge = sous l'eau minimale, rouge foncé = émergé. Le N indique le nord.</li>
-  <li>Le message sous les chiffres décrit le danger le plus proche (« Hauts-fonds à tribord à 61 m (veille) »).</li>
-  <li>Boutons : <b>Muet</b> (coupe les sons) et <b>Arrêter</b>.</li>
+  <li><b>Muet</b> coupe les sons. Pour arrêter, <b>fais glisser le bouton rouge</b> jusqu'au bout : un simple toucher n'arrête rien.</li>
 </ul>
 
-<h2 id="reglages">4. Tous les réglages du radar</h2>
+<h2 id="reglages">4. Profils et réglages</h2>
+<h3>Profils de navigation</h3>
+<p>Un profil regroupe les réglages d'alerte. Quatre profils sont fournis, tous modifiables : <b>Foil</b> (2 m d'eau, 7 s), <b>Planche</b> (1,5 m, 6 s),
+<b>Kite</b> (1 m, 8 s) et <b>Prudent</b> (3 m, 12 s, fonds lisses compris). Touche la carte « Profil » de l'accueil (ou <b>Plus → Profils</b>) :</p>
+<ul>
+  <li>touche un profil pour l'utiliser ;</li>
+  <li>touche le crayon ✎ pour le modifier : nom et réglages ci-dessous, enregistrés aussitôt ;</li>
+  <li><b>＋ Nouveau</b> crée un profil, <b>Dupliquer</b> en copie un, <b>Supprimer</b> l'efface.</li>
+</ul>
 <table>
-  <tr><th>Réglage</th><th>Rôle</th><th>Par défaut</th></tr>
-  <tr><td>Recalage en direct sur le marégraphe</td><td>Corrige la prédiction avec les mesures des dernières heures (effet de la météo). Réseau nécessaire au démarrage ; sinon la prédiction seule est utilisée.</td><td>activé</td></tr>
-  <tr><td>Recaler sur l'annuaire officiel</td><td>Facultatif : saisis les pleines et basses mers du jour d'un port (heure locale, hauteur) pour caler la courbe dessus.</td><td>vide</td></tr>
-  <tr><td>Eau minimale sous la planche</td><td>En dessous de cette eau au-dessus d'une roche, c'est un danger. Tiens compte de ton foil (mât + aileron).</td><td>2,0 m</td></tr>
-  <tr><td>Alertes à partir de</td><td>Pas d'alerte en dessous de cette vitesse (à pied, à l'arrêt, à l'eau après une chute).</td><td>8 km/h</td></tr>
-  <tr><td>Anticipation</td><td>Secondes de navigation avant le danger : fixe la distance d'alerte (voir § 5).</td><td>7 s</td></tr>
-  <tr><td>Pré-alerte</td><td>Tintement doux pour un danger droit devant (±10°) encore loin (jusqu'à 2 × la distance d'alerte).</td><td>activée</td></tr>
-  <tr><td>Bips d'alerte</td><td>Bips dont la cadence suit la distance.</td><td>activés</td></tr>
-  <tr><td>Annonces vocales</td><td>La voix annonce la pré-alerte et la première alerte (« Roche à tribord, 40 mètres »), puis les bips prennent le relais. Sans bips : « Impact imminent, tribord » à mi-distance.</td><td>au choix</td></tr>
-  <tr><td>Veille latérale</td><td>Annonce une fois les dangers proches hors de ta route (jusqu'à 110° de chaque côté), utile avant un virement ou un empannage.</td><td>activée</td></tr>
-  <tr><td>Fonds lisses</td><td>Alerte aussi sur le sable et la vase peu profonds (plus d'alertes).</td><td>désactivé</td></tr>
-  <tr><td>Relayer sur la montre</td><td>Envoie des notifications Android (relayées par l'appli de ta montre) : démarrage, dangers et leur déplacement, GPS perdu, batterie faible. Inutile avec l'appli montre Garmin.</td><td>au choix</td></tr>
-  <tr><td>Mes roches</td><td>Roches ajoutées à la main (éditeur ou jeux partagés) utilisées par le radar.</td><td>—</td></tr>
-  <tr><td>Essais</td><td>Test GPS, mode test, simulation : voir § 7.</td><td>désactivés</td></tr>
+  <tr><th>Réglage du profil</th><th>Rôle</th></tr>
+  <tr><td>Eau minimale sous la planche</td><td>En dessous de cette eau au-dessus d'une roche, c'est un danger. Tiens compte de ton foil (mât + aile).</td></tr>
+  <tr><td>Anticipation</td><td>Secondes de navigation avant le danger : fixe la distance d'alerte (voir § 5).</td></tr>
+  <tr><td>Alertes à partir de</td><td>Pas d'alerte en dessous de cette vitesse (à pied, à l'arrêt, à l'eau après une chute).</td></tr>
+  <tr><td>Pré-alerte</td><td>Tintement doux pour un danger droit devant (±10°) encore loin (jusqu'à 2 × la distance d'alerte).</td></tr>
+  <tr><td>Veille latérale</td><td>Annonce une fois les dangers proches hors de ta route (jusqu'à 110° de chaque côté), utile avant un virement ou un empannage.</td></tr>
+  <tr><td>Bips d'alerte</td><td>Bips dont la cadence suit la distance.</td></tr>
+  <tr><td>Annonces vocales</td><td>La voix annonce la pré-alerte et la première alerte (« Roche à tribord, 40 mètres »), puis les bips prennent le relais. Sans bips : « Impact imminent, tribord » à mi-distance.</td></tr>
+  <tr><td>Fonds lisses</td><td>Alerte aussi sur le sable et la vase peu profonds (plus d'alertes).</td></tr>
 </table>
-<p class="sub">Touche <b>🔊 Écouter les sons</b> pour entendre chaque son avant de partir.</p>
+<h3>Réglages avancés (Plus → Réglages avancés et essais)</h3>
+<table>
+  <tr><th>Réglage</th><th>Rôle</th></tr>
+  <tr><td>Recalage en direct sur le marégraphe</td><td>Corrige la prédiction avec les mesures des dernières heures (effet de la météo). Réseau nécessaire au démarrage ; sinon la prédiction seule est utilisée. Activé par défaut.</td></tr>
+  <tr><td>Recaler sur l'annuaire officiel</td><td>Facultatif : saisis les pleines et basses mers du jour d'un port (heure locale, hauteur) pour caler la courbe dessus.</td></tr>
+  <tr><td>Écouter les sons</td><td>Fait entendre chaque son avant de partir.</td></tr>
+  <tr><td>Relayer sur la montre</td><td>Envoie des notifications Android (relayées par l'appli de ta montre) : démarrage, dangers et leur déplacement, GPS perdu, batterie faible. Inutile avec l'appli montre Garmin.</td></tr>
+  <tr><td>Mes roches</td><td>Import d'un fichier GeoJSON de roches (les roches de l'onglet Roches sont déjà utilisées automatiquement).</td></tr>
+  <tr><td>Essais</td><td>Test GPS, mode test, simulation : voir § 7.</td></tr>
+</table>
 
 <h2 id="alertes">5. Comprendre les alertes et les sons</h2>
 <ul>
@@ -149,7 +174,7 @@ Par défaut, seules les <b>roches</b> déclenchent une alerte ; les fonds lisses
 </table>
 <h3>Installer</h3>
 <ol>
-  <li>Télécharge le fichier de ta zone et de ta montre : dans l'appli, <b>Carte et téléchargements</b> → bouton <b>Télécharger pour …</b> ;
+  <li>Télécharge le fichier de ta zone et de ta montre : dans l'appli, <b>Plus → Carte et téléchargements</b>, choisis <b>Ma montre</b>, puis <b>Télécharger pour ma montre</b> ;
     ou depuis un ordinateur sur la <a href="#web">version web</a>.</li>
   <li>Branche la montre à un ordinateur avec le câble Garmin. Windows : elle apparaît dans l'Explorateur (Internal Storage).
     Mac : utilise l'utilitaire gratuit OpenMTP.</li>
@@ -187,10 +212,10 @@ Par défaut, seules les <b>roches</b> déclenchent une alerte ; les fonds lisses
 <div class="note info">Le mode test et la simulation sont <b>désactivés à chaque démarrage</b> (téléphone et montre), pour ne jamais partir sur l'eau avec une hauteur d'eau fausse.</div>
 <h3>Téléphone</h3>
 <ul>
-  <li><b>📡 Tester le GPS (30 s)</b> : à faire à terre ; il faut environ une position par seconde.</li>
+  <li><b>Plus → Réglages avancés et essais</b>. <b>Tester le GPS (30 s)</b> : à faire à terre ; il faut environ une position par seconde.</li>
   <li><b>Mode test : hauteur d'eau forcée</b> : remplace la marée par la hauteur choisie (pour vérifier les alertes à une marée donnée).</li>
   <li><b>Ignorer le relevé Litto3D</b> : avec le mode test, seules tes roches de test comptent (essai sur un parking).</li>
-  <li><b>Roches de test</b> : dans l'éditeur, coche « éléments de test » avant d'ajouter une roche ; elles ne servent qu'en mode test et ne sont jamais partagées.</li>
+  <li><b>Roches de test</b> : dans l'onglet Roches, coche « test » avant d'ajouter une roche (◎ Ici la pose à ta position) ; elles ne servent qu'en mode test et ne sont jamais partagées.</li>
   <li><b>Simulation</b> : sans GPS, une planche virtuelle se déplace (flèches à l'écran) depuis un point de départ choisi.</li>
   <li>Pour un essai à pied, mets <b>Alertes à partir de</b> à 0 km/h, puis remets 8 km/h.</li>
 </ul>
@@ -203,23 +228,27 @@ Par défaut, seules les <b>roches</b> déclenchent une alerte ; les fonds lisses
 </ol>
 
 <h2 id="carte">8. Carte, téléchargements et roches partagées</h2>
-<p><b>Carte et téléchargements</b> (accueil) montre la couverture de l'appli téléphone (vert), l'emprise des applis montre (violet), tes roches (bleu)
+<p><b>Carte et téléchargements</b> (Plus) montre la couverture de l'appli téléphone (vert), l'emprise des applis montre (violet), tes roches (turquoise)
 et les jeux de roches partagés (orange). La liste sous la carte ne garde que ce qui est dans la zone affichée : zoome sur ton spot.</p>
 <ul>
-  <li><b>Applis montre</b> : un bouton de téléchargement par modèle de montre.</li>
+  <li><b>Applis montre</b> : choisis <b>Ma montre</b> dans la liste (mémorisée), puis <b>Télécharger pour ma montre</b> sous l'appli de ta zone.</li>
   <li><b>Importer un jeu partagé</b> : ajoute ses roches à tes roches (éditeur et radar).</li>
   <li><b>Partager mes roches</b> : nom du jeu, département, description (zone, source, date, précision), auteur facultatif ; « roches visibles sur la carte » ou toutes.
     Les éléments de test ne sont jamais envoyés. Le jeu est visible par tous <b>après vérification</b> par un modérateur.</li>
-  <li><b>Modération</b> (réservée) : connexion modérateur, jeux en attente en rouge pointillé, aperçu, valider ou refuser.</li>
+  <li><b>Modération</b> (réservée, Plus → Modération) : connexion modérateur, jeux en attente en rouge pointillé, aperçu, valider ou refuser.</li>
 </ul>
 
-<h2 id="editeur">9. Ajouter ses propres roches (éditeur)</h2>
-<p>Pour une roche absente du relevé laser ou une zone mal couverte. L'éditeur est plus confortable <b>sur ordinateur</b> (<a href="#web">version web</a>).</p>
+<h2 id="editeur">9. Ajouter ses propres roches (onglet Roches)</h2>
+<p>Pour une roche absente du relevé laser ou une zone mal couverte. La carte occupe tout l'écran ; le panneau du bas se replie, s'ouvre à mi-hauteur
+ou en grand (touche la barrette ou le titre « Mes roches »). Sur ordinateur, le panneau est sur le côté (<a href="#web">version web</a>).</p>
 <ol>
-  <li>Choisis le fond : photo aérienne, carte SHOM, relief Litto3D (les têtes de roche détectées apparaissent).</li>
-  <li><b>＋ Roche (point)</b> ou <b>＋ Zone (polygone)</b>, puis renseigne : nom, cote (<b>découvre de</b> x m = hauteur au-dessus du zéro des cartes, ou <b>sonde</b> x m = profondeur sous le zéro), rayon de sécurité pour un point, note.</li>
-  <li>Les cotes se lisent sur la carte marine (chiffres soulignés = découvre).</li>
-  <li>Dans l'appli, <b>Exporter</b> transmet directement les roches au radar ; sur ordinateur, <b>Exporter (GeoJSON)</b> enregistre un fichier à importer dans le radar (<b>Mes roches → Importer</b>) ou à garder en sauvegarde.</li>
+  <li><b>＋ Roche</b> puis touche la carte à l'endroit de la roche ; <b>＋ Zone</b> puis touche les sommets et le premier point pour fermer ;
+    <b>◎ Ici</b> pose une roche à ta position GPS (rayon = précision du GPS). Re-toucher « ＋ Roche » ou « ＋ Zone » annule.</li>
+  <li>Renseigne la fiche : nom, cote (<b>découvre de</b> x m = hauteur au-dessus du zéro des cartes, ou <b>sonde</b> x m = profondeur sous le zéro), rayon de sécurité pour un point, note.
+    Les cotes se lisent sur la carte marine (chiffres soulignés = découvre).</li>
+  <li>Tes roches sont <b>utilisées directement par le radar</b>, sans rien exporter.</li>
+  <li>Fonds et aides dans le panneau : photo aérienne, carte SHOM, relief Litto3D, zones dangereuses et têtes de roche détectées (touche-en une pour l'ajouter), captures de carte calées.</li>
+  <li><b>Partager</b> ouvre le dépôt de tes roches (§ 8). Sur ordinateur, <b>Exporter (GeoJSON)</b> enregistre une sauvegarde ; <b>Importer</b> recharge un fichier.</li>
 </ol>
 
 <h2 id="rejeu">10. Rejouer une session</h2>
@@ -240,19 +269,19 @@ et les jeux de roches partagés (orange). La liste sous la carte ne garde que ce
 </ol>
 
 <h2 id="web">11. Version web (ordinateur)</h2>
-<p>Toutes les pages existent aussi dans un navigateur, sans installation :</p>
+<p>Sur ordinateur, l'<b>atelier</b> sert à préparer et analyser, sans radar (sur l'eau : l'appli ou la montre) :</p>
 <p class="url"><a href="https://ymca-dev-wow.github.io/radar-roches/">https://ymca-dev-wow.github.io/radar-roches/</a></p>
 <ul>
-  <li><b>Éditeur de roches</b> : plus confortable à la souris, pour déclarer tes roches et les exporter.</li>
+  <li><b>Éditeur de roches</b> : plus confortable à la souris, pour déclarer tes roches, caler des captures de carte et les exporter.</li>
   <li><b>Rejeu de session</b> : ouvre directement les fichiers .fit copiés depuis la montre.</li>
-  <li><b>Carte et téléchargements</b> : télécharge les fichiers .prg directement sur l'ordinateur, prêts à copier sur la montre.</li>
-  <li>Le radar marche aussi dans Chrome ou Firefox sur Android, mais l'écran doit rester allumé : préfère l'appli.</li>
+  <li><b>Carte et téléchargements</b> : télécharge les fichiers .prg directement sur l'ordinateur, prêts à copier sur la montre ; partage et modération.</li>
+  <li>Lien de téléchargement de l'appli Android.</li>
 </ul>
 <p class="sub">Les roches saisies dans le navigateur de l'ordinateur restent dans ce navigateur : exporte-les en GeoJSON pour les importer dans l'appli, ou partage-les.</p>
 
 <h2 id="maj">12. Mises à jour</h2>
 <ul>
-  <li><b>Appli téléphone</b> : une notification l'annonce et le pied de page de l'accueil affiche <b>Mise à jour disponible</b>. Touche ce lien et installe par-dessus : réglages et roches sont conservés. Le pied de page indique la construction installée.</li>
+  <li><b>Appli téléphone</b> : une notification l'annonce et le pied de page de <b>Plus</b> affiche <b>Mise à jour disponible</b>. Touche ce lien et installe par-dessus : réglages et roches sont conservés. Le pied de page indique la construction installée.</li>
   <li><b>Appli montre</b> : retélécharge son fichier (la date figure sous chaque appli dans la carte) et remplace l'ancien dans GARMIN → Apps.</li>
 </ul>
 
