@@ -68,8 +68,8 @@
 
   <h2>Marée</h2>
   <div class="card">
-    <div class="row"><span class="grow">Hauteur d'eau à Saint-Malo maintenant</span><b id="hNow">…</b></div>
-    <div class="row"><label><input type="checkbox" id="live" checked> Recalage en direct sur le marégraphe de Saint-Malo (réseau requis au départ)</label></div>
+    <div class="row"><span class="grow">Hauteur d'eau maintenant (<span id="zoneNom">…</span>)</span><b id="hNow">…</b></div>
+    <div class="row"><label><input type="checkbox" id="live" checked> Recalage en direct sur le marégraphe de la zone (réseau requis au départ)</label></div>
     <div class="sub" id="liveInfo"></div>
     <details style="margin-top:10px">
       <summary>Recaler sur l'annuaire officiel (facultatif)</summary>
@@ -553,7 +553,7 @@ $('offline').onclick = async () => {
 // ---------- Zone ----------
 // Zone active (suit la position) : ports du recalage annuaire, informations sur les données, recalage en direct
 window.addEventListener('zone', async () => {
-  remplirPorts();
+  remplirPorts(); $('zoneNom').textContent = zone.nom;
   if (!PORTS.some(p => p.id === (store.get('recal', null) || {}).port)) $('offRows').innerHTML = '';
   const tj = tide.info;
   $('dataInfo').textContent = `Zone ${zone.nom} (${ZONES.length > 1 ? 'choisie selon la position, ' : ''}${ZONES.map(z => z.nom).join(' / ')}) · ${meta.tuiles.length} tuiles Litto3D · ` +
