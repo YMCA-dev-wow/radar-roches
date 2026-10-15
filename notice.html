@@ -193,11 +193,17 @@ Par défaut, seules les <b>roches</b> déclenchent une alerte ; les fonds lisses
   <tr><td>Radar</td><td>START</td><td>Menu Reprendre / Enregistrer / Supprimer</td></tr>
   <tr><td>Radar</td><td>BACK, écran tactile</td><td>Ignorés (pas d'arrêt involontaire)</td></tr>
 </table>
-<p>Sons de la montre : les mêmes que sur le téléphone, avec une vibration à chaque bip (réglable).
+<p>Sons de la montre : Forerunner 255, les mêmes bips que sur le téléphone ; Fenix 8 (haut-parleur), les sons d'alerte Garmin
+(bip fort devant, son aigu à tribord, grave à bâbord, plus rapides quand tu te rapproches). Une vibration accompagne chaque bip (réglable).
+La montre ne peut pas parler : Garmin ne permet pas la voix aux applis Connect IQ.</p>
+<p><b>Vitesses max</b> : l'activité enregistre ta meilleure vitesse sur 2 s, 100 m, 250 m et 500 m. Dans Garmin Connect, ouvre l'activité :
+elles apparaissent dans les statistiques, rubrique Connect IQ / Radar roches.
+
 « <b>Hors zone</b> » : tu es hors des données de cette appli, aucune alerte possible (installe celle de la zone).</p>
 <h3>Réglages de la montre (DOWN depuis l'accueil, START pour changer)</h3>
 <table>
   <tr><th>Réglage</th><th>Valeurs</th><th>Par défaut</th></tr>
+  <tr><td>Essai parking</td><td>essai à pied en un appui (§ 7) ; un second appui y met fin</td><td>—</td></tr>
   <tr><td>Poser / Effacer roche test</td><td>pose une roche fictive à ta position (§ 7)</td><td>aucune</td></tr>
   <tr><td>Eau minimale</td><td>1,0 à 3,0 m</td><td>2,0 m</td></tr>
   <tr><td>Anticipation</td><td>5 à 15 s</td><td>7 s</td></tr>
@@ -219,13 +225,18 @@ Par défaut, seules les <b>roches</b> déclenchent une alerte ; les fonds lisses
   <li><b>Simulation</b> : sans GPS, une planche virtuelle se déplace (flèches à l'écran) depuis un point de départ choisi.</li>
   <li>Pour un essai à pied, mets <b>Alertes à partir de</b> à 0 km/h, puis remets 8 km/h.</li>
 </ul>
-<h3>Montre : la roche de test</h3>
+<h3>Montre : essai parking (à pied)</h3>
 <ol>
-  <li>Sur le parking, attends « GPS : bon », puis <b>DOWN → Poser roche test</b> (cote 6 m, rayon 15 m).</li>
-  <li><b>Alertes dès</b> : 0 km/h ; <b>Mode test (eau)</b> : 6 m ou moins (roche émergée) ou 7 m (1 m d'eau dessus).</li>
-  <li>Éloigne-toi d'environ 100 m, START, et reviens vers le point : les bips commencent vers 55 m.</li>
-  <li>Avant d'aller à l'eau : <b>Effacer roche test</b> et <b>Alertes dès</b> à 8 km/h.</li>
+  <li>Sur le parking, attends « GPS : bon », puis <b>DOWN → Essai parking</b> (premier réglage), START.
+    La montre vibre et revient à l'accueil, qui affiche en rose « ESSAI : roche à … m ».</li>
+  <li>L'essai a tout réglé : roche de test à ta position, hauteur d'eau forcée (roche émergée), alertes dès 0 km/h.</li>
+  <li>Éloigne-toi d'environ <b>100 m</b> (la distance s'affiche), START pour lancer le radar, et marche vers le point :
+    pré-alerte vers 95 m, puis bips à partir de 55 m environ, de plus en plus rapides.</li>
+  <li>Fin : START → Supprimer, puis <b>DOWN → Essai parking</b> à nouveau (« EN COURS : finir ») : tout revient comme avant.
+    Relancer l'appli met aussi fin à l'essai.</li>
 </ol>
+<p class="sub">Réglage manuel, pour un essai à une autre hauteur d'eau : <b>Poser roche test</b>, <b>Mode test (eau)</b> sous la cote de la roche (6 m par défaut),
+<b>Alertes dès</b> 0 km/h. Sans mode test, la vraie marée compte : à marée haute, la roche est couverte et ne déclenche rien.</p>
 
 <h2 id="carte">8. Carte, téléchargements et roches partagées</h2>
 <p><b>Carte et téléchargements</b> (Plus) montre la couverture de l'appli téléphone (vert), l'emprise des applis montre (violet), tes roches (turquoise)
@@ -294,7 +305,7 @@ ou en grand (touche la barrette ou le titre « Mes roches »). Sur ordinateur, l
   <tr><td>« Marégraphe injoignable »</td><td>Pas de réseau au départ : la prédiction seule est utilisée (garde de la marge).</td></tr>
   <tr><td>La montre n'apparaît pas sur l'ordinateur</td><td>Autre port ou câble Garmin d'origine ; sur Mac, OpenMTP.</td></tr>
   <tr><td>Radar roches absent de la liste de la montre</td><td>Le fichier doit être dans GARMIN → Apps (pas Download, pas un sous-dossier), et pour le bon modèle de montre.</td></tr>
-  <tr><td>Pas de bips sur la montre</td><td>Tonalités d'alerte de la montre désactivées, ou « Bips » coupé dans les réglages de l'appli.</td></tr>
+  <tr><td>Pas de bips sur la montre</td><td>Tonalités d'alerte de la montre désactivées (Fenix 8 : volume du haut-parleur), ou « Bips » coupé dans les réglages de l'appli.</td></tr>
   <tr><td>« Hors zone »</td><td>Hors des données de cette appli (ou de la zone) : installe celle de ton spot.</td></tr>
   <tr><td>Logo IQ avec un point d'exclamation</td><td>L'appli montre a planté : note l'heure et l'endroit, envoie le fichier de la session.</td></tr>
   <tr><td>Bandeau rouge dans l'appli</td><td>Erreur technique : fais une capture d'écran et envoie-la.</td></tr>
