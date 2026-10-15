@@ -113,8 +113,8 @@ async function chargerDonnees() {
     chargementEnAttente.add(f);
     return fetch(f).then(r => { if (!r.ok) throw new Error(f + ' : HTTP ' + r.status); return r[type](); }).finally(() => chargementEnAttente.delete(f));
   };
-  ZONES = await lire('donnees/zones.json', 'json');
-  await Promise.all(ZONES.map(async z => {
+  const zs = await lire('donnees/zones.json', 'json');
+  await Promise.all(zs.map(async z => {
     const [m, ...tables] = await Promise.all([lire(z.dossier + '/meta.json', 'json'),
       ...z.jauges.flatMap(j => [lire(`${z.dossier}/maree/${j.fichier}.json`, 'json'), lire(`${z.dossier}/maree/${j.fichier}.bin`, 'arrayBuffer')])]);
     z.meta = m; m.set = new Set(m.tuiles.map(t => t[0] + '/' + t[1]));
@@ -123,6 +123,7 @@ async function chargerDonnees() {
       return { t0: Date.parse(tj.debut_utc), step: tj.pas_min * 60000, h: new Int16Array(tables[2 * g + 1]), info: tj };
     });
   }));
+  ZONES = zs; // publiées une fois entièrement chargées
   let z0 = null;
   try { z0 = ZONES.find(z => z.id === localStorage.getItem('radar.zone')); } catch {}
   activerZone(z0 || ZONES[0]);
@@ -140,7 +141,7 @@ function zonePour(lat, lon) {
 }
 // Change de zone active (renvoie vrai si elle a changé) ; les pages écoutent l'évènement « zone »
 function activerZone(z) {
-  if (!z || z === zone) return false;
+  if (!z || z === zone || !z.tables || !z.meta) return false; // zone pas encore chargée (position GPS arrivée avant les données)
   zone = z; PORTS = z.ports; MALO = PORTS[Math.floor(PORTS.length / 2)];
   meta = z.meta; jauges = z.tables; tide = jauges[0];
   surge = 0; recal = null; tiles.clear();

@@ -51,6 +51,9 @@
     border-radius: 20px 20px 0 0; padding: 0 14px 16px; overflow-y: auto; height: 152px; transition: height .2s; }
   html.appli aside { bottom: 63px; }
   aside.moyen { height: 50vh; } aside.ouvert { height: 80vh; }
+  aside:not(.moyen):not(.ouvert) { overflow: hidden; }
+  .poignee { touch-action: none; user-select: none; -webkit-user-select: none; }
+  .poignee input, .poignee label { touch-action: auto; }
   html.appli aside.ouvert { height: calc(100vh - 140px); }
   .poignee { position: sticky; top: 0; z-index: 2; background: var(--p1); padding: 8px 0 6px; }
   .barrette { width: 44px; height: 5px; border-radius: 3px; background: var(--ln2); margin: 0 auto 8px; cursor: pointer; }
@@ -303,8 +306,33 @@ function zoomTo(f) {
 // ---------- Panneau (téléphone) : replié, mi-hauteur, ouvert ----------
 const panneau = $('panneau');
 function etatPanneau(e) { panneau.classList.toggle('moyen', e === 'moyen'); panneau.classList.toggle('ouvert', e === 'ouvert'); if (e === 'replie') panneau.scrollTop = 0; }
-$('barrette').onclick = () => etatPanneau(panneau.classList.contains('ouvert') || panneau.classList.contains('moyen') ? 'replie' : 'ouvert');
+const ETATS = ['replie', 'moyen', 'ouvert'];
+const etatActuel = () => panneau.classList.contains('ouvert') ? 2 : panneau.classList.contains('moyen') ? 1 : 0;
+$('barrette').onclick = () => etatPanneau(etatActuel() ? 'replie' : 'ouvert');
 $('count').onclick = $('barrette').onclick;
+// Glisser la partie haute du panneau (barrette, titre, boutons) : vers le haut pour l'ouvrir, vers le bas pour le replier
+(() => {
+  const p = panneau.querySelector('.poignee'); let y0 = null, h0 = 0, bouge = false;
+  p.addEventListener('pointerdown', e => { y0 = e.clientY; h0 = panneau.getBoundingClientRect().height; bouge = false; });
+  p.addEventListener('pointermove', e => {
+    if (y0 == null) return;
+    const dy = e.clientY - y0;
+    if (!bouge && Math.abs(dy) < 8) return;
+    if (!bouge) { bouge = true; p.setPointerCapture(e.pointerId); panneau.style.transition = 'none'; }
+    panneau.style.height = Math.max(120, Math.min(innerHeight * 0.85, h0 - dy)) + 'px';
+  });
+  const fin = e => {
+    if (y0 == null) return;
+    const dy = e.clientY - y0; y0 = null;
+    if (!bouge) return;
+    panneau.style.transition = ''; panneau.style.height = '';
+    const i = etatActuel();
+    etatPanneau(ETATS[dy < -40 ? Math.min(2, i + (dy < -innerHeight * 0.3 ? 2 : 1)) : dy > 40 ? Math.max(0, i - (dy > innerHeight * 0.3 ? 2 : 1)) : i]);
+  };
+  p.addEventListener('pointerup', fin); p.addEventListener('pointercancel', fin);
+  // un appui qui se termine en glissement ne doit pas déclencher le bouton touché au départ
+  p.addEventListener('click', e => { if (bouge) { e.stopPropagation(); e.preventDefault(); bouge = false; } }, true);
+})();
 
 // ---------- Sélection / formulaire ----------
 function select(id) {
