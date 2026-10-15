@@ -712,8 +712,11 @@ addEventListener('hashchange', route);
 // ---------- Démarrage ----------
 (async () => {
   loadSettings();
-  // sécurité : chaque démarrage repart sur la vraie marée et le vrai GPS (mode test et simulation désactivés)
-  $('testMode').checked = false; $('simMode').checked = false; saveSettings();
+  // sécurité : chaque lancement de l'appli repart sur la vraie marée et le vrai GPS (mode test et simulation désactivés).
+  // Seulement au lancement : pas en passant d'un onglet à l'autre (la page radar se recharge, les réglages doivent tenir).
+  let premiereOuverture = true;
+  try { premiereOuverture = !sessionStorage.getItem('radar.lance'); sessionStorage.setItem('radar.lance', '1'); } catch {}
+  if (premiereOuverture) { $('testMode').checked = false; $('simMode').checked = false; saveSettings(); }
   styleMontre = $('styleMontre').value; $('testH').oninput(); $('simMode').onchange(); showGeoInfo();
   initProfils(); route(); demarrerGpsAccueil(); majVerifs();
   addEventListener('load', () => diagEtat().then(t => $('diagInfo').textContent = t));
