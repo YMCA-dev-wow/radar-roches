@@ -100,17 +100,7 @@
     <ul id="list"></ul>
 
     <h2>Fond de carte</h2>
-    <div class="row">
-      <select id="base">
-        <option value="ortho">Photo aérienne IGN</option>
-        <option value="osm">OpenStreetMap</option>
-        <option value="none">Aucun</option>
-      </select>
-      <label><input type="checkbox" id="shomOn" checked> Carte SHOM</label>
-    </div>
-    <div class="row"><label><input type="checkbox" id="lidarOn"> Relief Litto3D (chaque tête de roche apparaît)</label></div>
-    <div class="row"><label style="width:110px">Opacité relief</label><input type="range" id="lidarOp" min="0" max="1" step="0.05" value="0.8"></div>
-    <div class="row"><label style="width:110px">Opacité SHOM</label><input type="range" id="shomOp" min="0" max="1" step="0.05" value="1"></div>
+    <div id="fonds"></div>
 
     <h2>Dangers Litto3D (automatique)</h2>
     <div class="row"><label><input type="checkbox" id="l3dOn"> Zones dangereuses à la hauteur d'eau ci-dessous</label></div>
@@ -166,6 +156,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.min.js"></script>
 <script src="https://unpkg.com/leaflet-imageoverlay-rotated@0.2.1/Leaflet.ImageOverlay.Rotated.js"></script>
+<script src="fonds.js"></script>
 <script>
 // ---------- Modèle ----------
 // Une feature = { id, kind: 'point'|'zone', geom: [lat,lng] | [[lat,lng],...], nom, ref: 'decouvre'|'sonde',
@@ -196,30 +187,10 @@ const map = L.map('map', { maxZoom: 20, zoomControl: !window.androidBridge });
   else map.setView(localStorage.getItem('radar.zone') === 'cotes_armor' ? [48.84, -3.3] : [48.66, -2.003], localStorage.getItem('radar.zone') === 'cotes_armor' ? 12 : 15);
 })();
 map.on('moveend', () => { const c = map.getCenter(); try { localStorage.setItem('editeur.vue', JSON.stringify({ lat: c.lat, lon: c.lng, z: map.getZoom() })); } catch {} });
-const geopf = (layer, fmt, maxNative) => L.tileLayer(
-  'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=' + layer +
-  '&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=' + fmt,
-  { maxZoom: 20, maxNativeZoom: maxNative, attribution: '© IGN / SHOM' });
-const bases = {
-  ortho: geopf('ORTHOIMAGERY.ORTHOPHOTOS', 'image/jpeg', 19),
-  osm: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 20, maxNativeZoom: 19, attribution: '© OpenStreetMap' }),
-  none: null,
-};
-const shom = geopf('GEOGRAPHICALGRIDSYSTEMS.COASTALMAPS', 'image/png', 16).setZIndex(5);
-let currentBase = bases.ortho; currentBase.addTo(map); shom.addTo(map);
 L.control.scale({ imperial: false }).addTo(map);
 
 const $ = id => document.getElementById(id);
-$('base').onchange = e => { if (currentBase) map.removeLayer(currentBase); currentBase = bases[e.target.value]; if (currentBase) currentBase.addTo(map).bringToBack(); };
-$('shomOn').onchange = e => e.target.checked ? shom.addTo(map) : map.removeLayer(shom);
-// Relief Litto3D Bretagne 2018-2021 (service WMS public du SHOM, licence ouverte)
-const lidar = L.tileLayer.wms('https://services.data.shom.fr/INSPIRE/wms/r', {
-  layers: 'LITTO3D_BZH_2018_2021_PYR_3857_WMSR', format: 'image/png', transparent: true, version: '1.3.0',
-  maxZoom: 20, opacity: 0.8, attribution: 'Litto3D® Shom – IGN',
-}).setZIndex(6);
-$('lidarOn').onchange = e => e.target.checked ? lidar.addTo(map) : map.removeLayer(lidar);
-$('lidarOp').oninput = e => lidar.setOpacity(+e.target.value);
-$('shomOp').oninput = e => shom.setOpacity(+e.target.value);
+fondsCarte(map, $('fonds'), 'editeur.fonds', { base: 'ortho', shom: true });
 map.on('mousemove', e => $('coords').textContent = e.latlng.lat.toFixed(6) + ', ' + e.latlng.lng.toFixed(6));
 
 // ---------- Couleurs selon hauteur d'eau ----------

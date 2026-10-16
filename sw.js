@@ -3,7 +3,7 @@
 // Pages, noyau et marée : réseau d'abord, cache en secours. Le marégraphe (autre domaine) passe toujours par le réseau.
 const APP = 'radar-app-v4';
 const TUILES = 'radar-tuiles';
-const BASE = ['radar.html', 'rejeu.html', 'noyau.js', 'theme.css', 'nav.js', 'logo.svg', 'donnees/zones.json']; // les données de chaque zone se mettent en cache à la première lecture
+const BASE = ['radar.html', 'rejeu.html', 'noyau.js', 'theme.css', 'nav.js', 'fonds.js', 'logo.svg', 'donnees/zones.json']; // les données de chaque zone se mettent en cache à la première lecture
 
 self.addEventListener('install', e => {
   self.skipWaiting();
