@@ -9,6 +9,7 @@
 <link rel="icon" href="logo.svg">
 <link rel="stylesheet" href="theme.css">
 <script src="nav.js"></script>
+<script src="nouveautes.js"></script>
 <style>
   footer { text-align: center; color: #4f7a76; font-size: 13px; margin-top: 26px; }
 </style>
@@ -26,12 +27,14 @@ const ENTREES = [
   ['profils', 'radar.html#profils', 'Profils de navigation', 'créer, modifier, dupliquer'],
   ['reglages', 'radar.html#avance', 'Réglages avancés et essais', 'marée, sons, montre, mode test, simulation'],
   ['moderation', 'carte.html#moderation', 'Modération', 'jeux de roches partagés à valider'],
+  ['nouveautes', '#nouveautes', 'Nouveautés', 'ce qui a changé à chaque version'],
   ['notice', 'notice.html', 'Notice', 'installation, réglages, dépannage'],
 ];
 for (const [ic, href, titre, sous] of ENTREES) {
   const a = document.createElement('a'); a.href = href;
   a.innerHTML = `<span class="ic">${icone(ic)}</span><span><span class="t"></span><small></small></span>`;
   a.querySelector('.t').textContent = titre; a.querySelector('small').textContent = sous;
+  if (href === '#nouveautes') a.onclick = e => { e.preventDefault(); nouveautes.ouvrir(true); };
   document.getElementById('menu').append(a);
 }
 </script>

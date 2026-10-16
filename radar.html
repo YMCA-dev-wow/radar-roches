@@ -9,6 +9,7 @@
 <link rel="icon" href="logo.svg">
 <link rel="stylesheet" href="theme.css">
 <script src="nav.js"></script>
+<script src="nouveautes.js"></script>
 <style>
   html, body { height: 100%; }
   body.navigation { overflow: hidden; }
@@ -719,6 +720,7 @@ addEventListener('hashchange', route);
   if (premiereOuverture) { $('testMode').checked = false; $('simMode').checked = false; saveSettings(); }
   styleMontre = $('styleMontre').value; $('testH').oninput(); $('simMode').onchange(); showGeoInfo();
   initProfils(); route(); demarrerGpsAccueil(); majVerifs();
+  if (premiereOuverture && window.androidBridge) nouveautes.ouvrir(); // après une mise à jour : quoi de neuf
   addEventListener('load', () => diagEtat().then(t => $('diagInfo').textContent = t));
   setTimeout(() => { // chargement anormalement long : dire ce qui manque
     if (chargementEnAttente.size) $('dataInfo').textContent = 'Chargement bloqué sur : ' + [...chargementEnAttente].join(', ');

@@ -1,7 +1,7 @@
 // Copie les pages web du radar (dossier parent) dans www/, que Capacitor embarque dans l'APK.
 const fs = require('fs'), path = require('path');
 const src = path.resolve(__dirname, '..'), dst = path.join(__dirname, 'www');
-const FICHIERS = ['index.html', 'plus.html', 'theme.css', 'nav.js', 'fonds.js', 'logo.svg', 'notice.html', 'maj.js', 'radar.html', 'rejeu.html', 'carte.html', 'noyau.js', 'diagnostic.js', 'editeur_zones.html', 'donnees/zones.json',
+const FICHIERS = ['index.html', 'plus.html', 'theme.css', 'nav.js', 'fonds.js', 'nouveautes.js', 'nouveautes.json', 'logo.svg', 'notice.html', 'maj.js', 'radar.html', 'rejeu.html', 'carte.html', 'noyau.js', 'diagnostic.js', 'editeur_zones.html', 'donnees/zones.json',
   'donnees/montres.json']; // applis montre (.prg) : téléchargées depuis le site, pas embarquées dans l'APK
 // données de chaque zone décrite dans donnees/zones.json : méta, têtes de roche, marées, tuiles
 const ZONES = JSON.parse(fs.readFileSync(path.join(src, 'donnees', 'zones.json'), 'utf8'));

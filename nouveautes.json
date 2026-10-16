@@ -1,0 +1,47 @@
+{
+  "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
+  "entrees": [
+    {
+      "id": 4,
+      "date": "2026-10-16",
+      "titre": "Fonds de carte et nouveautés",
+      "points": [
+        "Carte et téléchargements, modération : mêmes fonds que l'éditeur de roches (photo aérienne, OpenStreetMap, carte marine SHOM, relief Litto3D), chacun avec son opacité. Bloc « Fond de carte » sous la carte.",
+        "Éditeur de roches : opacité réglable aussi pour la photo aérienne.",
+        "Cette fenêtre : les nouveautés s'affichent au premier démarrage après une mise à jour. Historique complet dans Plus → Nouveautés."
+      ]
+    },
+    {
+      "id": 3,
+      "date": "2026-10-15",
+      "titre": "Applis montre",
+      "montre": true,
+      "points": [
+        "Fenix 8 : les alertes sonnent enfin (sons d'alerte Garmin : bip fort devant, aigu à tribord, grave à bâbord).",
+        "Vitesses max sur 2 s, 100 m, 250 m et 500 m enregistrées dans l'activité (Garmin Connect, rubrique Connect IQ).",
+        "Réglage « Essai parking » : un appui pose la roche de test et règle tout pour un essai à pied ; un second appui remet tout en place.",
+        "Pour en profiter : retélécharge l'appli de ta montre (Plus → Carte et téléchargements) et remplace l'ancienne dans GARMIN → Apps."
+      ]
+    },
+    {
+      "id": 2,
+      "date": "2026-10-15",
+      "titre": "Correctifs",
+      "points": [
+        "Plus d'erreur au démarrage quand le GPS répond avant le chargement des données.",
+        "Onglet Roches : le panneau du bas se déplace au doigt.",
+        "Le mode test n'est plus coupé à chaque retour sur l'onglet Radar, seulement au lancement de l'appli."
+      ]
+    },
+    {
+      "id": 1,
+      "date": "2026-10-14",
+      "titre": "Nouvelle interface",
+      "points": [
+        "Thème sombre « Sonar » et nouveau logo ; trois onglets : Radar, Roches, Plus.",
+        "Profils de navigation modifiables et personnalisables.",
+        "Notice complète intégrée (Plus → Notice)."
+      ]
+    }
+  ]
+}
