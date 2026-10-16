@@ -391,12 +391,25 @@ async function montrePermission() {
   return Notification.permission;
 }
 let idNotif = 1;
+// Deux canaux Android : discret (importance basse : ni son, ni bandeau, l'écran reste éteint) et alerte (comportement
+// habituel). Discret par défaut : chaque notification qui allume l'écran expose l'écran de verrouillage aux appuis
+// involontaires (combinaison mouillée). L'importance d'un canal ne se change plus après sa création, d'où deux canaux.
+let notifDiscretes = true, canauxCrees = null;
+function creerCanaux() {
+  if (!canauxCrees) canauxCrees = Promise.all([
+    Natif.notifs.createChannel({ id: 'radar_discret', name: 'Radar : relais montre (discret)', importance: 2, visibility: 1, vibration: false }),
+    Natif.notifs.createChannel({ id: 'radar_alerte', name: 'Radar : relais montre', importance: 4, visibility: 1 }),
+  ]).catch(() => {});
+  return canauxCrees;
+}
 async function notifier(titre, texte) {
   if (surMontre) surMontre(titre, texte);
   if (APPLI) {
+    traceSon('notif', titre);
     // Toujours le même numéro : chaque notification remplace la précédente (comme l'étiquette « radar » de la version web),
     // sinon la montre les empile et affiche des grilles périmées.
-    try { await Natif.notifs.schedule({ notifications: [{ id: idNotif, title: titre, body: texte }] }); return true; } catch { return false; }
+    await creerCanaux();
+    try { await Natif.notifs.schedule({ notifications: [{ id: idNotif, title: titre, body: texte, channelId: notifDiscretes ? 'radar_discret' : 'radar_alerte' }] }); return true; } catch { return false; }
   }
   if (!('Notification' in window) || Notification.permission !== 'granted') return false;
   try {

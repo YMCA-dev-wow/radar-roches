@@ -2,6 +2,17 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 6,
+      "date": "2026-10-17",
+      "titre": "Volume réglable et moins d'appuis involontaires",
+      "points": [
+        "Nouveau réglage « Volume des alertes » (Plus → Réglages avancés → Sons). Les boutons de volume du téléphone règlent les médias, pas les alertes du radar, qui passent par le volume « alarme ».",
+        "Pendant la navigation, « Muet » demande un appui maintenu : un toucher de combinaison mouillée ne coupe plus les alertes.",
+        "Relais montre : notifications discrètes par défaut, elles n'allument plus l'écran du téléphone. Si ta montre ne les reçoit plus, décoche « Notifications discrètes ».",
+        "Moins de batterie consommée : la sortie audio se coupe entre deux alertes."
+      ]
+    },
+    {
       "id": 5,
       "date": "2026-10-17",
       "titre": "Sons fiables écran éteint et journal de session",

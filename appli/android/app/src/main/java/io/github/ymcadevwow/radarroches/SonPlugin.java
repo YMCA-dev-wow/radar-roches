@@ -43,6 +43,7 @@ public class SonPlugin extends Plugin {
     private final ArrayList<Note> notes = new ArrayList<>();
     private ArrayList<double[]> motif = null; // [f, f1, t ms, d ms, v, triangle]
     private double periode = 1; private long prochainMotif = 0, finCadence = 0;
+    private volatile double gain = 1;  // volume des alertes choisi dans l'appli (0,1 à 1)
     private double continuF = 0; private long finContinu = 0; private double phaseContinu = 0;
     private long pos = 0;               // échantillons écrits depuis le début
     private volatile Thread fil; private volatile boolean marche = false;
@@ -73,10 +74,12 @@ public class SonPlugin extends Plugin {
     }
 
     // ---------------------------------------------------------------- synthèse
-    private void demarrerFil() {
+    // Fil de synthèse : démarré au premier son, arrêté après 5 s sans rien à jouer (économie de batterie).
+    // Appelé sous « verrou », après l'ajout des notes : le fil ne peut pas s'arrêter entre-temps.
+    private void assurerFil() {
         if (marche) return;
         marche = true;
-        fil = new Thread(() -> {
+        Thread t = new Thread(() -> {
             int mini = AudioTrack.getMinBufferSize(TAUX, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
             AudioTrack piste = new AudioTrack.Builder().setAudioAttributes(ATTR)
                     .setAudioFormat(new AudioFormat.Builder().setSampleRate(TAUX).setEncoding(AudioFormat.ENCODING_PCM_16BIT)
@@ -84,14 +87,22 @@ public class SonPlugin extends Plugin {
                     .setBufferSizeInBytes(Math.max(mini, BLOC * 2 * 4)).setTransferMode(AudioTrack.MODE_STREAM).build();
             piste.play();
             short[] tampon = new short[BLOC];
-            while (marche && fil == Thread.currentThread()) { // un nouveau fil remplace l'ancien après un arrêt
+            int inactif = 0;
+            while (true) {
+                synchronized (verrou) {
+                    if (fil != Thread.currentThread() || !marche) break;
+                    boolean rien = notes.isEmpty() && motif == null && (continuF <= 0 || pos >= finContinu);
+                    inactif = rien ? inactif + 1 : 0;
+                    if (inactif > 250) { marche = false; fil = null; break; } // 5 s de silence
+                }
                 remplir(tampon);
                 piste.write(tampon, 0, BLOC); // bloquant : cadence la boucle sur la sortie audio
             }
             piste.stop(); piste.release();
         }, "radar-son");
-        fil.setPriority(Thread.MAX_PRIORITY);
-        fil.start();
+        fil = t;
+        t.setPriority(Thread.MAX_PRIORITY);
+        t.start();
     }
 
     private void remplir(short[] tampon) {
@@ -118,7 +129,7 @@ public class SonPlugin extends Plugin {
                     phaseContinu += continuF / TAUX; phaseContinu -= Math.floor(phaseContinu);
                     x += (phaseContinu < 0.5 ? 1 : -1) * 0.9;
                 }
-                tampon[i] = (short) (Math.max(-1, Math.min(1, x)) * 30000);
+                tampon[i] = (short) (Math.max(-1, Math.min(1, x)) * 30000 * gain);
             }
             pos += BLOC;
             for (Iterator<Note> it = notes.iterator(); it.hasNext(); ) if (it.next().fin < pos) it.remove();
@@ -148,15 +159,13 @@ public class SonPlugin extends Plugin {
     // ---------------------------------------------------------------- méthodes appelées par la page
     @PluginMethod
     public void jouer(PluginCall call) {
-        demarrerFil();
         ArrayList<double[]> l = lireNotes(call.getArray("notes"));
-        synchronized (verrou) { long t = pos + BLOC; for (double[] m : l) ajouter(t, m); }
+        synchronized (verrou) { long t = pos + BLOC; for (double[] m : l) ajouter(t, m); if (!l.isEmpty()) assurerFil(); }
         call.resolve();
     }
 
     @PluginMethod
     public void cadence(PluginCall call) {
-        demarrerFil();
         ArrayList<double[]> l = lireNotes(call.getArray("notes"));
         double p = Math.max(0.1, call.getDouble("periode", 1.0)), duree = call.getDouble("duree", 2.5);
         synchronized (verrou) {
@@ -165,6 +174,7 @@ public class SonPlugin extends Plugin {
             if (!enCours) prochainMotif = pos + BLOC;
             else prochainMotif = Math.min(prochainMotif, pos + BLOC + (long) (p * TAUX)); // accélération immédiate
             finCadence = pos + (long) (duree * TAUX);
+            if (motif != null) assurerFil();
         }
         call.resolve();
     }
@@ -172,8 +182,10 @@ public class SonPlugin extends Plugin {
     @PluginMethod
     public void continu(PluginCall call) {
         double f = call.getDouble("f", 0.0);
-        if (f > 0) demarrerFil();
-        synchronized (verrou) { continuF = f; finContinu = pos + (long) (call.getDouble("duree", 2.5) * TAUX); if (f > 0) motif = null; }
+        synchronized (verrou) {
+            continuF = f; finContinu = pos + (long) (call.getDouble("duree", 2.5) * TAUX);
+            if (f > 0) { motif = null; assurerFil(); }
+        }
         call.resolve();
     }
 
@@ -186,8 +198,14 @@ public class SonPlugin extends Plugin {
     // Arrêt du radar : plus de son, la sortie audio est libérée
     @PluginMethod
     public void arreter(PluginCall call) {
-        synchronized (verrou) { notes.clear(); motif = null; continuF = 0; }
-        marche = false;
+        synchronized (verrou) { notes.clear(); motif = null; continuF = 0; marche = false; fil = null; }
+        call.resolve();
+    }
+
+    // Volume des alertes dans l'appli (0,1 à 1), en plus du volume « alarme » d'Android ; vaut aussi pour la voix
+    @PluginMethod
+    public void gain(PluginCall call) {
+        gain = Math.max(0.05, Math.min(1, call.getDouble("v", 1.0)));
         call.resolve();
     }
 
@@ -197,7 +215,7 @@ public class SonPlugin extends Plugin {
         synchronized (this) { if (appelParole != null) { appelParole.resolve(); } appelParole = call; }
         call.setKeepAlive(true);
         Bundle p = new Bundle();
-        p.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1f);
+        p.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, (float) gain);
         tts.setSpeechRate(call.getDouble("vitesse", 1.2).floatValue());
         tts.speak(call.getString("texte", ""), TextToSpeech.QUEUE_FLUSH, p, "radar" + System.nanoTime());
     }
@@ -239,7 +257,7 @@ public class SonPlugin extends Plugin {
         o.put("sonnerie", new String[] { "silencieux", "vibreur", "normal" }[Math.max(0, Math.min(2, am.getRingerMode()))]);
         o.put("voix", ttsPret);
         o.put("sortie", sortie(am));
-        o.put("notes", nNotes); o.put("motifs", nCadences); o.put("fil", marche);
+        o.put("notes", nNotes); o.put("motifs", nCadences); o.put("fil", marche); o.put("gain", gain);
         return o;
     }
 

@@ -102,6 +102,7 @@
 
   <h2>Sons</h2>
   <div class="carte">
+    <div class="ligne" id="volAlertesLigne"><span>Volume des alertes<small>dans l'appli, en plus du volume « alarme » du téléphone (les boutons de volume règlent un autre volume, celui des médias)</small></span><span style="display:flex;align-items:center;gap:8px"><input type="range" id="volAlertes" min="10" max="100" step="10" value="100" style="width:110px"><b id="volAlertesTxt">100 %</b></span></div>
     <label class="ligne" id="volMaxLigne"><span>Alertes au volume maximum<small>volume « alarme » du téléphone poussé au maximum pendant le radar, rétabli à l'arrêt</small></span><input type="checkbox" id="volMax" checked></label>
     <button id="testSound">Écouter les sons</button>
     <div class="mu" style="margin-top:8px">Tintement doux descendant = pré-alerte · 1 bip = devant · 2 bips montants = tribord · 2 bips descendants = bâbord · les bips accélèrent en approchant · son continu = moins de 10 m · 3 bips très graves = GPS perdu.</div>
@@ -110,6 +111,7 @@
   <h2>Montre (notifications)</h2>
   <div class="carte">
     <label class="ligne"><span>Relayer sur la montre<small>démarrage, dangers et leur déplacement, GPS perdu, batterie faible — inutile avec l'appli montre Garmin</small></span><input type="checkbox" id="relais"></label>
+    <label class="ligne"><span>Notifications discrètes<small>n'allument pas l'écran du téléphone (moins d'appuis involontaires) ; décoche si ta montre ne les reçoit plus</small></span><input type="checkbox" id="notifDiscretes" checked></label>
     <div class="ligne"><span>Format des directions</span><select id="styleMontre"><option value="grille">Grille 3×3 (Ambit 3)</option><option value="mots">Mots (Tribord 60)</option><option value="heures">Heures (2h 60)</option><option value="fleches">Flèches (&gt; 60)</option></select></div>
     <div class="row" style="padding-top:10px"><button id="testMontre">Tester la montre</button><span class="mu" id="montreInfo"></span></div>
     <div class="montre" id="apercu"><b>aperçu</b>–</div>
@@ -177,7 +179,7 @@
     <button data-a="left">◀</button><button data-a="slower">▼</button><button data-a="right">▶</button>
   </div>
   <div id="bas">
-    <button id="bMute">Muet</button>
+    <button id="bMute">Muet<small style="display:block;font-size:10px;opacity:.7">maintenir</small></button>
     <div class="glisse" id="glisse"><span>Glisser pour arrêter</span><div class="pouce" id="bStop">■</div></div>
   </div>
 </div>
@@ -287,7 +289,9 @@ $('testSound').onclick = () => {
   if (APPLI && $('volMax').checked) { Natif.son.volumeMax({ on: true }).catch(() => {}); setTimeout(() => { if (!running) Natif.son.volumeMax({ on: false }).catch(() => {}); }, 9000); }
   demoSons(); if ($('voix').checked) setTimeout(() => parler('Roche à tribord, 40 mètres'), 5000);
 };
-if (!APPLI) $('volMaxLigne').hidden = true;
+if (!APPLI) { $('volMaxLigne').hidden = true; $('volAlertesLigne').hidden = true; }
+const appliquerVolume = () => { $('volAlertesTxt').textContent = $('volAlertes').value + ' %'; if (APPLI) Natif.son.gain({ v: $('volAlertes').value / 100 }).catch(() => {}); };
+$('volAlertes').oninput = appliquerVolume; $('volAlertes').onchange = () => { appliquerVolume(); saveSettings(); };
 
 // =====================================================================
 // Position : GPS ou simulation
@@ -475,7 +479,19 @@ function frame() {
 }
 
 // ---------- Boutons ----------
-$('bMute').onclick = () => { muted = !muted; JournalSession.ev('muet', { on: muted }); $('bMute').classList.toggle('on', muted); $('bMute').textContent = muted ? 'Son coupé' : 'Muet'; if (muted) continu(false); };
+// Muet : appui maintenu 0,8 s (un toucher involontaire, combinaison mouillée, ne coupe pas les alertes)
+(() => {
+  const b = $('bMute'); let minuterie = null;
+  const basculer = () => {
+    muted = !muted; JournalSession.ev('muet', { on: muted });
+    b.classList.toggle('on', muted); b.firstChild.textContent = muted ? 'Son coupé' : 'Muet';
+    if (muted) { continu(false); if (SON_NATIF) cadenceNatif(null); }
+    if (navigator.vibrate) navigator.vibrate(60);
+  };
+  b.addEventListener('pointerdown', () => { clearTimeout(minuterie); minuterie = setTimeout(basculer, 800); });
+  for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => clearTimeout(minuterie));
+  b.addEventListener('contextmenu', e => e.preventDefault());
+})();
 // Arrêt : glisser le bouton rouge jusqu'au bout (pas d'arrêt par un simple toucher, pas de sélection de texte)
 (() => {
   const g = $('glisse'), b = $('bStop'); let x0 = null;
@@ -502,7 +518,7 @@ $('start').onclick = async () => {
   saveSettings();
   if (!SON_NATIF) audio(); // le navigateur n'autorise l'audio qu'après un appui
   arreterGpsAccueil(); majTest();
-  if (APPLI) { demarrerJournal(); const t = horlogeSon() + 0.15; tone(880, 880, t, 0.12, 0.8, 'triangle'); tone(1320, 1320, t + 0.16, 0.2, 0.8, 'triangle'); } // carillon : le son marche
+  if (APPLI) { appliquerVolume(); demarrerJournal(); const t = horlogeSon() + 0.15; tone(880, 880, t, 0.12, 0.8, 'triangle'); tone(1320, 1320, t + 0.16, 0.2, 0.8, 'triangle'); } // carillon : le son marche
   $('setup').hidden = true; $('avance').hidden = true; $('fProfils').classList.remove('on');
   document.body.classList.add('navigation'); $('run').hidden = false; resize();
   fix = null; lastFixes = []; analysis = null; last = null; running = true; window.radarEnCours = true;
@@ -510,7 +526,8 @@ $('start').onclick = async () => {
   clearInterval(tickTimer); tickTimer = setInterval(tick, 100);
   requestAnimationFrame(frame);
   bipsActifs = $('bips').checked; voixActive = $('voix').checked; if (voixActive) parler('Radar actif'); // le premier appel doit suivre un appui
-  relais.actif = $('relais').checked;
+  relais.actif = $('relais').checked; notifDiscretes = $('notifDiscretes').checked;
+  muted = false; $('bMute').classList.remove('on'); $('bMute').firstChild.textContent = 'Muet'; // chaque session démarre son actif
   relaisDemarrer(Date.now(), tt => niveauCourant(sim ? sim.lon : MALO.lon, tt), $('seuil').value,
     $('live').checked && !$('liveInfo').textContent.startsWith('✓') ? '\nMaregraphe injoignable' : '');
   surveillerBatterie();
@@ -540,7 +557,7 @@ async function demarrerJournal() {
 
 // ---------- Réglages persistants ----------
 const veilleEtat = {};
-const SETTINGS = ['veille', 'bips', 'voix', 'volMax', 'relais', 'styleMontre', 'seuil', 'vmin', 'antic', 'preAlerte', 'smooth', 'live', 'testMode', 'testH', 'testNoL3d', 'simMode', 'simStart'];
+const SETTINGS = ['veille', 'bips', 'voix', 'volMax', 'volAlertes', 'relais', 'notifDiscretes', 'styleMontre', 'seuil', 'vmin', 'antic', 'preAlerte', 'smooth', 'live', 'testMode', 'testH', 'testNoL3d', 'simMode', 'simStart'];
 function saveSettings() { SETTINGS.forEach(k => store.set(k, $(k).type === 'checkbox' ? $(k).checked : $(k).value)); }
 function loadSettings() { SETTINGS.forEach(k => { const v = store.get(k, null); if (v != null) $(k).type === 'checkbox' ? ($(k).checked = v) : ($(k).value = v); }); }
 function updHNow() { majMaree(); }
@@ -557,6 +574,7 @@ async function droitsMontre() {
   $('montreInfo').textContent = p === 'granted' ? '' : p === 'absent' ? 'Notifications non disponibles dans ce navigateur.' : 'Notifications refusées : autorise-les dans les réglages du site.';
   return p === 'granted';
 }
+$('notifDiscretes').onchange = () => { notifDiscretes = $('notifDiscretes').checked; saveSettings(); };
 $('relais').onchange = async () => { if ($('relais').checked && !(await droitsMontre())) $('relais').checked = false; saveSettings(); };
 $('testMontre').onclick = async () => { await droitsMontre(); testerMontre(); };
 $('styleMontre').onchange = () => { styleMontre = $('styleMontre').value; saveSettings(); };
