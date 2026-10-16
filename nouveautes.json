@@ -2,6 +2,17 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 5,
+      "date": "2026-10-17",
+      "titre": "Sons fiables écran éteint et journal de session",
+      "points": [
+        "Les sons et la voix sont maintenant joués par Android lui-même : ils continuent écran éteint, même après de longues minutes.",
+        "Ils passent par le volume « alarme », poussé au maximum pendant le radar puis rétabli (réglage « Alertes au volume maximum »). Un petit carillon confirme le démarrage.",
+        "L'accueil signale si l'optimisation de la batterie d'Android risque d'endormir le radar : touche l'avertissement pour l'autoriser.",
+        "Journal de session : un par lancement du radar, dans Plus → Journaux de session. En cas de souci, touche « Envoyer » et partage-le par WhatsApp."
+      ]
+    },
+    {
       "id": 4,
       "date": "2026-10-16",
       "titre": "Fonds de carte et nouveautés",

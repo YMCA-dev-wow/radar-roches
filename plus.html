@@ -12,6 +12,8 @@
 <script src="nouveautes.js"></script>
 <style>
   footer { text-align: center; color: #4f7a76; font-size: 13px; margin-top: 26px; }
+  .journal { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--ln); }
+  .journal > div { flex: 1; } .journal small { color: var(--mu); }
 </style>
 </head>
 <body data-onglet="plus">
@@ -27,6 +29,7 @@ const ENTREES = [
   ['profils', 'radar.html#profils', 'Profils de navigation', 'créer, modifier, dupliquer'],
   ['reglages', 'radar.html#avance', 'Réglages avancés et essais', 'marée, sons, montre, mode test, simulation'],
   ['moderation', 'carte.html#moderation', 'Modération', 'jeux de roches partagés à valider'],
+  ['journal', '#journaux', 'Journaux de session', 'à envoyer pour analyser un problème'],
   ['nouveautes', '#nouveautes', 'Nouveautés', 'ce qui a changé à chaque version'],
   ['notice', 'notice.html', 'Notice', 'installation, réglages, dépannage'],
 ];
@@ -35,10 +38,25 @@ for (const [ic, href, titre, sous] of ENTREES) {
   a.innerHTML = `<span class="ic">${icone(ic)}</span><span><span class="t"></span><small></small></span>`;
   a.querySelector('.t').textContent = titre; a.querySelector('small').textContent = sous;
   if (href === '#nouveautes') a.onclick = e => { e.preventDefault(); nouveautes.ouvrir(true); };
+  if (href === '#journaux') a.onclick = e => { e.preventDefault(); ouvrirJournaux(); };
   document.getElementById('menu').append(a);
 }
 </script>
 <script src="maj.js"></script>
 <script>verifierMaj(document.getElementById('maj'));</script>
+<script src="journal.js"></script>
+<script>
+// Journaux de session : un par lancement du radar, à envoyer (WhatsApp, e-mail…) pour analyse
+function ouvrirJournaux() {
+  const f = document.createElement('div'); f.className = 'feuille on';
+  f.innerHTML = '<div class="in"><h2 style="margin-top:0">Journaux de session</h2><div class="sub">Un journal par lancement du radar : positions, alertes, sons, état du téléphone. ' +
+    'Envoie celui de la séance concernée pour analyser un problème (il contient tes positions).</div><div id="listeJournaux" style="margin-top:8px">…</div>' +
+    '<button class="btn" style="width:100%;margin-top:16px" id="fermerJournaux">Fermer</button></div>';
+  document.body.append(f);
+  f.querySelector('#fermerJournaux').onclick = () => f.remove();
+  f.onclick = e => { if (e.target === f) f.remove(); };
+  afficherJournaux(f.querySelector('#listeJournaux'));
+}
+</script>
 </body>
 </html>

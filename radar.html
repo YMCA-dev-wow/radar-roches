@@ -102,6 +102,7 @@
 
   <h2>Sons</h2>
   <div class="carte">
+    <label class="ligne" id="volMaxLigne"><span>Alertes au volume maximum<small>volume « alarme » du téléphone poussé au maximum pendant le radar, rétabli à l'arrêt</small></span><input type="checkbox" id="volMax" checked></label>
     <button id="testSound">Écouter les sons</button>
     <div class="mu" style="margin-top:8px">Tintement doux descendant = pré-alerte · 1 bip = devant · 2 bips montants = tribord · 2 bips descendants = bâbord · les bips accélèrent en approchant · son continu = moins de 10 m · 3 bips très graves = GPS perdu.</div>
   </div>
@@ -182,6 +183,7 @@
 </div>
 
 <script src="noyau.js"></script>
+<script src="journal.js"></script>
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
@@ -281,7 +283,11 @@ $('geoFile').onchange = async e => {
   e.target.value = '';
 };
 
-$('testSound').onclick = () => { demoSons(); if ($('voix').checked) setTimeout(() => parler('Roche à tribord, 40 mètres'), 5000); };
+$('testSound').onclick = () => {
+  if (APPLI && $('volMax').checked) { Natif.son.volumeMax({ on: true }).catch(() => {}); setTimeout(() => { if (!running) Natif.son.volumeMax({ on: false }).catch(() => {}); }, 9000); }
+  demoSons(); if ($('voix').checked) setTimeout(() => parler('Roche à tribord, 40 mètres'), 5000);
+};
+if (!APPLI) $('volMaxLigne').hidden = true;
 
 // =====================================================================
 // Position : GPS ou simulation
@@ -427,11 +433,12 @@ function tick() {
     $('sGps').textContent = fix.acc ? Math.round(fix.acc) : '–';
   }
   // ----- son -----
-  const at = audio().currentTime, vmin = +$('vmin').value / 3.6;
+  const at = horlogeSon(), vmin = +$('vmin').value / 3.6;
   let message = '';
   if (!sim) $('gpsEtat').textContent = texteGps();
+  if (gpsAge > 5 !== gpsPerduJournal && fix) { gpsPerduJournal = gpsAge > 5; JournalSession.ev('gps', gpsPerduJournal ? { perdu: true } : { retrouve: true }); }
   if (gpsAge > 5) {
-    continu(false);
+    continu(false); if (SON_NATIF) cadenceNatif(null);
     message = fix ? 'GPS perdu depuis ' + Math.round(gpsAge) + ' s' : 'Recherche GPS…';
     if (fix && !muted && at > nextBeep) { gpsPerdu(at); nextBeep = at + 10; }
   } else if (analysis) {
@@ -442,10 +449,24 @@ function tick() {
     annoncer(b, p, armed, Date.now(), analysis.horizon);
     annoncerVeille(nouvelleVeille(veilleEtat, analysis, armed, t));
     relaisPas(t, analysis, fix.course, armed, tt => niveauCourant(fix.lon, tt), true);
+    if (fix.t !== fixJournal) { fixJournal = fix.t; journalPosition(fix, analysis, armed); }
   }
   if (gpsAge > 5 && fix) relaisPas(t, analysis, 0, false, tt => niveauCourant(fix.lon, tt), false);
   $('msg').textContent = message;
   $('msg').className = gpsAge > 5 || !analysis ? '' : analysis.best ? 'alerte' : analysis.pre ? 'pre' : analysis.lat ? 'veille' : '';
+}
+// Une ligne par position : lieu, précision, vitesse (km/h), cap, eau, alertes armées, danger [d, gisement, niveau],
+// pré-alerte [d, gisement], veille [d, gisement]
+let fixJournal = null, gpsPerduJournal = false;
+function journalPosition(f, an, armed) {
+  if (!JournalSession.ouvert) return;
+  const r = (x, k = 0) => x == null || isNaN(x) ? null : +x.toFixed(k);
+  const d = { la: r(f.lat, 6), lo: r(f.lon, 6), acc: r(f.acc), v: r(f.speed * 3.6, 1), cap: r(f.course), W: r(an.W, 2), arme: armed };
+  if (an.best) d.a = [r(an.best.d), r(an.best.rel), an.best.lvl];
+  if (an.pre) d.p = [r(an.pre.d), r(an.pre.rel)];
+  if (an.lat) d.l = [r(an.lat.d), r(an.lat.rel)];
+  if (sim) d.sim = true;
+  JournalSession.ev('pos', d);
 }
 function frame() {
   if (!running) return;
@@ -454,7 +475,7 @@ function frame() {
 }
 
 // ---------- Boutons ----------
-$('bMute').onclick = () => { muted = !muted; $('bMute').classList.toggle('on', muted); $('bMute').textContent = muted ? 'Son coupé' : 'Muet'; if (muted) continu(false); };
+$('bMute').onclick = () => { muted = !muted; JournalSession.ev('muet', { on: muted }); $('bMute').classList.toggle('on', muted); $('bMute').textContent = muted ? 'Son coupé' : 'Muet'; if (muted) continu(false); };
 // Arrêt : glisser le bouton rouge jusqu'au bout (pas d'arrêt par un simple toucher, pas de sélection de texte)
 (() => {
   const g = $('glisse'), b = $('bStop'); let x0 = null;
@@ -468,15 +489,20 @@ $('bMute').onclick = () => { muted = !muted; $('bMute').classList.toggle('on', m
 function arreter() {
   running = false; window.radarEnCours = false; continu(false); clearInterval(tickTimer);
   stopGps(); sim = null; $('sim').hidden = true;
-  if (APPLI) Natif.veille.liberer().catch(() => {});
+  if (APPLI) {
+    Natif.veille.liberer().catch(() => {});
+    cadenceNatif(null); Natif.son.arreter().catch(() => {}); Natif.son.volumeMax({ on: false }).catch(() => {});
+    JournalSession.fermer({ arret: 'bouton' }); journalSon = null;
+  }
   if (wakeLock) wakeLock.release().catch(() => {}); wakeLock = null;
   $('run').hidden = true; document.body.classList.remove('navigation');
   route(); demarrerGpsAccueil(); majMaree();
 }
 $('start').onclick = async () => {
   saveSettings();
-  audio();
+  if (!SON_NATIF) audio(); // le navigateur n'autorise l'audio qu'après un appui
   arreterGpsAccueil(); majTest();
+  if (APPLI) { demarrerJournal(); const t = horlogeSon() + 0.15; tone(880, 880, t, 0.12, 0.8, 'triangle'); tone(1320, 1320, t + 0.16, 0.2, 0.8, 'triangle'); } // carillon : le son marche
   $('setup').hidden = true; $('avance').hidden = true; $('fProfils').classList.remove('on');
   document.body.classList.add('navigation'); $('run').hidden = false; resize();
   fix = null; lastFixes = []; analysis = null; last = null; running = true; window.radarEnCours = true;
@@ -498,9 +524,23 @@ document.addEventListener('visibilitychange', async () => {
   if (running && document.visibilityState === 'visible' && !wakeLock) try { wakeLock = await navigator.wakeLock.request('screen'); } catch {}
 });
 
+// Journal de session (appli) : en-tête avec l'appareil, l'état du son et les réglages, puis les événements
+async function demarrerJournal() {
+  const ok = p => p.then(r => r, e => ({ erreur: e.message }));
+  const son = await ok($('volMax').checked ? Natif.son.volumeMax({ on: true }) : Natif.son.etat());
+  let version = null; try { version = (await (await fetch('version.txt', { cache: 'no-store' })).text()).trim(); } catch {}
+  await JournalSession.ouvrir({
+    version, appareil: await ok(Natif.journal.appareil()), son, zone: zone && zone.id,
+    profil: profils[profilActif] && profils[profilActif].nom,
+    reglages: Object.fromEntries(SETTINGS.map(k => [k, $(k).type === 'checkbox' ? $(k).checked : $(k).value])),
+    maree: { recalage: etatRecal, info: $('liveInfo').textContent }, ecran: !document.hidden,
+  });
+  journalSon = (nom, d) => JournalSession.ev('son', d == null ? { nom } : { nom, d });
+}
+
 // ---------- Réglages persistants ----------
 const veilleEtat = {};
-const SETTINGS = ['veille', 'bips', 'voix', 'relais', 'styleMontre', 'seuil', 'vmin', 'antic', 'preAlerte', 'smooth', 'live', 'testMode', 'testH', 'testNoL3d', 'simMode', 'simStart'];
+const SETTINGS = ['veille', 'bips', 'voix', 'volMax', 'relais', 'styleMontre', 'seuil', 'vmin', 'antic', 'preAlerte', 'smooth', 'live', 'testMode', 'testH', 'testNoL3d', 'simMode', 'simStart'];
 function saveSettings() { SETTINGS.forEach(k => store.set(k, $(k).type === 'checkbox' ? $(k).checked : $(k).value)); }
 function loadSettings() { SETTINGS.forEach(k => { const v = store.get(k, null); if (v != null) $(k).type === 'checkbox' ? ($(k).checked = v) : ($(k).value = v); }); }
 function updHNow() { majMaree(); }
@@ -618,7 +658,10 @@ function demarrerGpsAccueil() {
   }, e => { gpsAccueilErreur = e.code === 1 ? 'refusé' : 'indisponible'; majVerifs(); }, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
 }
 function arreterGpsAccueil() { if (watchAccueil != null) navigator.geolocation.clearWatch(watchAccueil); watchAccueil = null; }
-let batterie = null;
+let batterie = null, appareil = null;
+// Appli : l'optimisation de la batterie d'Android peut endormir le radar écran éteint ; on vérifie à chaque retour sur la page
+async function lireAppareil() { if (!APPLI) return; try { appareil = await Natif.journal.appareil(); } catch { appareil = null; } majVerifs(); }
+lireAppareil(); document.addEventListener('visibilitychange', () => { if (!document.hidden) lireAppareil(); });
 if (navigator.getBattery) navigator.getBattery().then(b => { batterie = b; b.onlevelchange = majVerifs; majVerifs(); }).catch(() => {});
 function majVerifs() {
   const v = [], ch = (cls, txt) => v.push(`<span class="chip ${cls}">${txt}</span>`);
@@ -630,7 +673,10 @@ function majVerifs() {
     { ok: '✓ Marée recalée', hors: '✓ Recalage récent', ko: '! Prédiction seule', off: '! Prédiction seule', attente: '… Marée' }[etatRecal]);
   ch($('testMode').checked ? 'dan' : 'ok', $('testMode').checked ? '⚠ Mode test actif' : '✓ Mode test coupé');
   if (batterie) { const pc = Math.round(batterie.level * 100); ch(pc > 30 || batterie.charging ? 'ok' : 'ko', (pc > 30 ? '✓' : '!') + ' Batterie ' + pc + ' %'); }
+  if (appareil && !appareil.batterieLibre) v.push('<button class="chip dan" id="corrigerBatterie">⚠ Optimisation batterie : toucher pour l\'autoriser</button>');
+  if (appareil && appareil.economie) ch('ko', '! Économie d\'énergie active');
   $('verifs').innerHTML = v.join('');
+  if ($('corrigerBatterie')) $('corrigerBatterie').onclick = () => Natif.journal.demanderBatterie().catch(() => {});
 }
 setInterval(() => { if (!running) { majVerifs(); majChipZone(); } }, 5000);
 

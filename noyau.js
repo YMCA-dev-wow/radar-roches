@@ -15,6 +15,8 @@ const Natif = APPLI ? {
   notifs: window.Capacitor.registerPlugin('LocalNotifications'),
   voix: window.Capacitor.registerPlugin('TextToSpeech'),
   veille: window.Capacitor.registerPlugin('Veille'), // processeur gardé éveillé pendant la navigation (plugin de l'appli)
+  son: window.Capacitor.registerPlugin('Son'),         // sons et voix joués par Android, canal alarme (plugin de l'appli)
+  journal: window.Capacitor.registerPlugin('Journal'), // journal de session, état de l'appareil (plugin de l'appli)
 } : null;
 
 // =====================================================================
@@ -274,9 +276,21 @@ function texteMenace(b) {
 // =====================================================================
 // Son
 // =====================================================================
+// Dans l'appli, Android joue les sons (SonPlugin, canal alarme) : la page peut être ralentie écran éteint, et l'audio web
+// s'y met en pause (son horloge s'arrête : plus aucun son). Les bips d'alerte y sont un motif répété par Android
+// (cadence), renouvelé à chaque position : si la page se tait, les bips s'arrêtent d'eux-mêmes au bout de 2,5 s.
+// Ailleurs (navigateur), audio web. Les horaires des sons sont exprimés sur horlogeSon() (secondes).
+const SON_NATIF = APPLI;
 let ac = null, muted = false, nextBeep = 0, contOsc = null;
+let journalSon = null; // (nom, détail) => void : branché par la page radar pour le journal de session
+const traceSon = (nom, d) => { if (journalSon) try { journalSon(nom, d); } catch {} };
 function audio() { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); return ac; }
+function horlogeSon() { return SON_NATIF ? performance.now() / 1000 : audio().currentTime; }
 function tone(f0, f1, t, dur, vol = 0.9, type = 'square') {
+  if (SON_NATIF) {
+    Natif.son.jouer({ notes: [{ f: f0, f1, t: Math.max(0, (t - horlogeSon()) * 1000), d: dur * 1000, v: vol, onde: type === 'square' ? 'carre' : 'triangle' }] }).catch(() => {});
+    return;
+  }
   const a = audio(), o = a.createOscillator(), g = a.createGain();
   o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.linearRampToValueAtTime(f1, t + dur);
   g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.01); g.gain.setValueAtTime(vol, t + dur - 0.02); g.gain.linearRampToValueAtTime(0, t + dur);
@@ -284,24 +298,50 @@ function tone(f0, f1, t, dur, vol = 0.9, type = 'square') {
 }
 // Motif : devant (1 note) / tribord (2 notes montantes) / bâbord (2 notes descendantes) ; plus aigu si émergé.
 // periode = intervalle jusqu'au motif suivant : les notes raccourcissent avec la cadence pour laisser ~1/3 de silence.
-function motif(rel, lvl, t, periode = 1) {
+function notesMotif(rel, lvl, periode = 1) { // [{ f, t, d }] en ms depuis le début du motif
   const up = lvl === 3 ? 300 : 0;
-  const note = Math.min(0.09, 0.28 * periode), blanc = Math.min(0.03, 0.1 * periode);
-  if (Math.abs(rel) < 15) tone(700 + up, 700 + up, t, Math.min(0.14, 0.6 * periode));
-  else if (rel > 0) { tone(600 + up, 600 + up, t, note); tone(1000 + up, 1000 + up, t + note + blanc, note); }
-  else { tone(1000 + up, 1000 + up, t, note); tone(600 + up, 600 + up, t + note + blanc, note); }
+  const note = Math.min(0.09, 0.28 * periode) * 1000, blanc = Math.min(0.03, 0.1 * periode) * 1000;
+  if (Math.abs(rel) < 15) return [{ f: 700 + up, t: 0, d: Math.min(0.14, 0.6 * periode) * 1000 }];
+  const [a, b] = rel > 0 ? [600, 1000] : [1000, 600];
+  return [{ f: a + up, t: 0, d: note }, { f: b + up, t: note + blanc, d: note }];
+}
+function motif(rel, lvl, t, periode = 1) {
+  for (const n of notesMotif(rel, lvl, periode)) tone(n.f, n.f, t + n.t / 1000, n.d / 1000);
+}
+// Bips d'alerte joués par Android : envoyés quand le motif change, quand la cadence varie de plus de 5 %, et au moins
+// toutes les 0,7 s (renouvellement) ; null arrête.
+let cadenceEnCours = null;
+function cadenceNatif(rel, lvl, periode) {
+  const now = performance.now();
+  if (rel == null) {
+    if (cadenceEnCours) { Natif.son.cadence({ notes: [], periode: 1, duree: 0 }).catch(() => {}); traceSon('bips', 'fin'); cadenceEnCours = null; }
+    return;
+  }
+  const cle = (Math.abs(rel) < 15 ? 'devant' : rel > 0 ? 'tribord' : 'babord') + lvl, c = cadenceEnCours;
+  if (c && c.cle === cle && Math.abs(periode - c.p) / c.p < 0.05 && now - c.t < 700) return;
+  if (!c || c.cle !== cle) traceSon('bips', cle);
+  Natif.son.cadence({ notes: notesMotif(rel, lvl, periode).map(n => ({ ...n, v: 0.9 })), periode, duree: 2.5 }).catch(() => {});
+  cadenceEnCours = { cle, p: periode, t: now };
 }
 function continu(on, f = 1100) {
+  if (SON_NATIF) {
+    const now = performance.now();
+    if (on) {
+      if (!contOsc) traceSon('continu', f);
+      if (!contOsc || contOsc.f !== f || now - contOsc.t > 700) { Natif.son.continu({ f, duree: 2.5 }).catch(() => {}); contOsc = { f, t: now }; cadenceEnCours = null; }
+    } else if (contOsc) { Natif.son.continu({ f: 0 }).catch(() => {}); contOsc = null; traceSon('continu', 'fin'); }
+    return;
+  }
   if (on && !contOsc) {
     const a = audio(), o = a.createOscillator(), g = a.createGain();
     o.type = 'square'; o.frequency.value = f; g.gain.value = 0.9; o.connect(g).connect(a.destination); o.start();
     contOsc = { o, g };
   } else if (!on && contOsc) { contOsc.o.stop(); contOsc = null; }
 }
-function tintement(t) { tone(1760, 1760, t, 0.22, 0.8, 'triangle'); tone(1320, 1320, t + 0.24, 0.30, 0.8, 'triangle'); } // pré-alerte : doux, aigu, descendant
-function gpsPerdu(t) { [0, 0.25, 0.5].forEach(s => tone(260, 260, t + s, 0.15)); }
+function tintement(t) { traceSon('pre-alerte'); tone(1760, 1760, t, 0.22, 0.8, 'triangle'); tone(1320, 1320, t + 0.24, 0.30, 0.8, 'triangle'); } // pré-alerte : doux, aigu, descendant
+function gpsPerdu(t) { traceSon('gps-perdu'); [0, 0.25, 0.5].forEach(s => tone(260, 260, t + s, 0.15)); }
 function demoSons() {
-  const t = audio().currentTime + 0.1;
+  const t = horlogeSon() + 0.1;
   tintement(t); sonVeille('tribord', t + 0.6); motif(0, 2, t + 1.6); motif(40, 2, t + 1.8); motif(-40, 2, t + 2.6); motif(0, 3, t + 3.4); gpsPerdu(t + 4.2);
 }
 // Joue l'alerte correspondant à la menace b, sinon la pré-alerte pre (appelé à chaque pas) ; armed = vitesse suffisante.
@@ -309,20 +349,21 @@ function demoSons() {
 let nextPre = 0, bipsActifs = true;
 let parleNatif = false;
 const voixEnCours = () => APPLI ? parleNatif : 'speechSynthesis' in window && speechSynthesis.speaking;
-function taireVoix() { if (APPLI) { Natif.voix.stop().catch(() => {}); parleNatif = false; } else if ('speechSynthesis' in window) speechSynthesis.cancel(); }
+function taireVoix() { if (APPLI) { Natif.son.taire().catch(() => {}); parleNatif = false; } else if ('speechSynthesis' in window) speechSynthesis.cancel(); }
 function sonnerMenace(b, horizon, armed, pre) {
-  const at = audio().currentTime;
+  const at = horlogeSon();
   if (b && armed && !muted) {
     if (b.d < 10) {
       if (bipsActifs) { if (voixEnCours()) taireVoix(); continu(true, b.lvl === 3 ? 1400 : 1100); } else continu(false);
       return;
     }
     continu(false);
-    if (!bipsActifs || voixEnCours()) return;
+    if (!bipsActifs || voixEnCours()) { if (SON_NATIF) cadenceNatif(null); return; }
     // Cadence : 1 motif toutes les 1,2 s à la distance d'alerte, jusqu'à 7 par seconde à 10 m (puis son continu).
     // Courbe accentuée près du danger pour que l'accélération finale traduise l'imminence.
     const f = Math.max(0, Math.min(1, (b.d - 10) / Math.max(1, horizon - 10)));
     const period = 0.14 + 1.06 * Math.pow(f, 1.5);
+    if (SON_NATIF) { cadenceNatif(b.rel, b.lvl, period); return; }
     // Bips programmés d'avance sur l'horloge audio (rythme régulier même si le calcul tourne à 10 Hz ou ralentit écran éteint)
     const avance = APPLI && document.hidden ? 1 : 0.25;
     if (nextBeep < at) nextBeep = at;
@@ -330,6 +371,7 @@ function sonnerMenace(b, horizon, armed, pre) {
     return;
   }
   continu(false);
+  if (SON_NATIF) cadenceNatif(null);
   if (pre && armed && !muted && bipsActifs && !voixEnCours() && at > nextPre) { tintement(at); nextPre = at + 3; } // rappel toutes les 3 s
 }
 // Niveau d'alerte pour la frise : 0 rien, 1 bips, 2 son continu (< 10 m), 3 contact (< 3 m)
@@ -499,8 +541,8 @@ function testerMontre() {
 let voixActive = false, derniereVoix = { t: 0, cle: '' };
 function parler(txt) {
   if (APPLI) {
-    taireVoix(); parleNatif = true;
-    Natif.voix.speak({ text: txt, lang: 'fr-FR', rate: 1.2, volume: 1 }).catch(() => {}).finally(() => { parleNatif = false; });
+    taireVoix(); parleNatif = true; traceSon('voix', txt);
+    Natif.son.parler({ texte: txt, vitesse: 1.2 }).catch(() => {}).finally(() => { parleNatif = false; });
     return true;
   }
   if (!('speechSynthesis' in window)) return false;
@@ -516,6 +558,7 @@ function nouvelleVeille(etat, an, armed, t) {
   return nouveau && !an.best ? { cote, d: an.lat.d, lvl: an.lat.lvl } : null;
 }
 function sonVeille(cote, t) { // glissando doux et grave : montant = tribord, descendant = bâbord
+  traceSon('veille', cote);
   const [a, b] = cote === 'tribord' ? [380, 620] : [620, 380];
   tone(a, b, t, 0.35, 0.7, 'sine'); tone(a, b, t + 0.45, 0.35, 0.7, 'sine');
 }
@@ -523,7 +566,7 @@ function annoncerVeille(v) {
   if (!v || muted) return;
   const d = v.d >= 30 ? Math.round(v.d / 10) * 10 : Math.round(v.d);
   if (voixActive) { if (!voixEnCours()) parler(`${v.lvl === 3 ? 'Roches' : 'Hauts-fonds'} à ${v.cote}, ${d} mètres`); }
-  else if (bipsActifs) sonVeille(v.cote, audio().currentTime);
+  else if (bipsActifs) sonVeille(v.cote, horlogeSon());
 }
 function texteVeille(l) { return `${l.lvl === 3 ? 'Roches' : 'Hauts-fonds'} à ${l.rel > 0 ? 'tribord' : 'bâbord'} à ${Math.round(l.d)} m (veille)`; }
 // La voix ne dit que la pré-alerte puis le premier message d'alerte d'un même épisode ; les bips prennent ensuite le relais.

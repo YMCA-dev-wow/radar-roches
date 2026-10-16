@@ -85,7 +85,9 @@ Par défaut, seules les <b>roches</b> déclenchent une alerte ; les fonds lisses
     <ul>
       <li><b>Localisation</b> : position exacte, <b>Toujours autoriser</b> ;</li>
       <li><b>Notifications</b> : oui (relais montre, annonce des mises à jour) ;</li>
-      <li><b>Batterie</b> : Paramètres Android → Applis → Radar roches → Batterie → <b>Non restreinte</b>.</li>
+      <li><b>Batterie</b> : si l'accueil affiche « ⚠ Optimisation batterie », touche-le et choisis <b>Autoriser</b>
+        (ou Paramètres Android → Applis → Radar roches → Batterie → <b>Non restreinte</b>).
+        Samsung : retire aussi l'appli des « applis en veille » ; Xiaomi : « Démarrage automatique » et « Pas de restrictions ».</li>
     </ul>
     Sans ces trois réglages, le radar s'arrête quand l'écran s'éteint.</li>
 </ol>
@@ -300,7 +302,12 @@ ou en grand (touche la barrette ou le titre « Mes roches »). Sur ordinateur, l
 <table>
   <tr><th>Problème</th><th>Solution</th></tr>
   <tr><td>Android refuse l'installation</td><td>Autorise la source (§ 2) ; garde environ 400 Mo libres.</td></tr>
-  <tr><td>Le radar s'arrête écran éteint</td><td>Batterie « Non restreinte » et localisation « Toujours autoriser ».</td></tr>
+  <tr><td>Le radar s'arrête écran éteint</td><td>Batterie « Non restreinte » et localisation « Toujours autoriser ». Envoie le journal de la séance (ci-dessous).</td></tr>
+  <tr><td>Pas de son, ou trop faible</td><td>Les alertes passent par le volume <b>alarme</b> du téléphone, poussé au maximum pendant le radar (réglage « Alertes au volume maximum »).
+    Teste avant de partir : Plus → Réglages avancés → <b>Écouter les sons</b>, téléphone dans sa pochette. Sous une combinaison et un gilet, le son est très étouffé :
+    place la pochette au-dessus du gilet (bras, épaule, harnais), ou utilise une montre.</td></tr>
+  <tr><td>Signaler un problème</td><td><b>Plus → Journaux de session</b> : un journal par lancement du radar (positions, alertes, sons joués, écran allumé ou éteint, état du téléphone).
+    Touche <b>Envoyer</b> sur celui de la séance et partage-le (WhatsApp, e-mail). Il contient tes positions.</td></tr>
   <tr><td>Précision GPS mauvaise (plus de 15 m)</td><td>Démarre le radar quelques minutes avant, à découvert ; le téléphone dans une pochette en haut du corps capte mieux.</td></tr>
   <tr><td>« Marégraphe injoignable »</td><td>Pas de réseau au départ : la prédiction seule est utilisée (garde de la marge).</td></tr>
   <tr><td>La montre n'apparaît pas sur l'ordinateur</td><td>Autre port ou câble Garmin d'origine ; sur Mac, OpenMTP.</td></tr>
