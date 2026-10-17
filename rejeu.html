@@ -55,6 +55,8 @@
   #lecture { display: flex; align-items: flex-end; gap: 18px; margin: 2px 0 6px; flex-wrap: wrap; }
   #lecture .val { display: grid; grid-template-columns: 4px auto; column-gap: 8px; align-items: center; }
   #lecture .val i { grid-row: span 2; align-self: stretch; border-radius: 2px; }
+  /* jauge façon Suunto : piste grise, remplie depuis le bas selon la valeur (--n de 0 à 1) */
+  .jauge { --n: 0; --c: #5ac8fa; background: linear-gradient(to top, var(--c) calc(var(--n) * 100%), #3a4654 calc(var(--n) * 100%)); }
   #lecture .val b { font-size: 20px; font-variant-numeric: tabular-nums; }
   #lecture .val small { color: var(--muted); font-size: 11px; }
   #lecture .fen { margin-left: auto; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
@@ -145,11 +147,11 @@
       <label class="suivre"><input type="checkbox" id="follow"> Suivre</label>
       <span class="zoom"><button id="zMoins" title="Zoom arrière">−</button><button id="zPlus" title="Zoom avant (ou pincer la frise)">+</button><button id="zTout">Tout</button><button id="zHaut" title="Hauteur de la frise">↕</button></span>
       <span style="flex:1"></span>
-      <span class="legend"><span><i class="dot" style="background:#bf5af2"></i>montre</span><span><i class="dot" style="background:#5ac8fa"></i>veille</span><span><i class="dot" style="background:#ffd60a"></i>pré-alerte</span><span><i class="dot" style="background:var(--a1)"></i>bips</span><span><i class="dot" style="background:var(--a2)"></i>&lt; 10 m</span><span><i class="dot" style="background:var(--a3)"></i>contact</span><span><i class="dot" style="background:#5ac8fa"></i>marée</span><span>fond : <i class="dot" style="background:#6e6a66"></i>roche <i class="dot" style="background:#c2a46b"></i>sable, vase</span></span>
+      <span class="legend"><span><i class="dot" style="background:#bf5af2"></i>montre</span><span><i class="dot" style="background:#5ac8fa"></i>veille</span><span><i class="dot" style="background:#ffd60a"></i>pré-alerte</span><span><i class="dot" style="background:var(--a1)"></i>bips</span><span><i class="dot" style="background:var(--a2)"></i>&lt; 10 m</span><span><i class="dot" style="background:var(--a3)"></i>contact</span><span><i class="dot" style="background:#5ac8fa"></i>marée</span><span>fond : <i class="dot" style="background:#6e6a66"></i>roche <i class="dot" style="background:#c2a46b"></i>sable, vase</span><span><i class="dot" style="background:#ff3b30"></i>eau mini</span></span>
     </div>
     <div id="lecture">
-      <span class="val"><i style="background:#c2a46b"></i><b id="lFond">–</b><small>fond sous le rider</small></span>
-      <span class="val"><i style="background:#5ac8fa"></i><b id="lEau">–</b><small>hauteur d'eau</small></span>
+      <span class="val"><i class="jauge" id="jFond" style="--c:#c2a46b"></i><b id="lFond">–</b><small>fond sous le rider</small></span>
+      <span class="val"><i class="jauge" id="jEau" style="--c:#5ac8fa"></i><b id="lEau">–</b><small>hauteur d'eau</small></span>
       <span class="fen" id="lFen"></span>
     </div>
     <canvas id="tl"></canvas>
@@ -484,46 +486,52 @@ function dessinerFrise() {
     const xa = x(p.t); g.fillStyle = p.lvl ? COLS[p.lvl] : '#ffd60a';
     g.fillRect(xa, yA, Math.max(1, x(pts[i + 1].t) - xa), ha);
   }
-  // échelles : fond sous le rider à gauche (0 en bas), hauteur d'eau à droite
-  const prs = visibles.map(p => p.prof).filter(v => v != null && v !== Infinity);
-  const pmax = Math.min(20, Math.max(4, ...prs, +$('seuil').value + 1)) * 1.08;
-  const yP = d => yC + hC - Math.max(0, Math.min(1, d / pmax)) * hC;
-  const ws = visibles.map(p => p.W), wmin = Math.min(...ws), wmax = Math.max(...ws), wa = wmin - Math.max(0.3, (wmax - wmin) * 0.15), wb = wmax + Math.max(0.3, (wmax - wmin) * 0.15);
-  const yW = v => yC + hC - (v - wa) / (wb - wa) * hC;
-  g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = k; // quadrillage léger tous les 2 m (ou 5 m)
-  const pas = pmax > 12 ? 5 : 2;
-  for (let d = pas; d < pmax; d += pas) { g.beginPath(); g.moveTo(0, yP(d)); g.lineTo(W, yP(d)); g.stroke(); g.fillStyle = '#5d6b7a'; g.fillText(d + ' m', 3 * k, yP(d) - 2 * k); }
-  // fond sous le rider : aire teintée et trait coloré selon la nature (roche, sable/vase) ; trou = pas de mesure
-  const vP = p => p.prof === Infinity ? pmax : p.prof;
-  for (let i = 0; i + 1 < visibles.length;) { // par tronçons de même nature : aire teintée d'un seul tenant, puis trait
+  // Coupe empilée sur le zéro des cartes : fond (cote du fond, couleur selon sa nature) en bas, eau au-dessus jusqu'à la
+  // surface (hauteur d'eau) ; l'épaisseur bleue est l'eau sous le rider. Échelle unique en m au-dessus du zéro des cartes.
+  const seuil = +$('seuil').value;
+  const cote = p => p.prof == null ? null : p.prof === Infinity ? -Infinity : p.W - p.prof;
+  const cs = visibles.map(cote).filter(c => c != null && c !== -Infinity);
+  const ws = visibles.map(p => p.W), wmin = Math.min(...ws), wmax = Math.max(...ws);
+  const zHaut = Math.max(wmax, ...cs) + 0.6, zBas = Math.min(wmin - seuil - 1, Math.max(wmin - 15, Math.min(...cs, wmin - 4) - 0.8)); // fond jusqu'à 15 m sous la surface
+  const yZ = z => yC + hC - (Math.max(zBas, Math.min(zHaut, z)) - zBas) / (zHaut - zBas) * hC;
+  const pas = zHaut - zBas > 14 ? 5 : 2;
+  g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = k; g.fillStyle = '#5d6b7a';
+  for (let z = Math.ceil(zBas / pas) * pas; z < zHaut; z += pas) { g.beginPath(); g.moveTo(0, yZ(z)); g.lineTo(W, yZ(z)); g.stroke(); g.fillText((z === 0 ? '0 (ZH)' : z + ' m'), 3 * k, yZ(z) - 2 * k); }
+  // eau : de la surface jusqu'au fond (ou jusqu'en bas du cadre s'il est plus profond que le relevé)
+  g.beginPath(); visibles.forEach((p, i) => i ? g.lineTo(x(p.t), yZ(p.W)) : g.moveTo(x(p.t), yZ(p.W)));
+  g.lineTo(x(visibles[visibles.length - 1].t), yC + hC); g.lineTo(x(visibles[0].t), yC + hC); g.closePath();
+  g.fillStyle = 'rgba(90,200,250,.18)'; g.fill();
+  // fond, par tronçons de même nature (aire pleine depuis le bas, puis trait)
+  for (let i = 0; i + 1 < visibles.length;) {
     if (visibles[i].prof == null || visibles[i + 1].prof == null) { i++; continue; }
     const nat = visibles[i].nature, c = FOND[nat] || FOND.lisse; let j = i;
     while (j + 1 < visibles.length && visibles[j + 1].prof != null && visibles[j].nature === nat) j++;
     g.beginPath(); g.moveTo(x(visibles[i].t), yC + hC);
-    for (let n = i; n <= j; n++) g.lineTo(x(visibles[n].t), yP(vP(visibles[n])));
-    g.lineTo(x(visibles[j].t), yC + hC); g.closePath(); g.fillStyle = c + '30'; g.fill();
-    g.beginPath(); for (let n = i; n <= j; n++) n === i ? g.moveTo(x(visibles[n].t), yP(vP(visibles[n]))) : g.lineTo(x(visibles[n].t), yP(vP(visibles[n])));
-    g.strokeStyle = c; g.lineWidth = 2.2 * k; g.stroke();
+    for (let n = i; n <= j; n++) g.lineTo(x(visibles[n].t), yZ(cote(visibles[n])));
+    g.lineTo(x(visibles[j].t), yC + hC); g.closePath(); g.fillStyle = c + 'b0'; g.fill();
+    g.beginPath(); for (let n = i; n <= j; n++) n === i ? g.moveTo(x(visibles[n].t), yZ(cote(visibles[n]))) : g.lineTo(x(visibles[n].t), yZ(cote(visibles[n])));
+    g.strokeStyle = c; g.lineWidth = 1.8 * k; g.stroke();
     i = j;
   }
-  const seuil = +$('seuil').value; // eau minimale : pointillé rouge sur l'échelle du fond
-  g.setLineDash([4 * k, 3 * k]); g.strokeStyle = '#ff3b30'; g.lineWidth = k; g.beginPath(); g.moveTo(0, yP(seuil)); g.lineTo(W, yP(seuil)); g.stroke(); g.setLineDash([]);
-  g.fillStyle = '#ff6b5b'; g.fillText('eau mini ' + fr1(seuil) + ' m', 3 * k, yP(seuil) + 11 * k);
-  // hauteur d'eau (marée) : trait bleu, échelle à droite
-  g.strokeStyle = '#5ac8fa'; g.lineWidth = 1.6 * k; g.beginPath();
-  visibles.forEach((p, i) => { const y = yW(p.W); i ? g.lineTo(x(p.t), y) : g.moveTo(x(p.t), y); });
-  g.stroke();
-  g.fillStyle = '#5ac8fa'; g.textAlign = 'right';
-  g.fillText(fr1(wmax) + ' m', W - 3 * k, yW(wmax) - 3 * k); g.fillText(fr1(wmin) + ' m', W - 3 * k, yW(wmin) + 11 * k);
-  g.textAlign = 'left';
-  // curseur : trait pointillé et points sur les deux courbes
+  // eau minimale sous la planche : pointillé rouge à « surface − eau minimale » (le fond au-dessus = danger)
+  g.setLineDash([4 * k, 3 * k]); g.strokeStyle = '#ff3b30'; g.lineWidth = k; g.beginPath();
+  visibles.forEach((p, i) => i ? g.lineTo(x(p.t), yZ(p.W - seuil)) : g.moveTo(x(p.t), yZ(p.W - seuil))); g.stroke(); g.setLineDash([]);
+  // surface (hauteur d'eau) : trait bleu
+  g.strokeStyle = '#5ac8fa'; g.lineWidth = 1.8 * k; g.beginPath();
+  visibles.forEach((p, i) => i ? g.lineTo(x(p.t), yZ(p.W)) : g.moveTo(x(p.t), yZ(p.W))); g.stroke();
+  g.fillStyle = '#ff6b5b'; g.fillText('eau mini ' + fr1(seuil) + ' m', 3 * k, yZ(visibles[0].W - seuil) + 11 * k);
+  // curseur : trait pointillé, points sur la surface et sur le fond
   const xc = x(cur), pc = etatA(cur), pi = pts[Math.min(pts.length - 1, pc.i ?? 0)];
   g.setLineDash([2 * k, 3 * k]); g.strokeStyle = '#fff'; g.lineWidth = 1.5 * k; g.beginPath(); g.moveTo(xc, 0); g.lineTo(xc, H); g.stroke(); g.setLineDash([]);
-  if (pi && pi.prof != null) { g.fillStyle = FOND[pi.nature] || FOND.lisse; g.beginPath(); g.arc(xc, yP(pi.prof === Infinity ? pmax : pi.prof), 4 * k, 0, 7); g.fill(); }
-  if (pi) { g.fillStyle = '#5ac8fa'; g.beginPath(); g.arc(xc, yW(pi.W), 4 * k, 0, 7); g.fill(); }
-  // valeurs au curseur et fenêtre affichée (au-dessus de la frise)
+  if (pi && pi.prof != null) { g.fillStyle = FOND[pi.nature] || FOND.lisse; g.beginPath(); g.arc(xc, yZ(cote(pi)), 4 * k, 0, 7); g.fill(); }
+  if (pi) { g.fillStyle = '#5ac8fa'; g.beginPath(); g.arc(xc, yZ(pi.W), 4 * k, 0, 7); g.fill(); }
+  // jauges façon Suunto : valeur à l'instant sur l'étendue de la portion affichée
+  const prs = visibles.map(p => p.prof).filter(v => v != null && v !== Infinity);
+  const jauge = (el, v, a, b) => { el.style.setProperty('--n', v == null || !(b > a) ? 0 : Math.max(0.04, Math.min(1, (v - a) / (b - a)))); };
+  jauge($('jFond'), pi && pi.prof != null ? (pi.prof === Infinity ? Math.max(...prs, 1) : pi.prof) : null, Math.min(0, ...prs), Math.max(...prs, 1));
+  jauge($('jEau'), pi ? pi.W : null, wmin - 0.01, wmax + 0.01);
+  $('jFond').style.setProperty('--c', FOND[pi && pi.nature] || FOND.lisse);
   $('lFond').textContent = !pi || pi.prof == null ? '–' : pi.prof === Infinity ? '> ' + fr1(pi.W - meta.cote_min) + ' m' : fr1(pi.prof) + ' m';
-  $('lFond').previousElementSibling.style.background = FOND[pi && pi.nature] || FOND.lisse;
   $('lFond').nextElementSibling.textContent = 'fond sous le rider' + (pi && pi.nature ? ' · ' + { roche: 'roche', lisse: 'sable, vase', terre: 'terre', profond: 'profond' }[pi.nature] : '');
   $('lEau').textContent = pi ? fr1(pi.W) + ' m' : '–';
   const [a0, b0] = bornes(), zoom = t0 > a0 + 1 || t1 < b0 - 1;

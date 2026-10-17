@@ -2,6 +2,15 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 11,
+      "date": "2026-10-18",
+      "titre": "Rejeu : coupe fond et eau",
+      "points": [
+        "Frise : fond et hauteur d'eau empilés sur le zéro des cartes. L'épaisseur bleue est l'eau sous la planche, le pointillé rouge l'eau minimale.",
+        "Jauges façon Suunto à côté des valeurs, remplies selon la valeur à l'instant sur la portion affichée."
+      ]
+    },
+    {
       "id": 10,
       "date": "2026-10-18",
       "titre": "Rejeu façon Suunto",
