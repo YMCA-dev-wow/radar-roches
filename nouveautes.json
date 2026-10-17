@@ -2,6 +2,16 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 8,
+      "date": "2026-10-18",
+      "titre": "Frise du rejeu",
+      "points": [
+        "Le fond sous le rider s'affiche sur toute la session (il n'apparaissait qu'à la fin).",
+        "Bouton ↕ : frise deux fois plus haute pour mieux lire le fond (choix mémorisé).",
+        "Portion zoomée : glisser fait défiler la frise, toucher place le curseur, glisser en partant du curseur le déplace. Session entière : glisser déplace le curseur."
+      ]
+    },
+    {
       "id": 7,
       "date": "2026-10-18",
       "titre": "Radar fiable écran éteint, angles réglables, rejeu enrichi",

@@ -50,6 +50,7 @@
   #clock { font-variant-numeric: tabular-nums; font-size: 16px; min-width: 150px; }
   #tl { width: 100%; height: 110px; display: block; cursor: pointer; touch-action: none; border-radius: 6px; }
   .zoom button { padding: 4px 10px; min-width: 36px; }
+  #tl.haute { height: 220px; }
   .legend span { display: inline-flex; gap: 4px; align-items: center; margin-right: 10px; font-size: 12px; color: var(--muted); }
   .montre { font: 15px/1.25 system-ui, sans-serif; padding: 22px; gap: 4px; overflow: hidden; background: #000; color: #e8edf3; border: 2px solid #444; border-radius: 50%; width: 150px; height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; margin: 8px auto; }
   .montre span { white-space: pre-line; }
@@ -67,8 +68,9 @@
     #ctrl { gap: 6px; margin-bottom: 4px; flex-wrap: nowrap; }
     #ctrl .sub, #ctrl label.sub { display: none; }
     #play { width: 48px; }
-    #clock { min-width: 0; font-size: 14px; flex: 1; }
+    #clock { min-width: 0; font-size: 14px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #tl { height: 120px; }
+    #tl.haute { height: 240px; }
   }
 </style>
 </head>
@@ -129,7 +131,7 @@
       <select id="speed"><option>1</option><option>2</option><option selected>5</option><option>10</option><option>30</option><option>60</option></select><span class="sub">× vitesse</span>
       <span id="clock">–</span>
       <label class="sub"><input type="checkbox" id="follow" checked> Suivre sur la carte</label>
-      <span class="zoom"><button id="zMoins" title="Zoom arrière">−</button><button id="zPlus" title="Zoom avant (ou pincer la frise)">+</button><button id="zTout">Tout</button></span>
+      <span class="zoom"><button id="zMoins" title="Zoom arrière">−</button><button id="zPlus" title="Zoom avant (ou pincer la frise)">+</button><button id="zTout">Tout</button><button id="zHaut" title="Hauteur de la frise">↕</button></span>
       <span style="flex:1"></span>
       <span class="legend"><span><i class="dot" style="background:#bf5af2"></i>montre</span><span><i class="dot" style="background:#5ac8fa"></i>veille</span><span><i class="dot" style="background:#ffd60a"></i>pré-alerte</span><span><i class="dot" style="background:var(--a1)"></i>bips</span><span><i class="dot" style="background:var(--a2)"></i>&lt; 10 m</span><span><i class="dot" style="background:var(--a3)"></i>contact</span><span><i class="dot" style="background:#5ac8fa"></i>marée</span><span><i class="dot" style="background:#6b5a3e"></i>fond sous le rider</span></span>
     </div>
@@ -456,6 +458,7 @@ function dessinerFrise() {
   const pm = Math.min(15, Math.max(4, ...visibles.map(p => p.prof == null || p.prof === Infinity ? 0 : p.prof))); // échelle : 4 à 15 m
   const yP = d => yb + Math.max(0, Math.min(1, d / pm)) * (hb - 2 * k);
   g.fillStyle = '#0d2733'; g.fillRect(0, yb, W, hb); // eau
+  g.fillStyle = '#6b5a3e'; // fond
   g.beginPath(); let ouvert = false;
   for (const p of visibles) {
     const xx = x(p.t);
@@ -463,7 +466,6 @@ function dessinerFrise() {
     const y = yP(p.prof === Infinity ? pm : p.prof);
     if (!ouvert) { g.moveTo(xx, H); g.lineTo(xx, y); ouvert = true; } else g.lineTo(xx, y);
   }
-  g.fillStyle = '#6b5a3e';
   if (ouvert) { g.lineTo(x(visibles[visibles.length - 1].t), H); g.closePath(); g.fill(); }
   const seuil = +$('seuil').value; // eau minimale : trait rouge pointillé
   g.setLineDash([4 * k, 3 * k]); g.strokeStyle = '#ff3b30'; g.lineWidth = k; g.beginPath(); g.moveTo(0, yP(seuil)); g.lineTo(W, yP(seuil)); g.stroke(); g.setLineDash([]);
@@ -495,16 +497,24 @@ function dessinerFrise() {
   g.fillStyle = '#fff'; g.fillRect(x(cur) - k, 0, 2 * k, H);
 }
 const fr1 = v => v.toFixed(1).replace('.', ',');
-// Gestes : un doigt = curseur ; deux doigts = pincer (zoom) et glisser ; molette = zoom ; double toucher = tout
-const doigts = new Map(); let pince = null, dernierToucher = 0;
+// Gestes sur la frise :
+//  - session entière affichée : glisser = déplacer le curseur ;
+//  - portion zoomée : glisser = faire défiler la frise, toucher = placer le curseur, glisser en partant du curseur = le déplacer ;
+//  - pincer à deux doigts = zoomer / dézoomer ; molette = zoom ; double toucher = toute la session.
+const doigts = new Map(); let pince = null, geste = null, dernierToucher = 0;
 const tDe = clientX => { const r = tl.getBoundingClientRect(); return vue.t0 + (clientX - r.left) / r.width * (vue.t1 - vue.t0); };
+const zoome = () => { const [a, b] = bornes(); return vue.t0 > a + 1 || vue.t1 < b - 1; };
 tl.addEventListener('pointerdown', e => {
   if (!pts.length) return;
-  tl.setPointerCapture(e.pointerId); doigts.set(e.pointerId, e.clientX);
-  if (doigts.size === 2) { const [x1, x2] = [...doigts.values()]; pince = { d: Math.abs(x2 - x1) || 1, tc: tDe((x1 + x2) / 2), w: vue.t1 - vue.t0, t0: vue.t0 }; return; }
-  if (Date.now() - dernierToucher < 300) { vueTout(); recadrerCarte(); }
+  try { tl.setPointerCapture(e.pointerId); } catch {} doigts.set(e.pointerId, e.clientX);
+  if (doigts.size === 2) { const [x1, x2] = [...doigts.values()]; pince = { d: Math.abs(x2 - x1) || 1, tc: tDe((x1 + x2) / 2), w: vue.t1 - vue.t0 }; geste = null; return; }
+  if (doigts.size > 2) return;
+  if (Date.now() - dernierToucher < 300) { vueTout(); recadrerCarte(); geste = null; dernierToucher = 0; return; }
   dernierToucher = Date.now();
-  seek(tDe(e.clientX));
+  const r = tl.getBoundingClientRect(), xCur = r.left + (cur - vue.t0) / (vue.t1 - vue.t0) * r.width;
+  if (!zoome()) { geste = { mode: 'curseur' }; seek(tDe(e.clientX)); }
+  else if (Math.abs(e.clientX - xCur) < 14) geste = { mode: 'curseur' };                      // on attrape le curseur
+  else geste = { mode: 'attente', x0: e.clientX, t0: vue.t0 };                                   // toucher ou défilement : décidé au mouvement
 });
 tl.addEventListener('pointermove', e => {
   if (!doigts.has(e.pointerId)) return;
@@ -514,11 +524,30 @@ tl.addEventListener('pointermove', e => {
     const w = Math.max(30000, Math.min(b - a, pince.w * pince.d / (Math.abs(x2 - x1) || 1)));
     let t0 = pince.tc - ((x1 + x2) / 2 - r.left) / r.width * w; t0 = Math.max(a, Math.min(b - w, t0));
     vue.t0 = t0; vue.t1 = t0 + w; dessinerFrise();
-  } else if (!pince) seek(tDe(e.clientX));
+    return;
+  }
+  if (!geste) return;
+  if (geste.mode === 'curseur') { seek(tDe(e.clientX)); return; }
+  if (geste.mode === 'attente' && Math.abs(e.clientX - geste.x0) > 6) geste.mode = 'defile';
+  if (geste.mode === 'defile') {
+    const r = tl.getBoundingClientRect(), [a, b] = bornes(), w = vue.t1 - vue.t0;
+    let t0 = geste.t0 - (e.clientX - geste.x0) / r.width * w; t0 = Math.max(a, Math.min(b - w, t0));
+    vue.t0 = t0; vue.t1 = t0 + w; dessinerFrise();
+  }
 });
-const finDoigt = e => { doigts.delete(e.pointerId); if (pince && doigts.size < 2) { pince = null; recadrerCarte(); } };
+const finDoigt = e => {
+  if (!doigts.has(e.pointerId)) return;
+  doigts.delete(e.pointerId);
+  if (pince) { if (doigts.size < 2) { pince = null; geste = null; recadrerCarte(); } return; } // le doigt restant ne fait plus rien
+  if (geste && geste.mode === 'attente') seek(tDe(e.clientX)); // simple toucher : le curseur vient ici
+  if (geste && geste.mode === 'defile') recadrerCarte();
+  geste = null;
+};
 tl.addEventListener('pointerup', finDoigt); tl.addEventListener('pointercancel', finDoigt);
 tl.addEventListener('wheel', e => { e.preventDefault(); vueZoom(e.deltaY > 0 ? 1.25 : 0.8, tDe(e.clientX)); }, { passive: false });
+const hauteurFrise = () => { let g = false; try { g = localStorage.getItem('rejeu.friseHaute') === '1'; } catch {} tl.classList.toggle('haute', g); };
+$('zHaut').onclick = () => { try { localStorage.setItem('rejeu.friseHaute', tl.classList.contains('haute') ? '0' : '1'); } catch {} hauteurFrise(); dessinerFrise(); };
+hauteurFrise();
 $('zMoins').onclick = () => vueZoom(1.6); $('zPlus').onclick = () => vueZoom(0.6); $('zTout').onclick = () => { vueTout(); recadrerCarte(); };
 addEventListener('resize', () => { dessinerFrise(); resizeRadar(); });
 
