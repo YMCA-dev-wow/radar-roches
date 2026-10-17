@@ -2,6 +2,15 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 10,
+      "date": "2026-10-18",
+      "titre": "Rejeu façon Suunto",
+      "points": [
+        "Frise : courbes du fond sous le rider (couleur selon la nature du fond) et de la hauteur d'eau, chacune avec son échelle. Au-dessus, leurs valeurs à l'instant du curseur, et le début, la fin et la durée de la portion affichée.",
+        "Sur ordinateur : réglages et liste des alertes sur toute la hauteur à droite, aperçu de la montre bien rond."
+      ]
+    },
+    {
       "id": 9,
       "date": "2026-10-18",
       "titre": "Rejeu : nature du fond et carte libre",

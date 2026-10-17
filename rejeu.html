@@ -25,7 +25,8 @@
   button.on { outline: 2px solid var(--accent); }
   input[type=number] { width: 70px; }
   label { display: inline-flex; gap: 6px; align-items: center; }
-  #app { display: grid; grid-template-rows: auto 1fr auto; height: 100%; }
+  #app { display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: 1fr 340px; grid-template-areas: "h h" "m s" "f s"; height: 100%; }
+  #app > header { grid-area: h; } #app > main { display: contents; } #app > footer { grid-area: f; } #map { grid-area: m; } #side { grid-area: s; }
   header { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 12px; border-bottom: 1px solid var(--line); }
   header h1 { font-size: 16px; margin: 0 8px 0 0; }
   .sub { color: var(--muted); font-size: 12px; }
@@ -51,9 +52,15 @@
   #tl { width: 100%; height: 110px; display: block; cursor: pointer; touch-action: none; border-radius: 6px; }
   .zoom button { padding: 4px 10px; min-width: 36px; }
   .suivre { font-size: 12px; color: var(--muted); }
+  #lecture { display: flex; align-items: flex-end; gap: 18px; margin: 2px 0 6px; flex-wrap: wrap; }
+  #lecture .val { display: grid; grid-template-columns: 4px auto; column-gap: 8px; align-items: center; }
+  #lecture .val i { grid-row: span 2; align-self: stretch; border-radius: 2px; }
+  #lecture .val b { font-size: 20px; font-variant-numeric: tabular-nums; }
+  #lecture .val small { color: var(--muted); font-size: 11px; }
+  #lecture .fen { margin-left: auto; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
   #tl.haute { height: 220px; }
   .legend span { display: inline-flex; gap: 4px; align-items: center; margin-right: 10px; font-size: 12px; color: var(--muted); }
-  .montre { font: 15px/1.25 system-ui, sans-serif; padding: 22px; gap: 4px; overflow: hidden; background: #000; color: #e8edf3; border: 2px solid #444; border-radius: 50%; width: 150px; height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; margin: 8px auto; }
+  .montre { flex: none; font: 15px/1.25 system-ui, sans-serif; padding: 22px; gap: 4px; overflow: hidden; background: #000; color: #e8edf3; border: 2px solid #444; border-radius: 50%; width: 150px; height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; margin: 8px auto; }
   .montre span { white-space: pre-line; }
   .montre b { font-size: 17px; color: #ffd60a; border-bottom: 1px dotted #888; padding-bottom: 3px; }
   #busy { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 2000; font-size: 16px; }
@@ -68,9 +75,13 @@
     .legend { display: none; }
     #ctrl { gap: 6px; margin-bottom: 4px; flex-wrap: wrap; }
     #ctrl .sub, #ctrl label.sub { display: none; }
-    #play { width: 48px; }
+    #play { width: 44px; padding: 4px; }
+    #speed { width: 52px; padding: 4px; }
+    .zoom { display: flex; gap: 4px; } .zoom button { padding: 4px 6px; min-width: 34px; }
+    #tl.haute { height: 200px; }
     #clock { order: 9; flex-basis: 100%; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #tl { height: 120px; }
+    #lecture { gap: 12px; } #lecture .val b { font-size: 16px; } #lecture .fen { flex-basis: 100%; margin-left: 0; }
     #tl.haute { height: 240px; }
   }
 </style>
@@ -135,6 +146,11 @@
       <span class="zoom"><button id="zMoins" title="Zoom arrière">−</button><button id="zPlus" title="Zoom avant (ou pincer la frise)">+</button><button id="zTout">Tout</button><button id="zHaut" title="Hauteur de la frise">↕</button></span>
       <span style="flex:1"></span>
       <span class="legend"><span><i class="dot" style="background:#bf5af2"></i>montre</span><span><i class="dot" style="background:#5ac8fa"></i>veille</span><span><i class="dot" style="background:#ffd60a"></i>pré-alerte</span><span><i class="dot" style="background:var(--a1)"></i>bips</span><span><i class="dot" style="background:var(--a2)"></i>&lt; 10 m</span><span><i class="dot" style="background:var(--a3)"></i>contact</span><span><i class="dot" style="background:#5ac8fa"></i>marée</span><span>fond : <i class="dot" style="background:#6e6a66"></i>roche <i class="dot" style="background:#c2a46b"></i>sable, vase</span></span>
+    </div>
+    <div id="lecture">
+      <span class="val"><i style="background:#c2a46b"></i><b id="lFond">–</b><small>fond sous le rider</small></span>
+      <span class="val"><i style="background:#5ac8fa"></i><b id="lEau">–</b><small>hauteur d'eau</small></span>
+      <span class="fen" id="lFen"></span>
     </div>
     <canvas id="tl"></canvas>
   </footer>
@@ -456,46 +472,62 @@ function dessinerFrise() {
   const t0 = vue.t0, t1 = vue.t1, x = t => (t - t0) / (t1 - t0) * W;
   const i0 = Math.max(0, pts.findIndex(p => p.t >= t0) - 1), i1 = Math.min(pts.length - 1, (pts.findIndex(p => p.t > t1) + pts.length) % pts.length + 1);
   const visibles = pts.slice(i0, i1 + 1);
-  // --- profondeur sous le rider (eau au-dessus du fond) : zone du bas, surface en haut de la zone, fond plus bas
-  const hb = H * 0.62, yb = H - hb; // bande « sonar »
-  const pm = Math.min(15, Math.max(4, ...visibles.map(p => p.prof == null || p.prof === Infinity ? 0 : p.prof))); // échelle : 4 à 15 m
-  const yP = d => yb + Math.max(0, Math.min(1, d / pm)) * (hb - 2 * k);
-  g.fillStyle = '#0d2733'; g.fillRect(0, yb, W, hb); // eau
-  for (let i = 0; i + 1 < visibles.length; i++) { // fond : une tranche par point, couleur selon sa nature
-    const p = visibles[i], q = visibles[i + 1];
-    if (p.prof == null || p.prof === Infinity || q.prof == null) continue;
-    const xa = x(p.t), xb = x(q.t), ya = yP(p.prof), yq = yP(q.prof === Infinity ? pm : q.prof);
-    g.fillStyle = FOND[p.nature] || FOND.lisse;
-    g.beginPath(); g.moveTo(xa, H); g.lineTo(xa, ya); g.lineTo(xb + 1, yq); g.lineTo(xb + 1, H); g.closePath(); g.fill();
-  }
-  const seuil = +$('seuil').value; // eau minimale : trait rouge pointillé
-  g.setLineDash([4 * k, 3 * k]); g.strokeStyle = '#ff3b30'; g.lineWidth = k; g.beginPath(); g.moveTo(0, yP(seuil)); g.lineTo(W, yP(seuil)); g.stroke(); g.setLineDash([]);
-  g.fillStyle = '#8a96a6'; g.font = `${10 * k}px system-ui`;
-  g.fillText('fond ' + pm.toFixed(0) + ' m', 3 * k, H - 3 * k); g.fillText(fr1(seuil) + ' m', 3 * k, yP(seuil) - 2 * k);
-  // --- bandes d'alerte au-dessus
-  g.fillStyle = '#ffd60a';
-  for (let i = i0; i < i1; i++) if (pts[i].pre) { const xa = x(pts[i].t); g.fillRect(xa, yb - 6 * k, Math.max(1, x(pts[i + 1].t) - xa), 6 * k); }
-  for (let i = i0; i < i1; i++) if (pts[i].lvl) {
-    g.fillStyle = COLS[pts[i].lvl]; const xa = x(pts[i].t), xb = Math.max(xa + 1, x(pts[i + 1].t));
-    const hh = (pts[i].lvl === 1 ? 0.35 : pts[i].lvl === 2 ? 0.6 : 0.85) * (yb - 6 * k);
-    g.fillRect(xa, yb - 6 * k - hh, xb - xa, hh);
-  }
-  g.fillStyle = '#bf5af2'; // notifications montre : losanges violets en haut
-  for (const n of notifs) { if (n.t < t0 || n.t > t1) continue; const xn = x(n.t), y = 6 * k; g.beginPath(); g.moveTo(xn, y - 5 * k); g.lineTo(xn + 4 * k, y); g.lineTo(xn, y + 5 * k); g.lineTo(xn - 4 * k, y); g.closePath(); g.fill(); }
-  g.fillStyle = '#5ac8fa'; // veille latérale : petits triangles bleus en haut
+  g.font = `${10 * k}px system-ui`;
+  // bandeau du haut : veille (triangles bleus), envois montre (losanges violets), puis pré-alerte et alertes
+  const hm = 9 * k, ha = 10 * k, yA = hm + 2 * k, yC = yA + ha + 4 * k, hC = H - yC - 2 * k; // zone des courbes : yC .. yC + hC
+  g.fillStyle = '#5ac8fa';
   for (const p of visibles) if (p.veille) { const xv = x(p.t); g.beginPath(); g.moveTo(xv - 4 * k, 0); g.lineTo(xv + 4 * k, 0); g.lineTo(xv, 7 * k); g.closePath(); g.fill(); }
-  // --- hauteur d'eau (marée), fine, sur toute la hauteur
-  const ws = visibles.map(p => p.W), wmin = Math.min(...ws), wmax = Math.max(...ws), sp = Math.max(1, wmax - wmin);
-  g.strokeStyle = 'rgba(90,200,250,.55)'; g.lineWidth = k; g.beginPath();
-  visibles.forEach((p, i) => { const y = yb - 2 * k - (p.W - wmin) / sp * (yb - 10 * k); i ? g.lineTo(x(p.t), y) : g.moveTo(x(p.t), y); });
+  g.fillStyle = '#bf5af2';
+  for (const n of notifs) { if (n.t < t0 || n.t > t1) continue; const xn = x(n.t), y = 4.5 * k; g.beginPath(); g.moveTo(xn, y - 4 * k); g.lineTo(xn + 3.5 * k, y); g.lineTo(xn, y + 4 * k); g.lineTo(xn - 3.5 * k, y); g.closePath(); g.fill(); }
+  for (let i = i0; i < i1; i++) {
+    const p = pts[i]; if (!p.lvl && !p.pre) continue;
+    const xa = x(p.t); g.fillStyle = p.lvl ? COLS[p.lvl] : '#ffd60a';
+    g.fillRect(xa, yA, Math.max(1, x(pts[i + 1].t) - xa), ha);
+  }
+  // échelles : fond sous le rider à gauche (0 en bas), hauteur d'eau à droite
+  const prs = visibles.map(p => p.prof).filter(v => v != null && v !== Infinity);
+  const pmax = Math.min(20, Math.max(4, ...prs, +$('seuil').value + 1)) * 1.08;
+  const yP = d => yC + hC - Math.max(0, Math.min(1, d / pmax)) * hC;
+  const ws = visibles.map(p => p.W), wmin = Math.min(...ws), wmax = Math.max(...ws), wa = wmin - Math.max(0.3, (wmax - wmin) * 0.15), wb = wmax + Math.max(0.3, (wmax - wmin) * 0.15);
+  const yW = v => yC + hC - (v - wa) / (wb - wa) * hC;
+  g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = k; // quadrillage léger tous les 2 m (ou 5 m)
+  const pas = pmax > 12 ? 5 : 2;
+  for (let d = pas; d < pmax; d += pas) { g.beginPath(); g.moveTo(0, yP(d)); g.lineTo(W, yP(d)); g.stroke(); g.fillStyle = '#5d6b7a'; g.fillText(d + ' m', 3 * k, yP(d) - 2 * k); }
+  // fond sous le rider : aire teintée et trait coloré selon la nature (roche, sable/vase) ; trou = pas de mesure
+  const vP = p => p.prof === Infinity ? pmax : p.prof;
+  for (let i = 0; i + 1 < visibles.length;) { // par tronçons de même nature : aire teintée d'un seul tenant, puis trait
+    if (visibles[i].prof == null || visibles[i + 1].prof == null) { i++; continue; }
+    const nat = visibles[i].nature, c = FOND[nat] || FOND.lisse; let j = i;
+    while (j + 1 < visibles.length && visibles[j + 1].prof != null && visibles[j].nature === nat) j++;
+    g.beginPath(); g.moveTo(x(visibles[i].t), yC + hC);
+    for (let n = i; n <= j; n++) g.lineTo(x(visibles[n].t), yP(vP(visibles[n])));
+    g.lineTo(x(visibles[j].t), yC + hC); g.closePath(); g.fillStyle = c + '30'; g.fill();
+    g.beginPath(); for (let n = i; n <= j; n++) n === i ? g.moveTo(x(visibles[n].t), yP(vP(visibles[n]))) : g.lineTo(x(visibles[n].t), yP(vP(visibles[n])));
+    g.strokeStyle = c; g.lineWidth = 2.2 * k; g.stroke();
+    i = j;
+  }
+  const seuil = +$('seuil').value; // eau minimale : pointillé rouge sur l'échelle du fond
+  g.setLineDash([4 * k, 3 * k]); g.strokeStyle = '#ff3b30'; g.lineWidth = k; g.beginPath(); g.moveTo(0, yP(seuil)); g.lineTo(W, yP(seuil)); g.stroke(); g.setLineDash([]);
+  g.fillStyle = '#ff6b5b'; g.fillText('eau mini ' + fr1(seuil) + ' m', 3 * k, yP(seuil) + 11 * k);
+  // hauteur d'eau (marée) : trait bleu, échelle à droite
+  g.strokeStyle = '#5ac8fa'; g.lineWidth = 1.6 * k; g.beginPath();
+  visibles.forEach((p, i) => { const y = yW(p.W); i ? g.lineTo(x(p.t), y) : g.moveTo(x(p.t), y); });
   g.stroke();
-  g.fillStyle = '#8a96a6'; g.textAlign = 'right';
-  g.fillText('marée ' + fr1(wmin) + '–' + fr1(wmax) + ' m', W - 3 * k, 18 * k);
-  const [a, b] = bornes();
-  if (t0 > a || t1 < b) { g.textAlign = 'left'; g.fillText(heure(t0), 3 * k, 18 * k); g.textAlign = 'right'; g.fillText(heure(t1), W - 3 * k, 30 * k); }
+  g.fillStyle = '#5ac8fa'; g.textAlign = 'right';
+  g.fillText(fr1(wmax) + ' m', W - 3 * k, yW(wmax) - 3 * k); g.fillText(fr1(wmin) + ' m', W - 3 * k, yW(wmin) + 11 * k);
   g.textAlign = 'left';
-  // curseur et profondeur à l'instant
-  g.fillStyle = '#fff'; g.fillRect(x(cur) - k, 0, 2 * k, H);
+  // curseur : trait pointillé et points sur les deux courbes
+  const xc = x(cur), pc = etatA(cur), pi = pts[Math.min(pts.length - 1, pc.i ?? 0)];
+  g.setLineDash([2 * k, 3 * k]); g.strokeStyle = '#fff'; g.lineWidth = 1.5 * k; g.beginPath(); g.moveTo(xc, 0); g.lineTo(xc, H); g.stroke(); g.setLineDash([]);
+  if (pi && pi.prof != null) { g.fillStyle = FOND[pi.nature] || FOND.lisse; g.beginPath(); g.arc(xc, yP(pi.prof === Infinity ? pmax : pi.prof), 4 * k, 0, 7); g.fill(); }
+  if (pi) { g.fillStyle = '#5ac8fa'; g.beginPath(); g.arc(xc, yW(pi.W), 4 * k, 0, 7); g.fill(); }
+  // valeurs au curseur et fenêtre affichée (au-dessus de la frise)
+  $('lFond').textContent = !pi || pi.prof == null ? '–' : pi.prof === Infinity ? '> ' + fr1(pi.W - meta.cote_min) + ' m' : fr1(pi.prof) + ' m';
+  $('lFond').previousElementSibling.style.background = FOND[pi && pi.nature] || FOND.lisse;
+  $('lFond').nextElementSibling.textContent = 'fond sous le rider' + (pi && pi.nature ? ' · ' + { roche: 'roche', lisse: 'sable, vase', terre: 'terre', profond: 'profond' }[pi.nature] : '');
+  $('lEau').textContent = pi ? fr1(pi.W) + ' m' : '–';
+  const [a0, b0] = bornes(), zoom = t0 > a0 + 1 || t1 < b0 - 1;
+  $('lFen').textContent = (zoom ? 'Zoom ' : 'Session ') + heure(t0) + ' – ' + heure(t1) + ' · ' + fmtDuree(t1 - t0);
 }
 const fr1 = v => v.toFixed(1).replace('.', ',');
 const FOND = { roche: '#6e6a66', lisse: '#c2a46b', terre: '#4f7a3a' }; // nature du fond (relief Litto3D)
