@@ -2,6 +2,14 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 12,
+      "date": "2026-10-18",
+      "titre": "Rejeu : courbe de vitesse",
+      "points": [
+        "Case « Vitesse » au-dessus de la frise : ajoute la courbe de vitesse, avec sa valeur à l'instant (km/h et nœuds) et sa jauge. Choix mémorisé."
+      ]
+    },
+    {
       "id": 11,
       "date": "2026-10-18",
       "titre": "Rejeu : coupe fond et eau",

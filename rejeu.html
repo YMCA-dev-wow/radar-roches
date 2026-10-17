@@ -59,6 +59,8 @@
   .jauge { --n: 0; --c: #5ac8fa; background: linear-gradient(to top, var(--c) calc(var(--n) * 100%), #3a4654 calc(var(--n) * 100%)); }
   #lecture .val b { font-size: 20px; font-variant-numeric: tabular-nums; }
   #lecture .val small { color: var(--muted); font-size: 11px; }
+  #lecture .val[hidden] { display: none; }
+  #lecture .suivre { align-self: center; }
   #lecture .fen { margin-left: auto; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
   #tl.haute { height: 220px; }
   .legend span { display: inline-flex; gap: 4px; align-items: center; margin-right: 10px; font-size: 12px; color: var(--muted); }
@@ -152,6 +154,8 @@
     <div id="lecture">
       <span class="val"><i class="jauge" id="jFond" style="--c:#c2a46b"></i><b id="lFond">–</b><small>fond sous le rider</small></span>
       <span class="val"><i class="jauge" id="jEau" style="--c:#5ac8fa"></i><b id="lEau">–</b><small>hauteur d'eau</small></span>
+      <span class="val" id="valVit"><i class="jauge" id="jVit" style="--c:#ff6482"></i><b id="lVit">–</b><small>vitesse</small></span>
+      <label class="suivre"><input type="checkbox" id="cVit"> Vitesse</label>
       <span class="fen" id="lFen"></span>
     </div>
     <canvas id="tl"></canvas>
@@ -520,17 +524,29 @@ function dessinerFrise() {
   g.strokeStyle = '#5ac8fa'; g.lineWidth = 1.8 * k; g.beginPath();
   visibles.forEach((p, i) => i ? g.lineTo(x(p.t), yZ(p.W)) : g.moveTo(x(p.t), yZ(p.W))); g.stroke();
   g.fillStyle = '#ff6b5b'; g.fillText('eau mini ' + fr1(seuil) + ' m', 3 * k, yZ(visibles[0].W - seuil) + 11 * k);
+  // vitesse (option) : trait rose, échelle propre (0 en bas du cadre), maximum indiqué en haut à droite
+  const vitOn = $('cVit').checked, vs = visibles.map(p => p.v * 3.6), vmax = Math.max(10, ...vs) * 1.08;
+  const yV = v => yC + hC - Math.max(0, Math.min(1, v / vmax)) * hC;
+  if (vitOn) {
+    g.strokeStyle = '#ff6482'; g.lineWidth = 1.5 * k; g.beginPath();
+    visibles.forEach((p, i) => i ? g.lineTo(x(p.t), yV(p.v * 3.6)) : g.moveTo(x(p.t), yV(p.v * 3.6))); g.stroke();
+    g.fillStyle = '#ff6482'; g.textAlign = 'right'; g.fillText(Math.round(vmax / 1.08) + ' km/h', W - 3 * k, yC + 10 * k); g.textAlign = 'left';
+  }
   // curseur : trait pointillé, points sur la surface et sur le fond
   const xc = x(cur), pc = etatA(cur), pi = pts[Math.min(pts.length - 1, pc.i ?? 0)];
   g.setLineDash([2 * k, 3 * k]); g.strokeStyle = '#fff'; g.lineWidth = 1.5 * k; g.beginPath(); g.moveTo(xc, 0); g.lineTo(xc, H); g.stroke(); g.setLineDash([]);
   if (pi && pi.prof != null) { g.fillStyle = FOND[pi.nature] || FOND.lisse; g.beginPath(); g.arc(xc, yZ(cote(pi)), 4 * k, 0, 7); g.fill(); }
   if (pi) { g.fillStyle = '#5ac8fa'; g.beginPath(); g.arc(xc, yZ(pi.W), 4 * k, 0, 7); g.fill(); }
+  if (pi && vitOn) { g.fillStyle = '#ff6482'; g.beginPath(); g.arc(xc, yV(pc.speed * 3.6), 4 * k, 0, 7); g.fill(); }
+  $('valVit').hidden = !vitOn;
+  if (vitOn) { $('lVit').textContent = Math.round(pc.speed * 3.6) + ' km/h'; $('lVit').nextElementSibling.textContent = 'vitesse · ' + (pc.speed * 1.944).toFixed(1).replace('.', ',') + ' nœuds'; }
   // jauges façon Suunto : valeur à l'instant sur l'étendue de la portion affichée
   const prs = visibles.map(p => p.prof).filter(v => v != null && v !== Infinity);
   const jauge = (el, v, a, b) => { el.style.setProperty('--n', v == null || !(b > a) ? 0 : Math.max(0.04, Math.min(1, (v - a) / (b - a)))); };
   jauge($('jFond'), pi && pi.prof != null ? (pi.prof === Infinity ? Math.max(...prs, 1) : pi.prof) : null, Math.min(0, ...prs), Math.max(...prs, 1));
   jauge($('jEau'), pi ? pi.W : null, wmin - 0.01, wmax + 0.01);
   $('jFond').style.setProperty('--c', FOND[pi && pi.nature] || FOND.lisse);
+  if (vitOn) jauge($('jVit'), pc.speed * 3.6, 0, Math.max(...vs, 1));
   $('lFond').textContent = !pi || pi.prof == null ? '–' : pi.prof === Infinity ? '> ' + fr1(pi.W - meta.cote_min) + ' m' : fr1(pi.prof) + ' m';
   $('lFond').nextElementSibling.textContent = 'fond sous le rider' + (pi && pi.nature ? ' · ' + { roche: 'roche', lisse: 'sable, vase', terre: 'terre', profond: 'profond' }[pi.nature] : '');
   $('lEau').textContent = pi ? fr1(pi.W) + ' m' : '–';
@@ -592,6 +608,8 @@ $('zHaut').onclick = () => { try { localStorage.setItem('rejeu.friseHaute', tl.c
 hauteurFrise();
 try { $('follow').checked = localStorage.getItem('rejeu.suivre') === '1'; } catch {}
 $('follow').onchange = () => { try { localStorage.setItem('rejeu.suivre', $('follow').checked ? '1' : '0'); } catch {} };
+try { $('cVit').checked = localStorage.getItem('rejeu.vitesse') === '1'; } catch {}
+$('cVit').onchange = () => { try { localStorage.setItem('rejeu.vitesse', $('cVit').checked ? '1' : '0'); } catch {} dessinerFrise(); };
 $('zMoins').onclick = () => vueZoom(1.6); $('zPlus').onclick = () => vueZoom(0.6); $('zTout').onclick = () => { vueTout(); recadrerCarte(); };
 addEventListener('resize', () => { dessinerFrise(); resizeRadar(); });
 
