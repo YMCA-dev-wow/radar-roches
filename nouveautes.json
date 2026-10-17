@@ -2,6 +2,15 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 9,
+      "date": "2026-10-18",
+      "titre": "Rejeu : nature du fond et carte libre",
+      "points": [
+        "Frise : le fond sous le rider est coloré selon sa nature (gris : roche, beige : sable ou vase, vert : terre).",
+        "La carte ne suit plus le rider : elle reste où tu la places. Coche « Suivre » pour retrouver l'ancien comportement (choix mémorisé)."
+      ]
+    },
+    {
       "id": 8,
       "date": "2026-10-18",
       "titre": "Frise du rejeu",

@@ -188,14 +188,19 @@ function prechargerTuiles(lat, lon, rayon = 1500) {
   for (let tx = Math.floor((px - r) / 256); tx <= Math.floor((px + r) / 256); tx++)
     for (let ty = Math.floor((py - r) / 256); ty <= Math.floor((py + r) / 256); ty++) loadTile(tx, ty);
 }
-// Cote du fond (m ZH) au point, d'après les tuiles déjà chargées : null sans mesure, -Infinity plus profond que le relevé
-function coteA(lat, lon) {
+// Fond au point, d'après les tuiles déjà chargées : { cote (m ZH), nature } ; nature : 'roche' (relief marqué),
+// 'lisse' (sable, vase), 'terre', 'profond' (plus profond que le relevé, cote -Infinity) ; null sans mesure
+function fondA(lat, lon) {
   if (!meta) return null;
   const [px, py] = toPx(lat, lon), d = tiles.get(Math.floor(px / 256) + '/' + Math.floor(py / 256));
   if (!d || d instanceof Promise) return null;
-  const Rc = d[(Math.floor(py % 256) * 256 + Math.floor(px % 256)) * 4];
-  return Rc === 255 ? null : Rc === 0 ? -Infinity : Rc === 254 ? 99 : meta.cote_min + (Rc - 1) * meta.pas_cote;
+  const i = (Math.floor(py % 256) * 256 + Math.floor(px % 256)) * 4, Rc = d[i];
+  if (Rc === 255) return null;
+  if (Rc === 0) return { cote: -Infinity, nature: 'profond' };
+  if (Rc === 254) return { cote: 99, nature: 'terre' };
+  return { cote: meta.cote_min + (Rc - 1) * meta.pas_cote, nature: d[i + 1] * meta.pas_relief >= 0.30 ? 'roche' : 'lisse' };
 }
+function coteA(lat, lon) { const f = fondA(lat, lon); return f ? f.cote : null; }
 const WORLD = 256 * 2 ** 16;
 const toPx = (lat, lon) => [(lon + 180) / 360 * WORLD, (1 - Math.asinh(Math.tan(lat * Math.PI / 180)) / Math.PI) / 2 * WORLD];
 const mPerPx = lat => 156543.03392 * Math.cos(lat * Math.PI / 180) / 2 ** 16;
