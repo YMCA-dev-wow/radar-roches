@@ -155,20 +155,46 @@ function loadTile(x, y) {
   const k = x + '/' + y;
   if (tiles.has(k)) return tiles.get(k) instanceof Promise ? tiles.get(k) : Promise.resolve();
   if (!meta.set.has(k)) { tiles.set(k, null); return Promise.resolve(); }
-  const zt = zone;
-  const p = new Promise(res => {
+  const zt = zone, url = zt.dossier + '/tuiles/' + meta.zoom + '/' + k + '.png';
+  // Décodage par fetch + createImageBitmap + OffscreenCanvas : il fonctionne page cachée (écran éteint), alors qu'une
+  // balise <img> n'est plus décodée tant que la page n'est pas affichée (constaté sur l'eau le 17/10 : radar aveugle
+  // hors des tuiles chargées écran allumé). <img> reste en secours pour les navigateurs qui n'ont pas ces fonctions.
+  const parImage = () => new Promise((res, rej) => {
     const img = new Image();
     img.onload = () => {
-      if (zone !== zt) return res(); // la zone a changé pendant le chargement
       const c = document.createElement('canvas'); c.width = c.height = 256;
       const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
-      tiles.set(k, g.getImageData(0, 0, 256, 256).data); res();
+      res(g.getImageData(0, 0, 256, 256).data);
     };
-    img.onerror = () => { if (zone === zt) tiles.set(k, null); res(); };
-    img.src = zt.dossier + '/tuiles/' + meta.zoom + '/' + k + '.png';
+    img.onerror = rej; img.src = url;
   });
+  const parBitmap = async () => {
+    const r = await fetch(url); if (!r.ok) throw new Error('HTTP ' + r.status);
+    const bmp = await createImageBitmap(await r.blob(), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+    const c = new OffscreenCanvas(256, 256), g = c.getContext('2d', { willReadFrequently: true });
+    g.drawImage(bmp, 0, 0); if (bmp.close) bmp.close();
+    return g.getImageData(0, 0, 256, 256).data;
+  };
+  const p = (typeof createImageBitmap === 'function' && typeof OffscreenCanvas === 'function' && location.protocol !== 'file:' ? parBitmap() : parImage())
+    .then(d => { if (zone === zt) tiles.set(k, d); }, () => { if (zone === zt) tiles.set(k, null); }); // zone changée pendant le chargement : on jette
   tiles.set(k, p);
   return p;
+}
+// Préchargement des tuiles dans un rayon (m) : au démarrage du radar puis tous les 500 m, pour ne jamais dépendre d'un
+// chargement à la dernière seconde
+function prechargerTuiles(lat, lon, rayon = 1500) {
+  if (!meta) return;
+  const [px, py] = toPx(lat, lon), r = rayon / mPerPx(lat);
+  for (let tx = Math.floor((px - r) / 256); tx <= Math.floor((px + r) / 256); tx++)
+    for (let ty = Math.floor((py - r) / 256); ty <= Math.floor((py + r) / 256); ty++) loadTile(tx, ty);
+}
+// Cote du fond (m ZH) au point, d'après les tuiles déjà chargées : null sans mesure, -Infinity plus profond que le relevé
+function coteA(lat, lon) {
+  if (!meta) return null;
+  const [px, py] = toPx(lat, lon), d = tiles.get(Math.floor(px / 256) + '/' + Math.floor(py / 256));
+  if (!d || d instanceof Promise) return null;
+  const Rc = d[(Math.floor(py % 256) * 256 + Math.floor(px % 256)) * 4];
+  return Rc === 255 ? null : Rc === 0 ? -Infinity : Rc === 254 ? 99 : meta.cote_min + (Rc - 1) * meta.pas_cote;
 }
 const WORLD = 256 * 2 ** 16;
 const toPx = (lat, lon) => [(lon + 180) / 360 * WORLD, (1 - Math.asinh(Math.tan(lat * Math.PI / 180)) / Math.PI) / 2 * WORLD];
@@ -190,9 +216,11 @@ function lireMesRoches(gj) {
 // opts : { seuil, smooth, useL3d, inclTest, antic, roches, affichage, preAlerte }
 // Renvoie la menace principale (alerte : cône ±50°, distance d'alerte), la pré-alerte (cône ±10°, jusqu'à 2× la distance
 // d'alerte) et, si affichage, les cellules dangereuses autour de la position.
-const CONE_ALERTE = 50, CONE_PRE = 10, VEILLE_MAX = 110; // veille latérale : jusqu'à 110° de part et d'autre du cap
+// Angles par défaut (de part et d'autre du cap) ; réglables dans les profils le temps de les qualifier sur l'eau
+const CONE_ALERTE = 50, CONE_PRE = 10, VEILLE_MAX = 110;
 function analyser(pos, course, speed, W, opts) {
   const { seuil, smooth, useL3d, inclTest, antic, roches = [], affichage = true, preAlerte = false, veille = false } = opts;
+  const cA = +opts.coneAlerte || CONE_ALERTE, cP = +opts.conePre || CONE_PRE, cV = +opts.coneVeille || VEILLE_MAX;
   const horizon = Math.max(40, speed * antic);                                   // distance d'alerte (m)
   const preH = preAlerte ? 2 * horizon : 0;                                      // distance de pré-alerte (m)
   const latH = veille ? 2 * horizon : 0;                                         // portée de la veille latérale (m)
@@ -200,14 +228,14 @@ function analyser(pos, course, speed, W, opts) {
   const mpp = mPerPx(pos.lat), [px, py] = toPx(pos.lat, pos.lon);
   const rp = Math.ceil(R / mpp);
   const cells = [];                                                              // [dx, dy, niveau] en mètres, est/sud positifs
-  let best = null, pre = null, lat = null;
+  let best = null, pre = null, lat = null, manquantes = 0;
   const consider = (dx, dy, lvl, d) => {
     let rel = Math.atan2(dx, -dy) * 180 / Math.PI - course; rel = ((rel + 540) % 360) - 180;
-    if (preH && d > horizon && d <= preH && Math.abs(rel) <= CONE_PRE && (!pre || d < pre.d)) pre = { d, rel, lvl };
-    // veille : tout danger à portée (2× la distance d'alerte) jusqu'à 110°, sauf ce que couvrent déjà l'alerte et la pré-alerte
-    const a = Math.abs(rel), couvert = (a <= CONE_ALERTE && d <= horizon) || (preH && a <= CONE_PRE);
-    if (latH && d <= latH && a <= VEILLE_MAX && !couvert && (!lat || d < lat.d)) lat = { d, rel, lvl };
-    const inCone = Math.abs(rel) <= CONE_ALERTE || (d < 20 && Math.abs(rel) <= 110); // proche : devant et côtés, pas derrière
+    if (preH && d > horizon && d <= preH && Math.abs(rel) <= cP && (!pre || d < pre.d)) pre = { d, rel, lvl };
+    // veille : tout danger à portée (2× la distance d'alerte) jusqu'à cV, sauf ce que couvrent déjà l'alerte et la pré-alerte
+    const a = Math.abs(rel), couvert = (a <= cA && d <= horizon) || (preH && a <= cP);
+    if (latH && d <= latH && a <= cV && !couvert && (!lat || d < lat.d)) lat = { d, rel, lvl };
+    const inCone = Math.abs(rel) <= cA || (d < 20 && Math.abs(rel) <= 110); // proche : devant et côtés, pas derrière
     if (!inCone || d > horizon) return;
     const score = d / Math.max(0.35, Math.cos(Math.min(Math.abs(rel), 80) * Math.PI / 180)) - lvl * 3;
     if (!best || score < best.score) best = { d, rel, lvl, score };
@@ -217,6 +245,7 @@ function analyser(pos, course, speed, W, opts) {
     for (let tx = tx0; tx <= tx1; tx++) for (let ty = ty0; ty <= ty1; ty++) {
       if (affichage) { loadTile(tx, ty); loadTile(tx - 1, ty); loadTile(tx + 1, ty); loadTile(tx, ty - 1); loadTile(tx, ty + 1); } // préchargement
       const d = tiles.get(tx + '/' + ty);
+      if (d instanceof Promise || (d === undefined && meta.set.has(tx + '/' + ty))) manquantes++; // pas encore chargée : radar aveugle ici
       if (!d || d instanceof Promise) continue;
       const u0 = Math.max(0, Math.floor(px - rp) - tx * 256), u1 = Math.min(255, Math.ceil(px + rp) - tx * 256);
       const v0 = Math.max(0, Math.floor(py - rp) - ty * 256), v1 = Math.min(255, Math.ceil(py + rp) - ty * 256);
@@ -255,7 +284,7 @@ function analyser(pos, course, speed, W, opts) {
       if (lvl >= 2) consider(n.x, n.y, lvl, n.d);
     }
   }
-  return { cells, zones, best, pre, lat, horizon, preH, latH, R };
+  return { cells, zones, best, pre, lat, horizon, preH, latH, R, cA, cP, cV, manquantes };
 }
 function nearestOnPoly(pts) { // point du polygone le plus proche de l'origine (0 si dedans)
   let inside = false, bd = Infinity, bx = 0, by = 0;
@@ -630,14 +659,15 @@ function drawRadar(cv, analysis, fix) {
     ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, r, -Math.PI / 2 - deg * Math.PI / 180, -Math.PI / 2 + deg * Math.PI / 180); ctx.closePath();
     ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = stroke; ctx.lineWidth = 1.5 * k; ctx.stroke();
   };
-  const h = analysis.horizon * sc, a = CONE_ALERTE * Math.PI / 180;
+  const cA = analysis.cA || CONE_ALERTE, cP = analysis.cP || CONE_PRE, cV = analysis.cV || VEILLE_MAX;
+  const h = analysis.horizon * sc, a = cA * Math.PI / 180;
   if (analysis.latH) for (const s of [1, -1]) { // secteurs de veille, de 10° (ou 0°) à 110° de chaque côté
     ctx.beginPath(); ctx.moveTo(0, 0);
-    ctx.arc(0, 0, analysis.latH * sc, -Math.PI / 2 + s * (analysis.preH ? CONE_PRE : 0) * Math.PI / 180, -Math.PI / 2 + s * VEILLE_MAX * Math.PI / 180, s < 0);
+    ctx.arc(0, 0, analysis.latH * sc, -Math.PI / 2 + s * (analysis.preH ? Math.min(cP, cV) : 0) * Math.PI / 180, -Math.PI / 2 + s * cV * Math.PI / 180, s < 0);
     ctx.closePath(); ctx.fillStyle = 'rgba(90,200,250,0.06)'; ctx.fill(); ctx.setLineDash([4 * k, 4 * k]); ctx.strokeStyle = 'rgba(90,200,250,0.5)'; ctx.lineWidth = k; ctx.stroke(); ctx.setLineDash([]);
   }
-  if (analysis.preH) cone(analysis.preH * sc, CONE_PRE, 'rgba(255,214,10,0.10)', 'rgba(255,214,10,0.75)');
-  cone(h, CONE_ALERTE, 'rgba(94,230,214,0.12)', 'rgba(94,230,214,0.6)');
+  if (analysis.preH) cone(analysis.preH * sc, cP, 'rgba(255,214,10,0.10)', 'rgba(255,214,10,0.75)');
+  cone(h, cA, 'rgba(94,230,214,0.12)', 'rgba(94,230,214,0.6)');
   ctx.font = `bold ${12 * k}px system-ui`; ctx.textAlign = 'center';
   ctx.fillStyle = '#5ee6d6'; ctx.fillText(Math.round(analysis.horizon) + ' m', Math.sin(a) * h + 20 * k, -Math.cos(a) * h);
   if (analysis.preH) { ctx.fillStyle = '#ffd60a'; ctx.fillText(Math.round(analysis.preH) + ' m', 0, -analysis.preH * sc - 6 * k); }

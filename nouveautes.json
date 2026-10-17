@@ -2,6 +2,16 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 7,
+      "date": "2026-10-18",
+      "titre": "Radar fiable écran éteint, angles réglables, rejeu enrichi",
+      "points": [
+        "Correction importante : écran éteint, le radar ne chargeait plus la carte du relief en avançant. Il ne voyait les roches que là où l'écran avait été allumé. Il précharge maintenant 1,5 km autour de toi et charge la suite écran éteint.",
+        "Profils : angles d'alerte, de pré-alerte et de veille réglables (50°, 10° et 110° par défaut). Une pré-alerte à 110° couvre tout le secteur de la veille.",
+        "Rejeu : courbe du fond sous le rider dans la frise, zoom sur une portion de session (pincer la frise, boutons − / + / Tout) avec la carte qui suit, roches émergées en noir sur la carte."
+      ]
+    },
+    {
       "id": 6,
       "date": "2026-10-17",
       "titre": "Volume réglable et moins d'appuis involontaires",

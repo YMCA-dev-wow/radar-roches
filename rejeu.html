@@ -48,7 +48,8 @@
   #ctrl { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
   #play { width: 64px; font-size: 18px; }
   #clock { font-variant-numeric: tabular-nums; font-size: 16px; min-width: 150px; }
-  #tl { width: 100%; height: 56px; display: block; cursor: pointer; touch-action: none; }
+  #tl { width: 100%; height: 110px; display: block; cursor: pointer; touch-action: none; border-radius: 6px; }
+  .zoom button { padding: 4px 10px; min-width: 36px; }
   .legend span { display: inline-flex; gap: 4px; align-items: center; margin-right: 10px; font-size: 12px; color: var(--muted); }
   .montre { font: 15px/1.25 system-ui, sans-serif; padding: 22px; gap: 4px; overflow: hidden; background: #000; color: #e8edf3; border: 2px solid #444; border-radius: 50%; width: 150px; height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; margin: 8px auto; }
   .montre span { white-space: pre-line; }
@@ -60,7 +61,14 @@
     #map { height: 45vh; }
     #side { border-left: none; }
     #radar { height: 260px; }
-    footer { position: sticky; bottom: 0; background: var(--bg); z-index: 1000; }
+    footer { position: sticky; bottom: 0; background: var(--bg); z-index: 1000; padding: 6px 10px 8px; }
+    html.appli footer { bottom: 62px; } /* au-dessus de la barre d'onglets de l'appli */
+    .legend { display: none; }
+    #ctrl { gap: 6px; margin-bottom: 4px; flex-wrap: nowrap; }
+    #ctrl .sub, #ctrl label.sub { display: none; }
+    #play { width: 48px; }
+    #clock { min-width: 0; font-size: 14px; flex: 1; }
+    #tl { height: 120px; }
   }
 </style>
 </head>
@@ -101,8 +109,9 @@
         <div class="r"><span>Eau minimale (m)</span><input type="number" id="seuil" step="0.1" min="0.5" value="2.0"></div>
         <div class="r"><span>Alertes dès (km/h)</span><input type="number" id="vmin" step="1" min="0" value="8"></div>
         <div class="r"><span>Anticipation (s)</span><input type="number" id="antic" step="1" min="3" value="7"></div>
-        <div class="r"><label><input type="checkbox" id="preAlerte" checked> Pré-alerte (±10°, 2× la distance)</label></div>
-        <div class="r"><label><input type="checkbox" id="veille" checked> Veille latérale (jusqu'à 110°)</label></div>
+        <div class="r"><span>Angle d'alerte (±°)</span><input type="number" id="coneAlerte" step="5" min="10" max="110" value="50"></div>
+        <div class="r"><label><input type="checkbox" id="preAlerte" checked> Pré-alerte (2× la distance)</label><span>±</span><input type="number" id="conePre" step="5" min="5" max="150" value="10" style="width:56px"><span>°</span></div>
+        <div class="r"><label><input type="checkbox" id="veille" checked> Veille latérale jusqu'à</label><input type="number" id="coneVeille" step="5" min="30" max="170" value="110" style="width:56px"><span>°</span></div>
         <div class="r"><label><input type="checkbox" id="smooth"> Fonds lisses aussi</label></div>
         <div class="r"><label><input type="checkbox" id="sound" checked> Sons pendant la lecture (×1 à ×5)</label></div>
         <div class="r"><label><input type="checkbox" id="bips" checked> Bips</label><label><input type="checkbox" id="voix" checked> Annonces vocales</label></div>
@@ -120,8 +129,9 @@
       <select id="speed"><option>1</option><option>2</option><option selected>5</option><option>10</option><option>30</option><option>60</option></select><span class="sub">× vitesse</span>
       <span id="clock">–</span>
       <label class="sub"><input type="checkbox" id="follow" checked> Suivre sur la carte</label>
+      <span class="zoom"><button id="zMoins" title="Zoom arrière">−</button><button id="zPlus" title="Zoom avant (ou pincer la frise)">+</button><button id="zTout">Tout</button></span>
       <span style="flex:1"></span>
-      <span class="legend"><span><i class="dot" style="background:#bf5af2"></i>montre</span><span><i class="dot" style="background:#5ac8fa"></i>veille</span><span><i class="dot" style="background:#ffd60a"></i>pré-alerte</span><span><i class="dot" style="background:var(--a1)"></i>bips</span><span><i class="dot" style="background:var(--a2)"></i>&lt; 10 m</span><span><i class="dot" style="background:var(--a3)"></i>contact</span><span><i class="dot" style="background:#5ac8fa"></i>hauteur d'eau</span></span>
+      <span class="legend"><span><i class="dot" style="background:#bf5af2"></i>montre</span><span><i class="dot" style="background:#5ac8fa"></i>veille</span><span><i class="dot" style="background:#ffd60a"></i>pré-alerte</span><span><i class="dot" style="background:var(--a1)"></i>bips</span><span><i class="dot" style="background:var(--a2)"></i>&lt; 10 m</span><span><i class="dot" style="background:var(--a3)"></i>contact</span><span><i class="dot" style="background:#5ac8fa"></i>marée</span><span><i class="dot" style="background:#6b5a3e"></i>fond sous le rider</span></span>
     </div>
     <canvas id="tl"></canvas>
   </footer>
@@ -169,7 +179,7 @@ const DangerLayer = L.GridLayer.extend({
         const eau = Wmap - (Rc === 254 ? 99 : meta.cote_min + (Rc - 1) * meta.pas_cote);
         return eau < 0 ? 3 : eau < seuil ? 2 : eau < seuil + 1 ? 1 : 0;
       };
-      const RGB = [null, [255, 159, 10], [255, 59, 48], [176, 48, 42]];
+      const RGB = [null, [255, 159, 10], [255, 59, 48], [0, 0, 0]]; // émergé : noir
       for (let v = 0; v < 256; v++) for (let u = 0; u < 256; u++) {
         let lvl = 0;
         if (z >= Z) {
@@ -317,7 +327,7 @@ async function chargerMaree() {
 
 function opts(affichage) {
   return { seuil: +$('seuil').value, smooth: $('smooth').checked, antic: +$('antic').value, roches: mesRoches, affichage, preAlerte: $('preAlerte').checked, veille: $('veille').checked,
-    useL3d: true, inclTest: false };
+    coneAlerte: +$('coneAlerte').value, conePre: +$('conePre').value, coneVeille: +$('coneVeille').value, useL3d: true, inclTest: false };
 }
 
 let calcToken = 0;
@@ -344,6 +354,7 @@ async function calculer() {
     if (token !== calcToken) return;
     const p = pts[i];
     p.W = hauteurAt(p);
+    const c = coteA(p.lat, p.lon); p.prof = c == null ? null : c === -Infinity ? Infinity : p.W - c; // Infinity : plus profond que le relevé
     let an = analyser(p, p.cap, p.v, p.W, o);
     const armedP = p.v >= vmin;
     if (armedP && (dangerSignale(an) || etatR.suivi)) an = analyser(p, p.cap, p.v, p.W, opts(true)); // grille complète (suivi des secteurs)
@@ -408,41 +419,107 @@ const heure = t => new Date(t).toLocaleTimeString('fr-FR');
 // Frise chronologique
 // =====================================================================
 const tl = $('tl');
+// Fenêtre affichée [vue.t0, vue.t1] : toute la session, ou une portion zoomée (pincer à deux doigts, molette, boutons
+// − / + / Tout ; double toucher = tout). Un doigt : déplacer le curseur. La carte se recadre sur la portion zoomée.
+const vue = { t0: 0, t1: 0 };
+const bornes = () => [pts[0].t, pts[pts.length - 1].t];
+function vueTout() { if (!pts.length) return; [vue.t0, vue.t1] = bornes(); dessinerFrise(); }
+function vueZoom(f, tc) { // f < 1 : zoom avant, autour de l'instant tc
+  if (!pts.length) return;
+  const [a, b] = bornes(), w = Math.max(30000, Math.min(b - a, (vue.t1 - vue.t0) * f));
+  tc = tc ?? cur; let t0 = tc - (tc - vue.t0) * w / (vue.t1 - vue.t0);
+  t0 = Math.max(a, Math.min(b - w, t0)); vue.t0 = t0; vue.t1 = t0 + w;
+  dessinerFrise(); recadrerCarte();
+}
+let recadrage = null;
+function recadrerCarte() { // la carte montre la portion zoomée (après la fin du geste)
+  clearTimeout(recadrage);
+  recadrage = setTimeout(() => {
+    const [a, b] = bornes(), sel = pts.filter(p => p.t >= vue.t0 && p.t <= vue.t1);
+    if (sel.length > 1) map.fitBounds(L.latLngBounds(sel.map(p => [p.lat, p.lon])), { padding: [30, 30], maxZoom: 18 });
+    if (vue.t0 <= a && vue.t1 >= b) map.fitBounds(L.latLngBounds(pts.map(p => [p.lat, p.lon])), { padding: [30, 30] });
+  }, 350);
+}
 function dessinerFrise() {
   const k = devicePixelRatio || 1, r = tl.getBoundingClientRect();
   tl.width = r.width * k; tl.height = r.height * k;
   const g = tl.getContext('2d'), W = tl.width, H = tl.height;
   g.fillStyle = '#151b23'; g.fillRect(0, 0, W, H);
   if (!pts.length) return;
-  const t0 = pts[0].t, t1 = pts[pts.length - 1].t, x = t => (t - t0) / (t1 - t0) * W;
-  // bandes de pré-alerte (jaune, basses) puis d'alerte
-  g.fillStyle = '#ffd60a';
-  for (let i = 0; i < pts.length - 1; i++) if (pts[i].pre) { const xa = x(pts[i].t); g.fillRect(xa, H * 0.72, Math.max(1, x(pts[i + 1].t) - xa), H); }
-  for (let i = 0; i < pts.length - 1; i++) if (pts[i].lvl) {
-    g.fillStyle = COLS[pts[i].lvl]; const xa = x(pts[i].t), xb = Math.max(xa + 1, x(pts[i + 1].t));
-    g.fillRect(xa, H * (pts[i].lvl === 1 ? 0.45 : pts[i].lvl === 2 ? 0.25 : 0.05), xb - xa, H);
+  if (!(vue.t1 > vue.t0)) [vue.t0, vue.t1] = bornes();
+  if (playing && (cur < vue.t0 || cur > vue.t1)) { const w = vue.t1 - vue.t0; vue.t0 = Math.max(pts[0].t, cur - w * 0.1); vue.t1 = vue.t0 + w; } // la lecture fait défiler
+  const t0 = vue.t0, t1 = vue.t1, x = t => (t - t0) / (t1 - t0) * W;
+  const i0 = Math.max(0, pts.findIndex(p => p.t >= t0) - 1), i1 = Math.min(pts.length - 1, (pts.findIndex(p => p.t > t1) + pts.length) % pts.length + 1);
+  const visibles = pts.slice(i0, i1 + 1);
+  // --- profondeur sous le rider (eau au-dessus du fond) : zone du bas, surface en haut de la zone, fond plus bas
+  const hb = H * 0.62, yb = H - hb; // bande « sonar »
+  const pm = Math.min(15, Math.max(4, ...visibles.map(p => p.prof == null || p.prof === Infinity ? 0 : p.prof))); // échelle : 4 à 15 m
+  const yP = d => yb + Math.max(0, Math.min(1, d / pm)) * (hb - 2 * k);
+  g.fillStyle = '#0d2733'; g.fillRect(0, yb, W, hb); // eau
+  g.beginPath(); let ouvert = false;
+  for (const p of visibles) {
+    const xx = x(p.t);
+    if (p.prof == null) { if (ouvert) { g.lineTo(xx, H); g.closePath(); g.fill(); g.beginPath(); ouvert = false; } continue; }
+    const y = yP(p.prof === Infinity ? pm : p.prof);
+    if (!ouvert) { g.moveTo(xx, H); g.lineTo(xx, y); ouvert = true; } else g.lineTo(xx, y);
   }
-  // notifications montre : losanges violets en haut
-  g.fillStyle = '#bf5af2';
-  for (const n of notifs) { const xn = x(n.t), y = 12 * k; g.beginPath(); g.moveTo(xn, y - 5 * k); g.lineTo(xn + 4 * k, y); g.lineTo(xn, y + 5 * k); g.lineTo(xn - 4 * k, y); g.closePath(); g.fill(); }
-  // veille latérale : petits triangles bleus en haut
-  g.fillStyle = '#5ac8fa';
-  for (const p of pts) if (p.veille) { const xv = x(p.t); g.beginPath(); g.moveTo(xv - 4 * k, 0); g.lineTo(xv + 4 * k, 0); g.lineTo(xv, 7 * k); g.closePath(); g.fill(); }
-  // hauteur d'eau
-  const ws = pts.map(p => p.W), wmin = Math.min(...ws), wmax = Math.max(...ws), sp = Math.max(1, wmax - wmin);
-  g.strokeStyle = '#5ac8fa'; g.lineWidth = 1.5 * k; g.beginPath();
-  pts.forEach((p, i) => { const y = H - 4 * k - (p.W - wmin) / sp * (H - 8 * k); i ? g.lineTo(x(p.t), y) : g.moveTo(x(p.t), y); });
-  g.stroke();
+  g.fillStyle = '#6b5a3e';
+  if (ouvert) { g.lineTo(x(visibles[visibles.length - 1].t), H); g.closePath(); g.fill(); }
+  const seuil = +$('seuil').value; // eau minimale : trait rouge pointillé
+  g.setLineDash([4 * k, 3 * k]); g.strokeStyle = '#ff3b30'; g.lineWidth = k; g.beginPath(); g.moveTo(0, yP(seuil)); g.lineTo(W, yP(seuil)); g.stroke(); g.setLineDash([]);
   g.fillStyle = '#8a96a6'; g.font = `${10 * k}px system-ui`;
-  g.fillText(wmax.toFixed(1) + ' m', 3 * k, 11 * k); g.fillText(wmin.toFixed(1) + ' m', 3 * k, H - 3 * k);
-  // curseur
+  g.fillText('fond ' + pm.toFixed(0) + ' m', 3 * k, H - 3 * k); g.fillText(fr1(seuil) + ' m', 3 * k, yP(seuil) - 2 * k);
+  // --- bandes d'alerte au-dessus
+  g.fillStyle = '#ffd60a';
+  for (let i = i0; i < i1; i++) if (pts[i].pre) { const xa = x(pts[i].t); g.fillRect(xa, yb - 6 * k, Math.max(1, x(pts[i + 1].t) - xa), 6 * k); }
+  for (let i = i0; i < i1; i++) if (pts[i].lvl) {
+    g.fillStyle = COLS[pts[i].lvl]; const xa = x(pts[i].t), xb = Math.max(xa + 1, x(pts[i + 1].t));
+    const hh = (pts[i].lvl === 1 ? 0.35 : pts[i].lvl === 2 ? 0.6 : 0.85) * (yb - 6 * k);
+    g.fillRect(xa, yb - 6 * k - hh, xb - xa, hh);
+  }
+  g.fillStyle = '#bf5af2'; // notifications montre : losanges violets en haut
+  for (const n of notifs) { if (n.t < t0 || n.t > t1) continue; const xn = x(n.t), y = 6 * k; g.beginPath(); g.moveTo(xn, y - 5 * k); g.lineTo(xn + 4 * k, y); g.lineTo(xn, y + 5 * k); g.lineTo(xn - 4 * k, y); g.closePath(); g.fill(); }
+  g.fillStyle = '#5ac8fa'; // veille latérale : petits triangles bleus en haut
+  for (const p of visibles) if (p.veille) { const xv = x(p.t); g.beginPath(); g.moveTo(xv - 4 * k, 0); g.lineTo(xv + 4 * k, 0); g.lineTo(xv, 7 * k); g.closePath(); g.fill(); }
+  // --- hauteur d'eau (marée), fine, sur toute la hauteur
+  const ws = visibles.map(p => p.W), wmin = Math.min(...ws), wmax = Math.max(...ws), sp = Math.max(1, wmax - wmin);
+  g.strokeStyle = 'rgba(90,200,250,.55)'; g.lineWidth = k; g.beginPath();
+  visibles.forEach((p, i) => { const y = yb - 2 * k - (p.W - wmin) / sp * (yb - 10 * k); i ? g.lineTo(x(p.t), y) : g.moveTo(x(p.t), y); });
+  g.stroke();
+  g.fillStyle = '#8a96a6'; g.textAlign = 'right';
+  g.fillText('marée ' + fr1(wmin) + '–' + fr1(wmax) + ' m', W - 3 * k, 18 * k);
+  const [a, b] = bornes();
+  if (t0 > a || t1 < b) { g.textAlign = 'left'; g.fillText(heure(t0), 3 * k, 18 * k); g.textAlign = 'right'; g.fillText(heure(t1), W - 3 * k, 30 * k); }
+  g.textAlign = 'left';
+  // curseur et profondeur à l'instant
   g.fillStyle = '#fff'; g.fillRect(x(cur) - k, 0, 2 * k, H);
 }
-let dragging = false;
-const seekFromEvent = e => { const r = tl.getBoundingClientRect(); seek(pts[0].t + (e.clientX - r.left) / r.width * (pts[pts.length - 1].t - pts[0].t)); };
-tl.addEventListener('pointerdown', e => { if (!pts.length) return; dragging = true; tl.setPointerCapture(e.pointerId); seekFromEvent(e); });
-tl.addEventListener('pointermove', e => { if (dragging) seekFromEvent(e); });
-tl.addEventListener('pointerup', () => { dragging = false; });
+const fr1 = v => v.toFixed(1).replace('.', ',');
+// Gestes : un doigt = curseur ; deux doigts = pincer (zoom) et glisser ; molette = zoom ; double toucher = tout
+const doigts = new Map(); let pince = null, dernierToucher = 0;
+const tDe = clientX => { const r = tl.getBoundingClientRect(); return vue.t0 + (clientX - r.left) / r.width * (vue.t1 - vue.t0); };
+tl.addEventListener('pointerdown', e => {
+  if (!pts.length) return;
+  tl.setPointerCapture(e.pointerId); doigts.set(e.pointerId, e.clientX);
+  if (doigts.size === 2) { const [x1, x2] = [...doigts.values()]; pince = { d: Math.abs(x2 - x1) || 1, tc: tDe((x1 + x2) / 2), w: vue.t1 - vue.t0, t0: vue.t0 }; return; }
+  if (Date.now() - dernierToucher < 300) { vueTout(); recadrerCarte(); }
+  dernierToucher = Date.now();
+  seek(tDe(e.clientX));
+});
+tl.addEventListener('pointermove', e => {
+  if (!doigts.has(e.pointerId)) return;
+  doigts.set(e.pointerId, e.clientX);
+  if (pince && doigts.size === 2) {
+    const [x1, x2] = [...doigts.values()], r = tl.getBoundingClientRect(), [a, b] = bornes();
+    const w = Math.max(30000, Math.min(b - a, pince.w * pince.d / (Math.abs(x2 - x1) || 1)));
+    let t0 = pince.tc - ((x1 + x2) / 2 - r.left) / r.width * w; t0 = Math.max(a, Math.min(b - w, t0));
+    vue.t0 = t0; vue.t1 = t0 + w; dessinerFrise();
+  } else if (!pince) seek(tDe(e.clientX));
+});
+const finDoigt = e => { doigts.delete(e.pointerId); if (pince && doigts.size < 2) { pince = null; recadrerCarte(); } };
+tl.addEventListener('pointerup', finDoigt); tl.addEventListener('pointercancel', finDoigt);
+tl.addEventListener('wheel', e => { e.preventDefault(); vueZoom(e.deltaY > 0 ? 1.25 : 0.8, tDe(e.clientX)); }, { passive: false });
+$('zMoins').onclick = () => vueZoom(1.6); $('zPlus').onclick = () => vueZoom(0.6); $('zTout').onclick = () => { vueTout(); recadrerCarte(); };
 addEventListener('resize', () => { dessinerFrise(); resizeRadar(); });
 
 // =====================================================================
@@ -534,7 +611,7 @@ $('styleMontre').onchange = () => { styleMontre = $('styleMontre').value; seek(c
 // =====================================================================
 let recalcTimer = null;
 const recalc = () => { clearTimeout(recalcTimer); recalcTimer = setTimeout(calculer, 300); };
-['seuil', 'vmin', 'antic', 'preAlerte', 'veille', 'smooth', 'tideMode'].forEach(k => $(k).onchange = recalc);
+['seuil', 'vmin', 'antic', 'coneAlerte', 'conePre', 'coneVeille', 'preAlerte', 'veille', 'smooth', 'tideMode'].forEach(k => $(k).onchange = recalc);
 $('forceH').oninput = () => { $('forceTxt').textContent = (+$('forceH').value).toFixed(1) + ' m'; };
 $('forceH').onchange = recalc;
 $('vSupp').onchange = () => dernierGPX && ouvrirTrace(...dernierGPX);
@@ -553,7 +630,7 @@ async function ouvrirTrace(txt, nom) {
   const dist = pts.reduce((s, p, i) => i ? s + Math.hypot((p.lon - pts[i - 1].lon) * 111320 * Math.cos(p.lat * Math.PI / 180), (p.lat - pts[i - 1].lat) * 110540) : 0, 0);
   $('info').textContent = (sansHeure ? '⚠ trace sans heures, vitesse supposée constante · ' : '') + `${nom} · ${new Date(pts[0].t).toLocaleDateString('fr-FR')} ${heure(pts[0].t)} · ${fmtDuree(pts[pts.length - 1].t - pts[0].t)} · ${(dist / 1000).toFixed(1)} km · ${pts.length} points`;
   map.fitBounds(L.latLngBounds(pts.map(p => [p.lat, p.lon])), { padding: [30, 30] });
-  cur = pts[0].t; idx = 0; Wmap = null;
+  cur = pts[0].t; idx = 0; Wmap = null; vue.t0 = vue.t1 = 0;
   $('play').disabled = false;
   await calculer();
 }

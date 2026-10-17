@@ -153,8 +153,11 @@
     <div class="ligne"><span>Eau minimale sous la planche<small>pense au mât et à l'aile du foil</small></span><span><input type="number" id="seuil" step="0.1" min="0.5" value="2.0"><span class="unite">m</span></span></div>
     <div class="ligne"><span>Anticipation<small>secondes de navigation avant le danger</small></span><span><input type="number" id="antic" step="1" min="3" value="7"><span class="unite">s</span></span></div>
     <div class="ligne"><span>Alertes à partir de</span><span><input type="number" id="vmin" step="1" min="0" value="8"><span class="unite">km/h</span></span></div>
-    <label class="ligne"><span>Pré-alerte<small>danger droit devant, jusqu'à 2 × la distance d'alerte</small></span><input type="checkbox" id="preAlerte" checked></label>
-    <label class="ligne"><span>Veille latérale<small>dangers proches sur les côtés, avant une manœuvre</small></span><input type="checkbox" id="veille" checked></label>
+    <div class="ligne"><span>Angle d'alerte<small>de part et d'autre du cap, jusqu'à la distance d'alerte</small></span><span><input type="number" id="coneAlerte" step="5" min="10" max="110" value="50"><span class="unite">°</span></span></div>
+    <label class="ligne"><span>Pré-alerte<small>tintement doux, jusqu'à 2 × la distance d'alerte</small></span><input type="checkbox" id="preAlerte" checked></label>
+    <div class="ligne"><span>Angle de pré-alerte<small>10° = droit devant ; jusqu'à 110° = tout le secteur de la veille</small></span><span><input type="number" id="conePre" step="5" min="5" max="150" value="10"><span class="unite">°</span></span></div>
+    <label class="ligne"><span>Veille latérale<small>dangers proches sur les côtés, avant une manœuvre (hors secteurs d'alerte et de pré-alerte)</small></span><input type="checkbox" id="veille" checked></label>
+    <div class="ligne"><span>Angle de veille<small>jusqu'où regarder sur les côtés</small></span><span><input type="number" id="coneVeille" step="5" min="30" max="170" value="110"><span class="unite">°</span></span></div>
     <label class="ligne"><span>Bips d'alerte</span><input type="checkbox" id="bips" checked></label>
     <label class="ligne"><span>Annonces vocales<small>pré-alerte et première alerte, puis les bips</small></span><input type="checkbox" id="voix" checked></label>
     <label class="ligne"><span>Fonds lisses aussi<small>sable et vase peu profonds</small></span><input type="checkbox" id="smooth"></label>
@@ -199,6 +202,7 @@ function niveauCourant(lon, t) {
 }
 function opts(affichage = true) {
   return { seuil: +$('seuil').value, smooth: $('smooth').checked, antic: +$('antic').value, roches: mesRoches, affichage, preAlerte: $('preAlerte').checked, veille: $('veille').checked,
+    coneAlerte: +$('coneAlerte').value, conePre: +$('conePre').value, coneVeille: +$('coneVeille').value,
     useL3d: !($('testMode').checked && $('testNoL3d').checked), inclTest: $('testMode').checked };
 }
 let etatRecal = 'attente'; // 'ok' | 'hors' (recalage récent réutilisé) | 'ko' | 'off'
@@ -428,6 +432,9 @@ function tick() {
   const gpsAge = fix ? (t - fix.t) / 1000 : Infinity;
   if (fix && (!analysis || now - analysis.at > 500)) {
     activerZone(zonePour(fix.lat, fix.lon)); // changement de zone : évènement « zone » (marée, ports, tuiles)
+    if (!dernierPrechargement || Math.hypot((fix.lon - dernierPrechargement.lon) * 111320 * Math.cos(fix.lat * Math.PI / 180), (fix.lat - dernierPrechargement.lat) * 110540) > 500 || dernierPrechargement.zone !== zone) {
+      dernierPrechargement = { lat: fix.lat, lon: fix.lon, zone }; prechargerTuiles(fix.lat, fix.lon);
+    }
     const W = niveauCourant(fix.lon, t);
     analysis = analyser(fix, fix.course, fix.speed, W, opts()); analysis.at = now; analysis.W = W;
     const W30 = niveauCourant(fix.lon, t + 30 * 60000);
@@ -461,7 +468,7 @@ function tick() {
 }
 // Une ligne par position : lieu, précision, vitesse (km/h), cap, eau, alertes armées, danger [d, gisement, niveau],
 // pré-alerte [d, gisement], veille [d, gisement]
-let fixJournal = null, gpsPerduJournal = false;
+let fixJournal = null, gpsPerduJournal = false, dernierPrechargement = null;
 function journalPosition(f, an, armed) {
   if (!JournalSession.ouvert) return;
   const r = (x, k = 0) => x == null || isNaN(x) ? null : +x.toFixed(k);
@@ -470,6 +477,7 @@ function journalPosition(f, an, armed) {
   if (an.pre) d.p = [r(an.pre.d), r(an.pre.rel)];
   if (an.lat) d.l = [r(an.lat.d), r(an.lat.rel)];
   if (sim) d.sim = true;
+  if (an.manquantes) d.tm = an.manquantes; // tuiles du relevé pas encore chargées autour (radar partiellement aveugle)
   JournalSession.ev('pos', d);
 }
 function frame() {
@@ -521,7 +529,7 @@ $('start').onclick = async () => {
   if (APPLI) { appliquerVolume(); demarrerJournal(); const t = horlogeSon() + 0.15; tone(880, 880, t, 0.12, 0.8, 'triangle'); tone(1320, 1320, t + 0.16, 0.2, 0.8, 'triangle'); } // carillon : le son marche
   $('setup').hidden = true; $('avance').hidden = true; $('fProfils').classList.remove('on');
   document.body.classList.add('navigation'); $('run').hidden = false; resize();
-  fix = null; lastFixes = []; analysis = null; last = null; running = true; window.radarEnCours = true;
+  fix = null; lastFixes = []; analysis = null; last = null; running = true; window.radarEnCours = true; dernierPrechargement = null;
   if ($('simMode').checked) startSim(); else startGps();
   clearInterval(tickTimer); tickTimer = setInterval(tick, 100);
   requestAnimationFrame(frame);
@@ -701,7 +709,8 @@ setInterval(() => { if (!running) { majVerifs(); majChipZone(); } }, 5000);
 // ---------- Profils de navigation ----------
 // Un profil regroupe les réglages d'alerte ; on en change d'un toucher, chacun reste modifiable, on peut en créer.
 // Les champs du profil actif sont les champs du radar eux-mêmes (seuil, antic, vmin…) : le calcul n'a pas changé.
-const CHAMPS = ['seuil', 'antic', 'vmin', 'preAlerte', 'veille', 'bips', 'voix', 'smooth'];
+const CHAMPS = ['seuil', 'antic', 'vmin', 'coneAlerte', 'preAlerte', 'conePre', 'veille', 'coneVeille', 'bips', 'voix', 'smooth'];
+const ANGLES_DEFAUT = { coneAlerte: 50, conePre: 10, coneVeille: 110 }; // profils créés avant les angles réglables
 const PROFILS_DEFAUT = [
   { nom: 'Foil', seuil: 2, antic: 7, vmin: 8, preAlerte: true, veille: true, bips: true, voix: true, smooth: false },
   { nom: 'Planche', seuil: 1.5, antic: 6, vmin: 10, preAlerte: true, veille: true, bips: true, voix: false, smooth: false },
@@ -722,11 +731,13 @@ function initProfils() {
 }
 function appliquerProfil(i) {
   profilActif = i; const p = profils[i];
+  Object.keys(ANGLES_DEFAUT).forEach(k => { if (p[k] == null) p[k] = ANGLES_DEFAUT[k]; });
   CHAMPS.forEach(k => { if ($(k).type === 'checkbox') $(k).checked = !!p[k]; else $(k).value = p[k]; });
   store.set('profilActif', i); saveSettings(); majProfil();
 }
 function resumeProfil(p) {
-  return `${fr(+p.seuil)} m d'eau · ${p.antic} s · dès ${p.vmin} km/h · ` + [p.bips && 'bips', p.voix && 'voix', p.veille && 'veille', p.preAlerte && 'pré-alerte', p.smooth && 'fonds lisses'].filter(Boolean).join(', ');
+  const angles = (p.coneAlerte || 50) != 50 || (p.conePre || 10) != 10 || (p.coneVeille || 110) != 110 ? ` · angles ${p.coneAlerte || 50}/${p.conePre || 10}/${p.coneVeille || 110}°` : '';
+  return `${fr(+p.seuil)} m d'eau · ${p.antic} s · dès ${p.vmin} km/h${angles} · ` + [p.bips && 'bips', p.voix && 'voix', p.veille && 'veille', p.preAlerte && 'pré-alerte', p.smooth && 'fonds lisses'].filter(Boolean).join(', ');
 }
 function majProfil() { $('nomProfil').textContent = profils[profilActif].nom + ' ▾'; $('resumeProfil').textContent = resumeProfil(profils[profilActif]); }
 function rendreProfils() {
