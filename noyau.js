@@ -619,7 +619,15 @@ function texteVeille(l) { return `${l.lvl === 3 ? 'Roches' : 'Hauts-fonds'} à $
 // La voix ne dit que la pré-alerte puis le premier message d'alerte d'un même épisode ; les bips prennent ensuite le relais.
 // Voix seule (bips coupés) : elle ajoute « Impact imminent » + direction à mi-distance d'alerte (la moitié du temps d'anticipation).
 // Un épisode se termine quand plus rien n'est signalé pendant 10 s.
-function annoncer(b, pre, armed, now = Date.now(), horizon = 40) {
+// Durée estimée avant impact (s) : distance / vitesse de rapprochement (composante de la vitesse vers le danger) ;
+// rien si l'on ne s'en approche pas franchement ou si c'est loin dans le temps
+function delaiImpact(m, vitesse) {
+  const vc = (vitesse || 0) * Math.cos(m.rel * Math.PI / 180);
+  if (vc < 1.5) return null;
+  const s = m.d / vc;
+  return s < 60 ? Math.max(1, Math.round(s)) : null;
+}
+function annoncer(b, pre, armed, now = Date.now(), horizon = 40, vitesse = 0) {
   if (b || pre) derniereVoix.vu = now;
   else if (now - (derniereVoix.vu || 0) > 10000) { derniereVoix.pre = false; derniereVoix.alerte = false; derniereVoix.impact = false; }
   if (!voixActive || muted || !armed || !(b || pre)) return;
@@ -634,7 +642,8 @@ function annoncer(b, pre, armed, now = Date.now(), horizon = 40) {
   if (b && b.d < 10) { derniereVoix.alerte = true; return; } // trop près : le son continu suffit
   const m = b || pre, cote = !b || Math.abs(b.rel) < 15 ? 'devant' : b.rel > 0 ? 'à tribord' : 'à bâbord';
   const d = m.d >= 30 ? Math.round(m.d / 10) * 10 : Math.round(m.d);
-  parler(`${m.lvl === 3 ? 'Roche' : 'Haut-fond'} ${cote}, ${d} mètres`);
+  const s = delaiImpact(m, vitesse);
+  parler(`${m.lvl === 3 ? 'Roche' : 'Haut-fond'} ${cote}, ${d} mètres` + (s ? `, ${s} seconde${s > 1 ? 's' : ''}` : ''));
   if (b) derniereVoix.alerte = true; else derniereVoix.pre = true;
 }
 

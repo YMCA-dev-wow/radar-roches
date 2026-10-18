@@ -291,7 +291,7 @@ $('geoFile').onchange = async e => {
 
 $('testSound').onclick = () => {
   if (APPLI && $('volMax').checked) { Natif.son.volumeMax({ on: true }).catch(() => {}); setTimeout(() => { if (!running) Natif.son.volumeMax({ on: false }).catch(() => {}); }, 9000); }
-  demoSons(); if ($('voix').checked) setTimeout(() => parler('Roche à tribord, 40 mètres'), 5000);
+  demoSons(); if ($('voix').checked) setTimeout(() => parler('Roche à tribord, 40 mètres, 6 secondes'), 5000);
 };
 if (!APPLI) { $('volMaxLigne').hidden = true; $('volAlertesLigne').hidden = true; }
 const appliquerVolume = () => { $('volAlertesTxt').textContent = $('volAlertes').value + ' %'; if (APPLI) Natif.son.gain({ v: $('volAlertes').value / 100 }).catch(() => {}); };
@@ -457,7 +457,7 @@ function tick() {
     const p = analysis.pre, coupe = armed ? '' : ' (alertes coupées sous ' + $('vmin').value + ' km/h)';
     if (b) message = texteMenace(b) + coupe; else if (p) message = textePre(p) + coupe; else if (analysis.lat) message = texteVeille(analysis.lat) + coupe;
     sonnerMenace(b, analysis.horizon, armed, p);
-    annoncer(b, p, armed, Date.now(), analysis.horizon);
+    annoncer(b, p, armed, Date.now(), analysis.horizon, fix.speed);
     annoncerVeille(nouvelleVeille(veilleEtat, analysis, armed, t));
     relaisPas(t, analysis, fix.course, armed, tt => niveauCourant(fix.lon, tt), true);
     if (fix.t !== fixJournal) { fixJournal = fix.t; journalPosition(fix, analysis, armed); }

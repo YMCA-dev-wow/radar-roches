@@ -2,6 +2,14 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 14,
+      "date": "2026-10-18",
+      "titre": "Voix : durée avant impact",
+      "points": [
+        "Les annonces vocales donnent aussi la durée estimée avant d'atteindre le danger à ta vitesse : « Roche à tribord, 40 mètres, 6 secondes »."
+      ]
+    },
+    {
       "id": 13,
       "date": "2026-10-18",
       "titre": "Rejouer une séance du téléphone",
