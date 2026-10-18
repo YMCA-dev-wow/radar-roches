@@ -139,6 +139,17 @@ public class JournalPlugin extends Plugin {
         call.resolve();
     }
 
+    // Contenu d'un journal, pour le rejeu dans l'appli
+    @PluginMethod
+    public void lire(PluginCall call) {
+        File f = new File(dossier(), call.getString("nom", ""));
+        if (!f.exists()) { call.reject("journal introuvable"); return; }
+        try {
+            byte[] b = java.nio.file.Files.readAllBytes(f.toPath());
+            JSObject r = new JSObject(); r.put("texte", new String(b, java.nio.charset.StandardCharsets.UTF_8)); call.resolve(r);
+        } catch (IOException e) { call.reject(e.getMessage()); }
+    }
+
     @PluginMethod
     public void supprimer(PluginCall call) {
         String n = call.getString("nom", "");

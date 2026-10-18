@@ -96,8 +96,8 @@
     <a href="index.html" id="retour" style="color:var(--muted);text-decoration:none;font-size:22px;line-height:1">‹</a>
     <script>if (window.androidBridge) document.getElementById('retour').href = 'plus.html';</script>
     <h1>Rejeu de session</h1>
-    <button class="primary" id="gpxBtn">Ouvrir une trace (FIT ou GPX)…</button>
-    <input type="file" id="gpxFile" accept=".gpx,.fit,application/gpx+xml" hidden>
+    <button class="primary" id="gpxBtn">Ouvrir une trace (FIT, GPX ou journal)…</button>
+    <input type="file" id="gpxFile" accept=".gpx,.fit,.jsonl,application/gpx+xml" hidden>
     <span class="sub" id="info">Charge une ancienne session (FIT de préférence : heures et vitesse exactes) pour rejouer les alertes du radar.</span>
     <span style="flex:1"></span>
   </header>
@@ -299,6 +299,30 @@ function lireFIT(buf) {
   }
   sansHeure = false;
   return completer(out);
+}
+// Journal de session de l'appli (.jsonl) : une position par ligne « pos » (la, lo, v en km/h) ; l'en-tête « debut »
+// donne les réglages du radar pendant la séance, repris dans le rejeu pour retrouver les mêmes alertes
+let reglagesJournal = null;
+function lireJournal(txt) {
+  const out = []; reglagesJournal = null;
+  for (const l of txt.split('\n')) {
+    if (!l.trim()) continue;
+    let e; try { e = JSON.parse(l); } catch { continue; }
+    if (e.type === 'debut') reglagesJournal = e.reglages || null;
+    else if (e.type === 'pos' && isFinite(e.la) && isFinite(e.lo) && !e.sim) out.push({ t: e.t, lat: e.la, lon: e.lo, vDev: e.v != null ? e.v / 3.6 : null });
+  }
+  sansHeure = false;
+  return completer(out);
+}
+function appliquerReglagesJournal() {
+  const r = reglagesJournal; if (!r) return '';
+  const pris = [];
+  for (const k of ['seuil', 'vmin', 'antic', 'coneAlerte', 'conePre', 'coneVeille', 'preAlerte', 'veille', 'smooth']) {
+    if (r[k] == null || !$(k)) continue;
+    if ($(k).type === 'checkbox') $(k).checked = !!r[k]; else $(k).value = r[k];
+    pris.push(k);
+  }
+  return pris.length ? ' · réglages de la séance repris' : '';
 }
 // Vitesse (mesurée par la montre si disponible) et cap sur une fenêtre de ±2 s (lisse le bruit GPS)
 function completer(out) {
@@ -710,16 +734,18 @@ $('vSupp').onchange = () => dernierGPX && ouvrirTrace(...dernierGPX);
 $('gpxBtn').onclick = () => $('gpxFile').click();
 $('gpxFile').onchange = async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-  try { ouvrirTrace(/\.fit$/i.test(f.name) ? await f.arrayBuffer() : await f.text(), f.name); } catch (err) { alert('Trace illisible : ' + err.message); }
+  try { await ouvrirTrace(/\.fit$/i.test(f.name) ? await f.arrayBuffer() : await f.text(), f.name); } catch (err) { alert('Trace illisible : ' + err.message); }
 };
 async function ouvrirTrace(txt, nom) {
   togglePlay(false);
-  pts = typeof txt === 'string' ? lireGPX(txt, nom) : lireFIT(txt);
+  const journal = typeof txt === 'string' && (/\.jsonl$/i.test(nom) || txt.trimStart().startsWith('{'));
+  pts = journal ? lireJournal(txt) : typeof txt === 'string' ? lireGPX(txt, nom) : lireFIT(txt);
+  const repris = journal ? appliquerReglagesJournal() : '';
   $('vRow').hidden = !sansHeure;
   dernierGPX = [txt, nom];
   if (pts.length < 10) throw new Error('trop peu de points');
   const dist = pts.reduce((s, p, i) => i ? s + Math.hypot((p.lon - pts[i - 1].lon) * 111320 * Math.cos(p.lat * Math.PI / 180), (p.lat - pts[i - 1].lat) * 110540) : 0, 0);
-  $('info').textContent = (sansHeure ? '⚠ trace sans heures, vitesse supposée constante · ' : '') + `${nom} · ${new Date(pts[0].t).toLocaleDateString('fr-FR')} ${heure(pts[0].t)} · ${fmtDuree(pts[pts.length - 1].t - pts[0].t)} · ${(dist / 1000).toFixed(1)} km · ${pts.length} points`;
+  $('info').textContent = (sansHeure ? '⚠ trace sans heures, vitesse supposée constante · ' : '') + `${nom} · ${new Date(pts[0].t).toLocaleDateString('fr-FR')} ${heure(pts[0].t)} · ${fmtDuree(pts[pts.length - 1].t - pts[0].t)} · ${(dist / 1000).toFixed(1)} km · ${pts.length} points${repris}`;
   map.fitBounds(L.latLngBounds(pts.map(p => [p.lat, p.lon])), { padding: [30, 30] });
   cur = pts[0].t; idx = 0; Wmap = null; vue.t0 = vue.t1 = 0;
   $('play').disabled = false;
@@ -734,6 +760,11 @@ async function ouvrirTrace(txt, nom) {
       ? 'Ouvert par double-clic : le navigateur bloque la lecture des données. Lance lancer_outils.bat (ou utilise l’adresse en ligne).'
       : 'Données introuvables : ' + err.message;
     $('gpxBtn').disabled = true;
+  }
+  const nj = new URLSearchParams(location.search).get('journal');
+  if (nj && APPLI) {
+    try { await ouvrirTrace((await Natif.journal.lire({ nom: nj })).texte, nj); }
+    catch (err) { $('info').textContent = 'Journal illisible : ' + err.message; }
   }
 })();
 </script>

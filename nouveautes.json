@@ -2,6 +2,16 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 13,
+      "date": "2026-10-18",
+      "titre": "Rejouer une séance du téléphone",
+      "points": [
+        "La trace enregistrée par le radar du téléphone se rejoue directement : Plus → Journaux de session → Rejouer.",
+        "Le rejeu reprend les réglages de la séance (eau minimale, anticipation, angles…) pour retrouver les mêmes alertes.",
+        "Sur ordinateur, le rejeu ouvre aussi les journaux (.jsonl) envoyés depuis le téléphone."
+      ]
+    },
+    {
       "id": 12,
       "date": "2026-10-18",
       "titre": "Rejeu : courbe de vitesse",

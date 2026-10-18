@@ -59,8 +59,10 @@ async function afficherJournaux(conteneur) {
     txt.querySelector('small').textContent = ` · ${Math.max(1, Math.round(j.taille / 1024))} Ko`;
     const env = document.createElement('button'); env.className = 'btn prim'; env.textContent = 'Envoyer';
     env.onclick = () => NJ().partager({ nom: j.nom }).catch(e => alert(e.message));
+    const rej = document.createElement('button'); rej.className = 'btn'; rej.textContent = 'Rejouer';
+    rej.onclick = () => { location.href = 'rejeu.html?journal=' + encodeURIComponent(j.nom); };
     const sup = document.createElement('button'); sup.className = 'btn'; sup.textContent = 'Suppr.';
     sup.onclick = async () => { if (confirm('Supprimer ce journal ?')) { await NJ().supprimer({ nom: j.nom }).catch(() => {}); afficherJournaux(conteneur); } };
-    ligne.append(txt, env, sup); conteneur.append(ligne);
+    ligne.append(txt, rej, env, sup); conteneur.append(ligne);
   }
 }
