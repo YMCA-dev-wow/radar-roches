@@ -2,6 +2,16 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 15,
+      "date": "2026-10-19",
+      "titre": "Applis montre : correction d'un plantage",
+      "montre": true,
+      "points": [
+        "Correction du plantage de l'appli montre en navigation, constaté sur une Forerunner 255 dans le Trégor : la montre chargeait la carte du relief au moment même du calcul des alertes, ce qui dépassait son temps de calcul autorisé. La carte se charge maintenant à part, une portion par seconde.",
+        "Pour en profiter : retélécharge l'appli de ta montre (Plus → Carte et téléchargements) et remplace l'ancienne dans GARMIN → Apps."
+      ]
+    },
+    {
       "id": 14,
       "date": "2026-10-18",
       "titre": "Voix : durée avant impact",
