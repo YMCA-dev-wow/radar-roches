@@ -95,7 +95,7 @@ public class SautPlugin extends Plugin implements SensorEventListener {
         JSArray c = new JSArray();
         for (int i = Math.min(nAcc, N) - 1; i >= 0; i--) {
             int k = (nAcc - 1 - i) % N;
-            if (tAcc[k] >= t0 - 2000 && (i & 1) == 0) c.put(Math.round(acc[k] * 100) / 100.0);
+            if (tAcc[k] >= t0 - 2000 && (i & 1) == 0) c.put((Object) Double.valueOf(Math.round(acc[k] * 100) / 100.0)); // put(Object) : pas d exception
         }
         o.put("courbe", c);
         notifyListeners("saut", o);
