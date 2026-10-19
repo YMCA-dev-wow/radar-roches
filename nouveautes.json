@@ -2,6 +2,17 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 17,
+      "date": "2026-10-19",
+      "titre": "Appli montre Saint-Malo : vibreur et sauts",
+      "montre": true,
+      "points": [
+        "Vibreur coupé par défaut (batterie), activable pendant la navigation : START → Vibreur.",
+        "Sauts (essai) : la montre détecte les sauts avec son accéléromètre et les enregistre dans l'activité (Garmin Connect : courbes Saut, Temps de vol et Sauts ; rejeu : triangles blancs). Page de données : nombre, plus haut et dernier saut.",
+        "Inclut aussi la correction du plantage en navigation. Concerne pour l'instant les applis de Saint-Malo (Forerunner 255 et Fenix 8) : retélécharge-la (Plus → Carte et téléchargements) et remplace l'ancienne dans GARMIN → Apps."
+      ]
+    },
+    {
       "id": 16,
       "date": "2026-10-19",
       "titre": "Fond sous la planche et sauts (essai)",

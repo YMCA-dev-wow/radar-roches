@@ -264,6 +264,7 @@ function lireFIT(buf) {
   const dv = new DataView(buf), hs = dv.getUint8(0), fin = hs + dv.getUint32(4, true);
   if (String.fromCharCode(dv.getUint8(8), dv.getUint8(9), dv.getUint8(10), dv.getUint8(11)) !== '.FIT') throw new Error('fichier FIT invalide');
   const defs = {}, out = [], EPOCH = 631065600000, SEMI = 180 / 2 ** 31;
+  const champsDev = {}; // « indexDev/numéro » -> nom, d'après les messages field_description (206) : champs Connect IQ
   let pos = hs, lastTs = 0;
   while (pos < fin) {
     const h = dv.getUint8(pos++);
@@ -275,27 +276,38 @@ function lireFIT(buf) {
       pos += 5;
       const fields = [];
       for (let i = 0; i < n; i++, pos += 3) fields.push({ num: dv.getUint8(pos), size: dv.getUint8(pos + 1) });
-      let devSize = 0;
-      if (h & 0x20) { const nd = dv.getUint8(pos++); for (let i = 0; i < nd; i++, pos += 3) devSize += dv.getUint8(pos + 1); }
-      defs[local] = { le, glob, fields, devSize };
+      let devSize = 0; const dev = [];
+      if (h & 0x20) { const nd = dv.getUint8(pos++); for (let i = 0; i < nd; i++, pos += 3) { dev.push({ num: dv.getUint8(pos), size: dv.getUint8(pos + 1), idx: dv.getUint8(pos + 2) }); devSize += dv.getUint8(pos + 1); } }
+      defs[local] = { le, glob, fields, devSize, dev };
       continue;
     } else local = h & 0x0f;
     const d = defs[local];
     if (!d) throw new Error('FIT : message sans définition');
     const rec = {};
     for (const f of d.fields) {
+      if (d.glob === 206) { // field_description : 0 index du développeur, 1 numéro du champ, 3 nom
+        if (f.num === 0 || f.num === 1) rec[f.num] = dv.getUint8(pos);
+        else if (f.num === 3) { let n = ''; for (let i = 0; i < f.size; i++) { const c = dv.getUint8(pos + i); if (!c) break; n += String.fromCharCode(c); } rec[3] = n; }
+      }
       if (d.glob === 20 || d.glob === 0) {
         if (f.size === 4) rec[f.num] = f.num === 0 || f.num === 1 ? dv.getInt32(pos, d.le) : dv.getUint32(pos, d.le);
         else if (f.size === 2) rec[f.num] = dv.getUint16(pos, d.le);
       }
       pos += f.size;
     }
-    pos += d.devSize;
+    const devVal = {};
+    for (const f of d.dev) { // champs Connect IQ : flottants sur 4 octets (sauts de l'appli montre)
+      const nom = champsDev[f.idx + '/' + f.num];
+      if (nom && f.size === 4) devVal[nom] = dv.getFloat32(pos, d.le);
+      pos += f.size;
+    }
+    if (d.glob === 206 && rec[3]) champsDev[rec[0] + '/' + rec[1]] = rec[3];
     if (rec[253] != null) lastTs = rec[253];
     else if (compTs != null) lastTs = (compTs >= (lastTs & 0x1f) ? lastTs - (lastTs & 0x1f) + compTs : lastTs - (lastTs & 0x1f) + 32 + compTs);
     if (d.glob !== 20 || rec[0] == null || rec[1] == null || rec[0] === 0x7fffffff || rec[1] === 0x7fffffff) continue;
     const v = rec[73] != null && rec[73] !== 0xffffffff ? rec[73] / 1000 : rec[6] != null && rec[6] !== 0xffff ? rec[6] / 1000 : null;
     out.push({ t: EPOCH + lastTs * 1000, lat: rec[0] * SEMI, lon: rec[1] * SEMI, vDev: v });
+    if (devVal.saut > 0) sautsJournal.push({ t: EPOCH + lastTs * 1000, h: Math.round(devVal.saut * 10) / 10, vol: Math.round((devVal.saut_vol || 0) * 100) / 100 }); // sauts de l'appli montre
   }
   sansHeure = false;
   return completer(out);
