@@ -302,13 +302,14 @@ function lireFIT(buf) {
 }
 // Journal de session de l'appli (.jsonl) : une position par ligne « pos » (la, lo, v en km/h) ; l'en-tête « debut »
 // donne les réglages du radar pendant la séance, repris dans le rejeu pour retrouver les mêmes alertes
-let reglagesJournal = null;
+let reglagesJournal = null, sautsJournal = [];
 function lireJournal(txt) {
-  const out = []; reglagesJournal = null;
+  const out = []; reglagesJournal = null; sautsJournal = [];
   for (const l of txt.split('\n')) {
     if (!l.trim()) continue;
     let e; try { e = JSON.parse(l); } catch { continue; }
     if (e.type === 'debut') reglagesJournal = e.reglages || null;
+    else if (e.type === 'saut') sautsJournal.push(e);
     else if (e.type === 'pos' && isFinite(e.la) && isFinite(e.lo) && !e.sim) out.push({ t: e.t, lat: e.la, lon: e.lo, vDev: e.v != null ? e.v / 3.6 : null });
   }
   sansHeure = false;
@@ -446,12 +447,15 @@ function listerEvenements() {
   let nPre = 0; pts.forEach((p, i) => { if (p.pre && (i === 0 || !pts[i - 1].pre)) nPre++; });
   const nVeille = pts.filter(p => p.veille).length;
   $('evCount').textContent = `(${events.length}${$('preAlerte').checked ? ` · ${nPre} pré-alerte(s)` : ''}${$('veille').checked ? ` · ${nVeille} veille(s)` : ''})`;
-  $('evCount').textContent = $('evCount').textContent.replace(/\)$/, ` · ${notifs.length} notif. montre)`);
+  $('evCount').textContent = $('evCount').textContent.replace(/\)$/, ` · ${notifs.length} notif. montre${sautsJournal.length ? ` · ${sautsJournal.length} saut(s)` : ''})`);
   const ul = $('events'); ul.innerHTML = '';
-  const lignes = events.map(ev => ({ t: pts[ev.debut].t, ev })).concat(notifs.map(n => ({ t: n.t, n }))).sort((a, b) => a.t - b.t);
-  for (const { t, ev, n } of lignes) {
+  const lignes = events.map(ev => ({ t: pts[ev.debut].t, ev })).concat(notifs.map(n => ({ t: n.t, n })), sautsJournal.map(s => ({ t: s.t, s }))).sort((a, b) => a.t - b.t);
+  for (const { t, ev, n, s } of lignes) {
     const li = document.createElement('li');
-    if (ev) {
+    if (s) {
+      li.innerHTML = `<i class="dot" style="background:#fff"></i><span>${heure(t)} · <b>saut</b> ${String(s.h).replace('.', ',')} m · ${String(s.vol).replace('.', ',')} s de vol${s.hBaro != null ? ` · baromètre ${String(s.hBaro).replace('.', ',')} m` : ''}</span>`;
+      li.onclick = () => seek(t - 3000);
+    } else if (ev) {
       const p = pts[ev.debut];
       li.innerHTML = `<i class="dot" style="background:${COLS[ev.max]}"></i><span>${heure(p.t)} · ${ev.max === 3 ? 'contact' : ev.max === 2 ? 'moins de 10 m' : 'bips'} · ${Math.round(ev.dmin)} m mini · ${Math.round((pts[ev.fin].t - p.t) / 1000)} s · eau ${p.W.toFixed(1)} m</span>`;
       li.onclick = () => { seek(p.t - 10000); map.setView([p.lat, p.lon], Math.max(map.getZoom(), 17)); };
@@ -507,6 +511,8 @@ function dessinerFrise() {
   const hm = 9 * k, ha = 10 * k, yA = hm + 2 * k, yC = yA + ha + 4 * k, hC = H - yC - 2 * k; // zone des courbes : yC .. yC + hC
   g.fillStyle = '#5ac8fa';
   for (const p of visibles) if (p.veille) { const xv = x(p.t); g.beginPath(); g.moveTo(xv - 4 * k, 0); g.lineTo(xv + 4 * k, 0); g.lineTo(xv, 7 * k); g.closePath(); g.fill(); }
+  g.fillStyle = '#ffffff'; // sauts (journal du téléphone) : petits triangles blancs pointe en haut
+  for (const s of sautsJournal) { if (s.t < t0 || s.t > t1) continue; const xs = x(s.t); g.beginPath(); g.moveTo(xs - 4 * k, 9 * k); g.lineTo(xs + 4 * k, 9 * k); g.lineTo(xs, 1 * k); g.closePath(); g.fill(); }
   g.fillStyle = '#bf5af2';
   for (const n of notifs) { if (n.t < t0 || n.t > t1) continue; const xn = x(n.t), y = 4.5 * k; g.beginPath(); g.moveTo(xn, y - 4 * k); g.lineTo(xn + 3.5 * k, y); g.lineTo(xn, y + 4 * k); g.lineTo(xn - 3.5 * k, y); g.closePath(); g.fill(); }
   for (let i = i0; i < i1; i++) {
@@ -739,6 +745,7 @@ $('gpxFile').onchange = async e => {
 async function ouvrirTrace(txt, nom) {
   togglePlay(false);
   const journal = typeof txt === 'string' && (/\.jsonl$/i.test(nom) || txt.trimStart().startsWith('{'));
+  if (!journal) sautsJournal = [];
   pts = journal ? lireJournal(txt) : typeof txt === 'string' ? lireGPX(txt, nom) : lireFIT(txt);
   const repris = journal ? appliquerReglagesJournal() : '';
   $('vRow').hidden = !sansHeure;

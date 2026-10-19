@@ -42,6 +42,7 @@
   #top { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
   .stat b { display: block; font-size: 34px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.05; }
   .stat span { font-size: 11px; color: var(--mu); text-transform: uppercase; letter-spacing: .05em; }
+  .stat .fondPetit { display: block; font-size: 12px; color: var(--mu); margin-top: 2px; font-variant-numeric: tabular-nums; }
   .stat:nth-child(2) { text-align: center; } .stat:nth-child(3) { text-align: right; }
   #msg { text-align: center; font-size: 15px; color: var(--mu); min-height: 22px; border-radius: 12px; padding: 4px 8px; }
   #msg.alerte { background: var(--dan); color: #fff; font-size: 21px; font-weight: 700; padding: 10px; }
@@ -104,6 +105,7 @@
   <div class="carte">
     <div class="ligne" id="volAlertesLigne"><span>Volume des alertes<small>dans l'appli, en plus du volume « alarme » du téléphone (les boutons de volume règlent un autre volume, celui des médias)</small></span><span style="display:flex;align-items:center;gap:8px"><input type="range" id="volAlertes" min="10" max="100" step="10" value="100" style="width:110px"><b id="volAlertesTxt">100 %</b></span></div>
     <label class="ligne" id="volMaxLigne"><span>Alertes au volume maximum<small>volume « alarme » du téléphone poussé au maximum pendant le radar, rétabli à l'arrêt</small></span><input type="checkbox" id="volMax" checked></label>
+    <label class="ligne" id="sautsLigne"><span>Sauts (essai)<small>détection par l'accéléromètre du téléphone porté sur le tronc ; la voix annonce hauteur et temps de vol à la réception</small></span><input type="checkbox" id="sauts" checked></label>
     <button id="testSound">Écouter les sons</button>
     <div class="mu" style="margin-top:8px">Tintement doux descendant = pré-alerte · 1 bip = devant · 2 bips montants = tribord · 2 bips descendants = bâbord · les bips accélèrent en approchant · son continu = moins de 10 m · 3 bips très graves = GPS perdu.</div>
   </div>
@@ -170,7 +172,7 @@
 <div id="run" hidden>
   <div class="bandeau bandeauTest" hidden>⚠ Mode test actif : hauteur d'eau forcée à <span class="testHVal"></span></div>
   <div id="top">
-    <div class="stat"><span>eau (m) <span id="sTrend"></span></span><b id="sH">–</b></div>
+    <div class="stat"><span>eau (m) <span id="sTrend"></span></span><b id="sH">–</b><small id="sFond" class="fondPetit">fond –</small></div>
     <div class="stat"><span>km/h</span><b id="sV">–</b></div>
     <div class="stat"><span>GPS (m)</span><b id="sGps">–</b></div>
   </div>
@@ -293,7 +295,7 @@ $('testSound').onclick = () => {
   if (APPLI && $('volMax').checked) { Natif.son.volumeMax({ on: true }).catch(() => {}); setTimeout(() => { if (!running) Natif.son.volumeMax({ on: false }).catch(() => {}); }, 9000); }
   demoSons(); if ($('voix').checked) setTimeout(() => parler('Roche à tribord, 40 mètres, 6 secondes'), 5000);
 };
-if (!APPLI) { $('volMaxLigne').hidden = true; $('volAlertesLigne').hidden = true; }
+if (!APPLI) { $('volMaxLigne').hidden = true; $('volAlertesLigne').hidden = true; $('sautsLigne').hidden = true; }
 const appliquerVolume = () => { $('volAlertesTxt').textContent = $('volAlertes').value + ' %'; if (APPLI) Natif.son.gain({ v: $('volAlertes').value / 100 }).catch(() => {}); };
 $('volAlertes').oninput = appliquerVolume; $('volAlertes').onchange = () => { appliquerVolume(); saveSettings(); };
 
@@ -442,6 +444,9 @@ function tick() {
     $('sTrend').textContent = $('testMode').checked ? '(test)' : (W30 > W + 0.05 ? '↑' : W30 < W - 0.05 ? '↓' : '→');
     $('sV').textContent = (fix.speed * 3.6).toFixed(0);
     $('sGps').textContent = fix.acc ? Math.round(fix.acc) : '–';
+    const fd = fondA(fix.lat, fix.lon); analysis.fond = fd; // fond sous la planche : eau au-dessus du fond
+    $('sFond').textContent = !fd || isNaN(W) ? 'fond –' : fd.cote === -Infinity ? 'fond > ' + (W - meta.cote_min).toFixed(0) + ' m'
+      : fd.nature === 'terre' ? 'à terre' : 'fond ' + (W - fd.cote).toFixed(1).replace('.', ',') + ' m' + (fd.nature === 'roche' ? ' · roche' : '');
   }
   // ----- son -----
   const at = horlogeSon(), vmin = +$('vmin').value / 3.6;
@@ -477,6 +482,7 @@ function journalPosition(f, an, armed) {
   if (an.pre) d.p = [r(an.pre.d), r(an.pre.rel)];
   if (an.lat) d.l = [r(an.lat.d), r(an.lat.rel)];
   if (sim) d.sim = true;
+  if (an.fond && an.fond.cote !== -Infinity) d.f = r(an.W - an.fond.cote, 1); // eau sous la planche
   if (an.manquantes) d.tm = an.manquantes; // tuiles du relevé pas encore chargées autour (radar partiellement aveugle)
   JournalSession.ev('pos', d);
 }
@@ -516,6 +522,7 @@ function arreter() {
   if (APPLI) {
     Natif.veille.liberer().catch(() => {});
     cadenceNatif(null); Natif.son.arreter().catch(() => {}); Natif.son.volumeMax({ on: false }).catch(() => {});
+    if (ecouteSauts) { ecouteSauts.remove(); ecouteSauts = null; Natif.saut.arreter().catch(() => {}); }
     JournalSession.fermer({ arret: 'bouton' }); journalSon = null;
   }
   if (wakeLock) wakeLock.release().catch(() => {}); wakeLock = null;
@@ -526,7 +533,7 @@ $('start').onclick = async () => {
   saveSettings();
   if (!SON_NATIF) audio(); // le navigateur n'autorise l'audio qu'après un appui
   arreterGpsAccueil(); majTest();
-  if (APPLI) { appliquerVolume(); demarrerJournal(); const t = horlogeSon() + 0.15; tone(880, 880, t, 0.12, 0.8, 'triangle'); tone(1320, 1320, t + 0.16, 0.2, 0.8, 'triangle'); } // carillon : le son marche
+  if (APPLI) { appliquerVolume(); demarrerJournal(); demarrerSauts(); const t = horlogeSon() + 0.15; tone(880, 880, t, 0.12, 0.8, 'triangle'); tone(1320, 1320, t + 0.16, 0.2, 0.8, 'triangle'); } // carillon : le son marche
   $('setup').hidden = true; $('avance').hidden = true; $('fProfils').classList.remove('on');
   document.body.classList.add('navigation'); $('run').hidden = false; resize();
   fix = null; lastFixes = []; analysis = null; last = null; running = true; window.radarEnCours = true; dernierPrechargement = null;
@@ -549,6 +556,22 @@ document.addEventListener('visibilitychange', async () => {
   if (running && document.visibilityState === 'visible' && !wakeLock) try { wakeLock = await navigator.wakeLock.request('screen'); } catch {}
 });
 
+// Sauts (version d'essai) : détectés par Android (SautPlugin), notés dans le journal avec la courbe d'accélération,
+// annoncés à la voix : « Saut, 1,2 mètre, 1 seconde ». La hauteur balistique g·t²/8 est surestimée quand l'aile porte.
+let ecouteSauts = null;
+const fr1v = v => String(v).replace('.', ',');
+async function demarrerSauts() {
+  if (!$('sauts').checked || ecouteSauts) return;
+  try {
+    const r = await Natif.saut.demarrer();
+    ecouteSauts = await Natif.saut.addListener('saut', s => {
+      JournalSession.ev('saut', s);
+      if (voixActive && !muted) parler(`Saut, ${fr1v(s.h)} mètre${s.h >= 2 ? 's' : ''}, ${fr1v(Math.round(s.vol * 10) / 10)} seconde${s.vol >= 2 ? 's' : ''}`);
+    });
+    JournalSession.ev('sauts', { actif: true, barometre: r.barometre });
+  } catch (e) { JournalSession.ev('sauts', { actif: false, erreur: e.message }); }
+}
+
 // Journal de session (appli) : en-tête avec l'appareil, l'état du son et les réglages, puis les événements
 async function demarrerJournal() {
   const ok = p => p.then(r => r, e => ({ erreur: e.message }));
@@ -565,7 +588,7 @@ async function demarrerJournal() {
 
 // ---------- Réglages persistants ----------
 const veilleEtat = {};
-const SETTINGS = ['veille', 'bips', 'voix', 'volMax', 'volAlertes', 'relais', 'notifDiscretes', 'styleMontre', 'seuil', 'vmin', 'antic', 'preAlerte', 'smooth', 'live', 'testMode', 'testH', 'testNoL3d', 'simMode', 'simStart'];
+const SETTINGS = ['veille', 'bips', 'voix', 'volMax', 'volAlertes', 'sauts', 'relais', 'notifDiscretes', 'styleMontre', 'seuil', 'vmin', 'antic', 'preAlerte', 'smooth', 'live', 'testMode', 'testH', 'testNoL3d', 'simMode', 'simStart'];
 function saveSettings() { SETTINGS.forEach(k => store.set(k, $(k).type === 'checkbox' ? $(k).checked : $(k).value)); }
 function loadSettings() { SETTINGS.forEach(k => { const v = store.get(k, null); if (v != null) $(k).type === 'checkbox' ? ($(k).checked = v) : ($(k).value = v); }); }
 function updHNow() { majMaree(); }

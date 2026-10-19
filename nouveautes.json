@@ -2,6 +2,15 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 16,
+      "date": "2026-10-19",
+      "titre": "Fond sous la planche et sauts (essai)",
+      "points": [
+        "Écran du radar : l'eau sous la planche s'affiche en petit sous la hauteur d'eau (« fond 2,3 m », « · roche » au-dessus d'une roche).",
+        "Sauts (version d'essai) : téléphone porté sur le tronc, la voix annonce à la réception la hauteur et le temps de vol. Précision d'environ ±30 %, à comparer avec d'autres applis. Les sauts apparaissent aussi dans le rejeu du journal."
+      ]
+    },
+    {
       "id": 15,
       "date": "2026-10-19",
       "titre": "Applis montre : correction d'un plantage",

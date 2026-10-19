@@ -11,6 +11,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(VeillePlugin.class); // maintien du processeur pendant la navigation, écran éteint
         registerPlugin(SonPlugin.class);    // sons et voix joués par Android (continuent écran éteint)
         registerPlugin(JournalPlugin.class); // journal de session, état de l'appareil
+        registerPlugin(SautPlugin.class);    // détection des sauts (accéléromètre, baromètre), version d'essai
         super.onCreate(savedInstanceState);
 
         // Geste retour : page précédente ; pendant la navigation radar, il ne quitte jamais le radar
