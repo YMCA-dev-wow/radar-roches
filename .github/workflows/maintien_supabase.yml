@@ -1,0 +1,23 @@
+# Garde éveillé le projet Supabase gratuit du partage de roches : sans activité pendant 7 jours, Supabase le met en pause
+# (jeux partagés, dépôt et modération indisponibles). Une lecture minimale par jour suffit.
+# Copié dans .github/workflows/ du dépôt par outils/preparer_site.py. Clé « anon » : publique, déjà présente dans carte.html.
+name: Maintien Supabase
+
+on:
+  schedule:
+    - cron: '17 6 * * *'   # chaque jour à 6 h 17 UTC
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lecture minimale du dépôt de roches
+        env:
+          URL: https://ydhuisrpkqylxknibnsl.supabase.co
+          CLE: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkaHVpc3Jwa3F5bHhrbmlibnNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MDg4MDYsImV4cCI6MjEwNzQ4NDgwNn0.dMDnwFBq3guFMM5Knw-P83QMoN3_MslyPvI-a-70nM8
+        run: |
+          CODE=$(curl -s -o reponse.json -w '%{http_code}' "$URL/rest/v1/jeux?select=id&limit=1" -H "apikey: $CLE" -H "Authorization: Bearer $CLE")
+          echo "HTTP $CODE"; cat reponse.json; echo
+          # échec visible (et e-mail de GitHub) si le projet est déjà en pause ou injoignable : le relancer depuis le tableau de bord Supabase
+          if [ "$CODE" != "200" ]; then echo "::error title=Supabase::réponse HTTP $CODE (projet en pause ?)"; exit 1; fi
