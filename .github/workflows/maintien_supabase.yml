@@ -17,7 +17,9 @@ jobs:
           URL: https://ydhuisrpkqylxknibnsl.supabase.co
           CLE: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkaHVpc3Jwa3F5bHhrbmlibnNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MDg4MDYsImV4cCI6MjEwNzQ4NDgwNn0.dMDnwFBq3guFMM5Knw-P83QMoN3_MslyPvI-a-70nM8
         run: |
-          CODE=$(curl -s -o reponse.json -w '%{http_code}' "$URL/rest/v1/jeux?select=id&limit=1" -H "apikey: $CLE" -H "Authorization: Bearer $CLE")
-          echo "HTTP $CODE"; cat reponse.json; echo
+          CODE=$(curl -s -o reponse.json -w '%{http_code}' "$URL/rest/v1/jeux?select=id&limit=1" -H "apikey: $CLE" -H "Authorization: Bearer $CLE" || true)
+          echo "HTTP $CODE"; cat reponse.json 2>/dev/null; echo
+          # adresse introuvable (code 000) : projet en pause, Supabase retire son adresse
+          if [ "$CODE" = "000" ]; then echo "::error title=Supabase en pause::adresse du projet introuvable : relancer le projet (Restore) depuis le tableau de bord Supabase"; exit 1; fi
           # échec visible (et e-mail de GitHub) si le projet est déjà en pause ou injoignable : le relancer depuis le tableau de bord Supabase
           if [ "$CODE" != "200" ]; then echo "::error title=Supabase::réponse HTTP $CODE (projet en pause ?)"; exit 1; fi
