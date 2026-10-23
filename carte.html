@@ -252,7 +252,7 @@ async function chargerPartages() {
     const r = await api('jeux?select=id,cree_le,nom,departement,description,auteur,bbox,nb_elements,statut&order=cree_le.desc', { signal: AbortSignal.timeout(10000) });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     partages = await r.json(); partageErreur = '';
-  } catch (err) { partageErreur = 'Partage indisponible pour l'instant (pas de réseau, ou serveur du partage en veille) : ' + err.message; return; }
+  } catch (err) { partageErreur = "Partage indisponible pour l'instant (pas de réseau, ou serveur du partage en veille) : " + err.message; return; }
   for (const j of partages) {
     const st = { valide: { color: '#ff9f0a' }, en_attente: { color: '#ff3b30', dashArray: '5 5' }, refuse: { color: '#777', dashArray: '2 6' } }[j.statut] || {};
     L.rectangle([[j.bbox[0], j.bbox[1]], [j.bbox[2], j.bbox[3]]], { weight: 2, fillOpacity: .08, ...st })
