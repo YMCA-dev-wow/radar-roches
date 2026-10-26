@@ -139,6 +139,27 @@ public class JournalPlugin extends Plugin {
         call.resolve();
     }
 
+    // Plusieurs journaux d'un coup (une seule fenêtre de partage, un seul message WhatsApp ou e-mail)
+    @PluginMethod
+    public void partagerPlusieurs(PluginCall call) {
+        JSArray noms = call.getArray("noms");
+        java.util.ArrayList<Uri> uris = new java.util.ArrayList<>();
+        if (noms != null) for (int k = 0; k < noms.length(); k++) {
+            File f = new File(dossier(), noms.optString(k));
+            if (f.exists()) uris.add(FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", f));
+        }
+        if (uris.isEmpty()) { call.reject("aucun journal"); return; }
+        Intent i = new Intent(Intent.ACTION_SEND_MULTIPLE);
+        i.setType("application/octet-stream");
+        i.putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris);
+        i.putExtra(Intent.EXTRA_SUBJECT, "Radar roches : " + uris.size() + " journaux");
+        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        Intent choix = Intent.createChooser(i, "Envoyer les journaux");
+        choix.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        getContext().startActivity(choix);
+        call.resolve();
+    }
+
     // Contenu d'un journal, pour le rejeu dans l'appli
     @PluginMethod
     public void lire(PluginCall call) {

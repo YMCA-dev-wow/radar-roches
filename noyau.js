@@ -17,7 +17,8 @@ const Natif = APPLI ? {
   veille: window.Capacitor.registerPlugin('Veille'), // processeur gardé éveillé pendant la navigation (plugin de l'appli)
   son: window.Capacitor.registerPlugin('Son'),         // sons et voix joués par Android, canal alarme (plugin de l'appli)
   journal: window.Capacitor.registerPlugin('Journal'), // journal de session, état de l'appareil (plugin de l'appli)
-  saut: window.Capacitor.registerPlugin('Saut'),       // détection des sauts, version d'essai (plugin de l'appli)
+  saut: window.Capacitor.registerPlugin('Saut'),
+  tuiles: window.Capacitor.registerPlugin('Tuiles'),   // tuiles du relevé décodées par Android (plugin de l'appli)       // détection des sauts, version d'essai (plugin de l'appli)
 } : null;
 
 // =====================================================================
@@ -176,7 +177,17 @@ function loadTile(x, y) {
     g.drawImage(bmp, 0, 0); if (bmp.close) bmp.close();
     return g.getImageData(0, 0, 256, 256).data;
   };
-  const p = (typeof createImageBitmap === 'function' && typeof OffscreenCanvas === 'function' && location.protocol !== 'file:' ? parBitmap() : parImage())
+  // Appli : décodage par Android (TuilesPlugin). Le 26/10, même par createImageBitmap, les tuiles demandées écran éteint
+  // ne finissaient jamais de se charger : radar aveugle au-delà de la zone préchargée au départ.
+  const parNatif = async () => {
+    const r = await Natif.tuiles.lire({ chemin: url });
+    const s = atob(r.rvba), d = new Uint8ClampedArray(s.length);
+    for (let i = 0; i < s.length; i++) d[i] = s.charCodeAt(i);
+    return d;
+  };
+  const sansDelai = (pr, ms) => Promise.race([pr, new Promise((_, rej) => setTimeout(() => rej(new Error('délai')), ms))]);
+  const navigateur = () => typeof createImageBitmap === 'function' && typeof OffscreenCanvas === 'function' && location.protocol !== 'file:' ? parBitmap() : parImage();
+  const p = (APPLI && Natif.tuiles ? sansDelai(parNatif(), 8000).catch(e => { if (window.journalTuile) journalTuile(k, e.message); return navigateur(); }) : navigateur())
     .then(d => { if (zone === zt) tiles.set(k, d); }, () => { if (zone === zt) tiles.set(k, null); }); // zone changée pendant le chargement : on jette
   tiles.set(k, p);
   return p;
@@ -235,16 +246,19 @@ function analyser(pos, course, speed, W, opts) {
   const rp = Math.ceil(R / mpp);
   const cells = [];                                                              // [dx, dy, niveau] en mètres, est/sud positifs
   let best = null, pre = null, lat = null, manquantes = 0;
-  const consider = (dx, dy, lvl, d) => {
+  // roche : relief marqué (ou terre, ou roche saisie) ; sinon fond lisse (sable, vase). À choisir, la roche passe devant :
+  // la voix dit « Roche » ou « Haut-fond », et une roche est annoncée même après un haut-fond dans le même épisode.
+  const avant = (o, d, roche) => !o || (roche && !o.roche) || (roche === o.roche && d < o.d);
+  const consider = (dx, dy, lvl, d, roche = true) => {
     let rel = Math.atan2(dx, -dy) * 180 / Math.PI - course; rel = ((rel + 540) % 360) - 180;
-    if (preH && d > horizon && d <= preH && Math.abs(rel) <= cP && (!pre || d < pre.d)) pre = { d, rel, lvl };
+    if (preH && d > horizon && d <= preH && Math.abs(rel) <= cP && avant(pre, d, roche)) pre = { d, rel, lvl, roche };
     // veille : tout danger à portée (2× la distance d'alerte) jusqu'à cV, sauf ce que couvrent déjà l'alerte et la pré-alerte
     const a = Math.abs(rel), couvert = (a <= cA && d <= horizon) || (preH && a <= cP);
-    if (latH && d <= latH && a <= cV && !couvert && (!lat || d < lat.d)) lat = { d, rel, lvl };
+    if (latH && d <= latH && a <= cV && !couvert && avant(lat, d, roche)) lat = { d, rel, lvl, roche };
     const inCone = Math.abs(rel) <= cA || (d < 20 && Math.abs(rel) <= 110); // proche : devant et côtés, pas derrière
     if (!inCone || d > horizon) return;
-    const score = d / Math.max(0.35, Math.cos(Math.min(Math.abs(rel), 80) * Math.PI / 180)) - lvl * 3;
-    if (!best || score < best.score) best = { d, rel, lvl, score };
+    const score = d / Math.max(0.35, Math.cos(Math.min(Math.abs(rel), 80) * Math.PI / 180)) - lvl * 3 - (roche ? 4 : 0);
+    if (!best || score < best.score) best = { d, rel, lvl, score, roche };
   };
   if (useL3d && meta) {
     const tx0 = Math.floor((px - rp) / 256), tx1 = Math.floor((px + rp) / 256), ty0 = Math.floor((py - rp) / 256), ty1 = Math.floor((py + rp) / 256);
@@ -266,7 +280,7 @@ function analyser(pos, course, speed, W, opts) {
         const dx = (tx * 256 + u + 0.5 - px) * mpp, dy = (ty * 256 + v + 0.5 - py) * mpp, dist = Math.hypot(dx, dy);
         if (dist > R) continue;
         if (affichage) cells.push(dx, dy, lvl);
-        if (lvl >= 2) consider(dx, dy, lvl, dist);
+        if (lvl >= 2) consider(dx, dy, lvl, dist, rock);
       }
     }
   }
@@ -304,8 +318,9 @@ function nearestOnPoly(pts) { // point du polygone le plus proche de l'origine (
   return inside ? { d: 0, x: 0, y: -1 } : { d: bd, x: bx, y: by };
 }
 function textePre(p) { return `Danger droit devant à ${Math.round(p.d)} m (pré-alerte)`; }
+const nomDanger = (m, pluriel = false) => m.roche ? (pluriel ? 'Roches' : 'Roche') + (m.lvl === 3 && !pluriel ? ' émergée' : '') : (pluriel ? 'Hauts-fonds' : 'Haut-fond');
 function texteMenace(b) {
-  return `${b.lvl === 3 ? 'Roche émergée' : 'Haut-fond'} à ${Math.round(b.d)} m ${Math.abs(b.rel) < 15 ? 'devant' : b.rel > 0 ? 'à tribord' : 'à bâbord'}`;
+  return `${nomDanger(b)} à ${Math.round(b.d)} m ${Math.abs(b.rel) < 15 ? 'devant' : b.rel > 0 ? 'à tribord' : 'à bâbord'}`;
 }
 
 // =====================================================================
@@ -346,6 +361,14 @@ function motif(rel, lvl, t, periode = 1) {
 // Bips d'alerte joués par Android : envoyés quand le motif change, quand la cadence varie de plus de 5 %, et au moins
 // toutes les 0,7 s (renouvellement) ; null arrête.
 let cadenceEnCours = null;
+// motif quelconque répété par Android (son intermittent au-dessus d'un danger)
+function cadenceNotesNatif(cle, notes, periode) {
+  const now = performance.now(), c = cadenceEnCours;
+  if (c && c.cle === cle && now - c.t < 700) return;
+  if (!c || c.cle !== cle) traceSon('bips', cle);
+  Natif.son.cadence({ notes, periode, duree: 2.5 }).catch(() => {});
+  cadenceEnCours = { cle, p: periode, t: now };
+}
 function cadenceNatif(rel, lvl, periode) {
   const now = performance.now();
   if (rel == null) {
@@ -385,11 +408,23 @@ let nextPre = 0, bipsActifs = true;
 let parleNatif = false;
 const voixEnCours = () => APPLI ? parleNatif : 'speechSynthesis' in window && speechSynthesis.speaking;
 function taireVoix() { if (APPLI) { Natif.son.taire().catch(() => {}); parleNatif = false; } else if ('speechSynthesis' in window) speechSynthesis.cancel(); }
+// Moins de 10 m : son continu pendant 5 s, puis même son 1 s sur 2 (passage voulu au-dessus d'un haut-fond, sans assourdir)
+let continuDepuis = null, continuVu = 0;
 function sonnerMenace(b, horizon, armed, pre) {
-  const at = horlogeSon();
+  const at = horlogeSon(), now = performance.now();
+  if (b && armed && !muted && b.d < 10) {
+    if (!continuDepuis || now - continuVu > 3000) continuDepuis = now;
+    continuVu = now;
+  }
   if (b && armed && !muted) {
     if (b.d < 10) {
-      if (bipsActifs) { if (voixEnCours()) taireVoix(); continu(true, b.lvl === 3 ? 1400 : 1100); } else continu(false);
+      if (!bipsActifs) { continu(false); return; }
+      if (voixEnCours()) taireVoix();
+      const f = b.lvl === 3 ? 1400 : 1100;
+      if (now - continuDepuis < 5000) { continu(true, f); return; }
+      continu(false);
+      if (SON_NATIF) { cadenceNotesNatif('intermittent' + f, [{ f, t: 0, d: 1000, v: 0.9 }], 2); return; }
+      if (at > nextBeep) { tone(f, f, at, 1.0); nextBeep = at + 2; }
       return;
     }
     continu(false);
@@ -603,7 +638,7 @@ function nouvelleVeille(etat, an, armed, t) {
   if (!an || !an.lat || !armed) return null;
   const cote = an.lat.rel > 0 ? 'tribord' : 'bâbord', nouveau = t - (etat[cote] ?? -1e15) > 20000;
   etat[cote] = t;
-  return nouveau && !an.best ? { cote, d: an.lat.d, lvl: an.lat.lvl } : null;
+  return nouveau && !an.best ? { cote, d: an.lat.d, lvl: an.lat.lvl, roche: an.lat.roche } : null;
 }
 function sonVeille(cote, t) { // glissando doux et grave : montant = tribord, descendant = bâbord
   traceSon('veille', cote);
@@ -613,10 +648,10 @@ function sonVeille(cote, t) { // glissando doux et grave : montant = tribord, de
 function annoncerVeille(v) {
   if (!v || muted) return;
   const d = v.d >= 30 ? Math.round(v.d / 10) * 10 : Math.round(v.d);
-  if (voixActive) { if (!voixEnCours()) parler(`${v.lvl === 3 ? 'Roches' : 'Hauts-fonds'} à ${v.cote}, ${d} mètres`); }
+  if (voixActive) { if (!voixEnCours()) parler(`${nomDanger(v, true)} à ${v.cote}, ${d} mètres`); }
   else if (bipsActifs) sonVeille(v.cote, horlogeSon());
 }
-function texteVeille(l) { return `${l.lvl === 3 ? 'Roches' : 'Hauts-fonds'} à ${l.rel > 0 ? 'tribord' : 'bâbord'} à ${Math.round(l.d)} m (veille)`; }
+function texteVeille(l) { return `${nomDanger(l, true)} à ${l.rel > 0 ? 'tribord' : 'bâbord'} à ${Math.round(l.d)} m (veille)`; }
 // La voix ne dit que la pré-alerte puis le premier message d'alerte d'un même épisode ; les bips prennent ensuite le relais.
 // Voix seule (bips coupés) : elle ajoute « Impact imminent » + direction à mi-distance d'alerte (la moitié du temps d'anticipation).
 // Un épisode se termine quand plus rien n'est signalé pendant 10 s.
@@ -630,7 +665,7 @@ function delaiImpact(m, vitesse) {
 }
 function annoncer(b, pre, armed, now = Date.now(), horizon = 40, vitesse = 0) {
   if (b || pre) derniereVoix.vu = now;
-  else if (now - (derniereVoix.vu || 0) > 10000) { derniereVoix.pre = false; derniereVoix.alerte = false; derniereVoix.impact = false; }
+  else if (now - (derniereVoix.vu || 0) > 10000) { derniereVoix.pre = false; derniereVoix.alerte = false; derniereVoix.impact = false; derniereVoix.roche = false; }
   if (!voixActive || muted || !armed || !(b || pre)) return;
   if (b && !bipsActifs && b.d <= horizon / 2) {
     if (!derniereVoix.impact) {
@@ -639,13 +674,16 @@ function annoncer(b, pre, armed, now = Date.now(), horizon = 40, vitesse = 0) {
     }
     return;
   }
-  if (b ? derniereVoix.alerte : derniereVoix.pre || derniereVoix.alerte) return;
+  // déjà annoncé dans cet épisode… sauf une roche alors qu'on n'avait annoncé que des fonds lisses (roche isolée sur la route)
+  const nouvelleRoche = (b || pre).roche && !derniereVoix.roche;
+  if ((b ? derniereVoix.alerte : derniereVoix.pre || derniereVoix.alerte) && !nouvelleRoche) return;
   if (b && b.d < 10) { derniereVoix.alerte = true; return; } // trop près : le son continu suffit
   const m = b || pre, cote = !b || Math.abs(b.rel) < 15 ? 'devant' : b.rel > 0 ? 'à tribord' : 'à bâbord';
   const d = m.d >= 30 ? Math.round(m.d / 10) * 10 : Math.round(m.d);
   const s = delaiImpact(m, vitesse);
-  parler(`${m.lvl === 3 ? 'Roche' : 'Haut-fond'} ${cote}, ${d} mètres` + (s ? `, ${s} seconde${s > 1 ? 's' : ''}` : ''));
+  parler(`${nomDanger(m)} ${cote}, ${d} mètres` + (s ? `, ${s} seconde${s > 1 ? 's' : ''}` : ''));
   if (b) derniereVoix.alerte = true; else derniereVoix.pre = true;
+  if (m.roche) derniereVoix.roche = true;
 }
 
 // =====================================================================

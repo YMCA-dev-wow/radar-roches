@@ -111,7 +111,11 @@ Par défaut, seules les <b>roches</b> déclenchent une alerte ; les fonds lisses
     <b>vitesse</b> (km/h), <b>précision GPS</b> (m).</li>
   <li><b>Sauts (essai)</b> : avec le téléphone porté sur le tronc, la voix annonce à la réception la hauteur et le temps de vol (« Saut, 1,2 mètre, 1 seconde »).
     Hauteur calculée d'après le temps de vol, surestimée quand l'aile porte ; précision d'environ ±30 %. Les sauts apparaissent dans le rejeu du journal
-    (triangles blancs sur la frise, lignes « saut » dans la liste). Réglage « Sauts (essai) » dans Plus → Réglages avancés → Sons.</li>
+    (triangles blancs sur la frise, lignes « saut » dans la liste). Réglage « Sauts (essai) » dans Plus → Réglages avancés → Sons, <b>coupé par défaut</b>.
+    Ne comptent que les vols vraiment allégés, au-dessus de 12 km/h (le pompage dans les molles n'est plus pris pour un saut) ; aucune annonce de saut
+    pendant une alerte.</li>
+  <li><b>La voix distingue</b> « Roche » (relief marqué, roche saisie) et « Haut-fond » (sable, vase). Après un haut-fond, une roche sur ta route
+    est annoncée à nouveau, même dans la même série d'alertes.</li>
   <li>Le bandeau sous les chiffres décrit le danger le plus proche : <b>rouge</b> pour une alerte, <b>jaune</b> pour une pré-alerte, <b>bleu</b> pour la veille latérale.</li>
   <li>Au centre, cap vers le haut : la flèche turquoise est ta planche ; le secteur turquoise est la zone d'alerte (±50°) ; le trait jaune la pré-alerte ;
     les secteurs en pointillés la veille latérale. Les dangers apparaissent en couleur : orange = peu d'eau (moins de l'eau minimale + 1 m),
@@ -167,7 +171,7 @@ Par défaut, seules les <b>roches</b> déclenchent une alerte ; les fonds lisses
   <tr><td>2 bips descendants</td><td>Danger à bâbord (gauche)</td></tr>
   <tr><td>Bips plus aigus</td><td>Roche émergée</td></tr>
   <tr><td>Bips qui accélèrent</td><td>Tu te rapproches (jusqu'à 7 par seconde)</td></tr>
-  <tr><td>Son continu</td><td>Moins de 10 m</td></tr>
+  <tr><td>Son continu</td><td>Moins de 10 m, pendant 5 s ; si tu restes au-dessus (passage voulu), le même son 1 s sur 2</td></tr>
   <tr><td>Glissando grave montant / descendant</td><td>Veille latérale tribord / bâbord</td></tr>
   <tr><td>3 bips très graves</td><td>GPS perdu (radar aveugle)</td></tr>
 </table>
@@ -332,7 +336,8 @@ ou en grand (touche la barrette ou le titre « Mes roches »). Sur ordinateur, l
     Teste avant de partir : Plus → Réglages avancés → <b>Écouter les sons</b>, téléphone dans sa pochette. Sous une combinaison et un gilet, le son est très étouffé :
     place la pochette au-dessus du gilet (bras, épaule, harnais), ou utilise une montre.</td></tr>
   <tr><td>Signaler un problème</td><td><b>Plus → Journaux de session</b> : un journal par lancement du radar (positions, alertes, sons joués, écran allumé ou éteint, état du téléphone).
-    Touche <b>Envoyer</b> sur celui de la séance et partage-le (WhatsApp, e-mail). Il contient tes positions.</td></tr>
+    Touche <b>Envoyer</b> sur celui de la séance et partage-le (WhatsApp, e-mail). Il contient tes positions.
+    Coche plusieurs journaux (ou « Tout ») pour les <b>rejouer à la suite</b>, les <b>envoyer</b> en un seul message ou les <b>supprimer</b>.</td></tr>
   <tr><td>Précision GPS mauvaise (plus de 15 m)</td><td>Démarre le radar quelques minutes avant, à découvert ; le téléphone dans une pochette en haut du corps capte mieux.</td></tr>
   <tr><td>« Marégraphe injoignable »</td><td>Pas de réseau au départ : la prédiction seule est utilisée (garde de la marge).</td></tr>
   <tr><td>La montre n'apparaît pas sur l'ordinateur</td><td>Autre port ou câble Garmin d'origine ; sur Mac, OpenMTP.</td></tr>

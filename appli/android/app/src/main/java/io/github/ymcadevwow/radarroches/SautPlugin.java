@@ -73,14 +73,27 @@ public class SautPlugin extends Plugin implements SensorEventListener {
         else if (debutBas >= 0 && t - finBas > 400) debutBas = -1; // la phase allégée s'est terminée sans réception
         if (g > PIC && debutBas >= 0 && finBas - debutBas >= 300 && t - finBas < 400 && t - dernierSaut > 2000) {
             double vol = (t - debutBas) / 1000.0;
-            if (vol < 4) signaler(debutBas, t, vol);
+            if (vol < 4) signaler(debutBas, t, vol, enVol(debutBas, t)); // les rejetés partent aussi au journal (réglage)
             debutBas = -1; dernierSaut = t;
         }
     }
 
-    private void signaler(long t0, long t1, double vol) {
-        nSauts++;
+    // Vrai vol : allégé tout du long (moyenne sous 0,35 g, au moins 70 % des mesures sous 0,6 g, au moins 0,45 s). Le pompage dans les molles
+    // (séance du 26/10, 418 faux sauts) oscille autour de 1 g en moyenne : rejeté.
+    private boolean enVol(long t0, long t1) {
+        double s = 0; int n = 0, bas = 0;
+        for (int i = 0; i < Math.min(nAcc, N); i++) {
+            int k = (nAcc - 1 - i) % N;
+            if (tAcc[k] < t0 || tAcc[k] >= t1 - 60) continue;   // sans le pic de réception
+            s += acc[k]; n++; if (acc[k] < BAS) bas++;
+        }
+        return n >= 20 && s / n < 0.35 && bas >= 0.7 * n;   // 26/10 : les 418 faux sauts avaient tous une moyenne ≥ 0,37 g
+    }
+
+    private void signaler(long t0, long t1, double vol, boolean vrai) {
+        if (vrai) nSauts++;
         JSObject o = new JSObject();
+        o.put("vrai", vrai);
         o.put("t", t1); o.put("vol", Math.round(vol * 100) / 100.0);
         o.put("h", Math.round(G * vol * vol / 8 * 10) / 10.0);
         // baromètre : altitude moyenne des 2 s avant le saut, puis maximum pendant le vol

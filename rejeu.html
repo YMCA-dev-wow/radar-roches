@@ -320,8 +320,8 @@ function lireJournal(txt) {
   for (const l of txt.split('\n')) {
     if (!l.trim()) continue;
     let e; try { e = JSON.parse(l); } catch { continue; }
-    if (e.type === 'debut') reglagesJournal = e.reglages || null;
-    else if (e.type === 'saut') sautsJournal.push(e);
+    if (e.type === 'debut') reglagesJournal = reglagesJournal || e.reglages || null; // plusieurs journaux : réglages de la première séance
+    else if (e.type === 'saut' && !e.ecarte) sautsJournal.push(e); // les candidats écartés (pompage, vitesse) restent dans le journal
     else if (e.type === 'pos' && isFinite(e.la) && isFinite(e.lo) && !e.sim) out.push({ t: e.t, lat: e.la, lon: e.lo, vDev: e.v != null ? e.v / 3.6 : null });
   }
   sansHeure = false;
@@ -780,10 +780,17 @@ async function ouvrirTrace(txt, nom) {
       : 'Données introuvables : ' + err.message;
     $('gpxBtn').disabled = true;
   }
-  const nj = new URLSearchParams(location.search).get('journal');
+  const q = new URLSearchParams(location.search), nj = q.get('journal'), njs = q.get('journaux');
   if (nj && APPLI) {
     try { await ouvrirTrace((await Natif.journal.lire({ nom: nj })).texte, nj); }
     catch (err) { $('info').textContent = 'Journal illisible : ' + err.message; }
+  }
+  if (njs && APPLI) { // plusieurs séances à la suite (sélection dans Plus → Journaux de session), réglages de la première
+    try {
+      const noms = njs.split(',').filter(Boolean), textes = [];
+      for (const n of noms) textes.push((await Natif.journal.lire({ nom: n })).texte);
+      await ouvrirTrace(textes.join('\n'), noms.length + ' journaux');
+    } catch (err) { $('info').textContent = 'Journaux illisibles : ' + err.message; }
   }
 })();
 </script>

@@ -44,25 +44,55 @@ const JournalSession = (() => {
   return { ev, ouvrir, fermer, get ouvert() { return ouvert; }, get nom() { return nom; } };
 })();
 
-// Liste des journaux (Plus → Journaux de session) : envoyer ou supprimer
+// Liste des journaux (Plus → Journaux de session) : actions sur un journal (Rejouer, Envoyer, Suppr.) ou, après en avoir
+// coché plusieurs, sur la sélection (rejeu de toutes les séances à la suite, envoi groupé, suppression)
 async function afficherJournaux(conteneur) {
   if (!APPLI_J) { conteneur.textContent = 'Disponible dans l\'appli Android.'; return; }
   let l = [];
   try { l = (await NJ().liste()).journaux || []; } catch (e) { conteneur.textContent = 'Lecture impossible : ' + e.message; return; }
   conteneur.innerHTML = '';
   if (!l.length) { conteneur.textContent = 'Aucun journal : un journal est créé à chaque lancement du radar.'; return; }
+  const choisis = new Set();
+  const barre = document.createElement('div'); barre.className = 'journauxSel';
+  const tout = document.createElement('label'); tout.innerHTML = '<input type="checkbox"> Tout';
+  const bRej = document.createElement('button'); bRej.className = 'btn';
+  const bEnv = document.createElement('button'); bEnv.className = 'btn prim';
+  const bSup = document.createElement('button'); bSup.className = 'btn';
+  barre.append(tout, bRej, bEnv, bSup); conteneur.append(barre);
+  const cases = [];
+  const majBarre = () => {
+    const n = choisis.size; barre.classList.toggle('vide', !n);
+    bRej.textContent = `Rejouer (${n})`; bEnv.textContent = `Envoyer (${n})`; bSup.textContent = `Suppr. (${n})`;
+    [bRej, bEnv, bSup].forEach(b => b.disabled = !n);
+    tout.firstChild.checked = n === l.length;
+  };
+  tout.firstChild.onchange = e => { cases.forEach(([c, nom]) => { c.checked = e.target.checked; e.target.checked ? choisis.add(nom) : choisis.delete(nom); }); majBarre(); };
+  // ordre chronologique pour le rejeu groupé (la liste est du plus récent au plus ancien)
+  const sel = () => l.filter(j => choisis.has(j.nom)).sort((a, b) => a.date - b.date).map(j => j.nom);
+  bRej.onclick = () => { location.href = 'rejeu.html?journaux=' + sel().map(encodeURIComponent).join(','); };
+  bEnv.onclick = () => NJ().partagerPlusieurs({ noms: sel() }).catch(e => alert(e.message));
+  bSup.onclick = async () => {
+    if (!confirm(`Supprimer ${choisis.size} journal${choisis.size > 1 ? 'aux' : ''} ?`)) return;
+    for (const nom of sel()) await NJ().supprimer({ nom }).catch(() => {});
+    afficherJournaux(conteneur);
+  };
   for (const j of l) {
     const ligne = document.createElement('div'); ligne.className = 'journal';
+    const c = document.createElement('input'); c.type = 'checkbox'; c.className = 'choix';
+    c.onchange = () => { c.checked ? choisis.add(j.nom) : choisis.delete(j.nom); majBarre(); };
+    cases.push([c, j.nom]);
     const txt = document.createElement('div');
     txt.innerHTML = '<b></b><small></small>';
     txt.querySelector('b').textContent = new Date(j.date).toLocaleString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
     txt.querySelector('small').textContent = ` · ${Math.max(1, Math.round(j.taille / 1024))} Ko`;
+    txt.onclick = () => { c.checked = !c.checked; c.onchange(); };
     const env = document.createElement('button'); env.className = 'btn prim'; env.textContent = 'Envoyer';
     env.onclick = () => NJ().partager({ nom: j.nom }).catch(e => alert(e.message));
     const rej = document.createElement('button'); rej.className = 'btn'; rej.textContent = 'Rejouer';
     rej.onclick = () => { location.href = 'rejeu.html?journal=' + encodeURIComponent(j.nom); };
     const sup = document.createElement('button'); sup.className = 'btn'; sup.textContent = 'Suppr.';
     sup.onclick = async () => { if (confirm('Supprimer ce journal ?')) { await NJ().supprimer({ nom: j.nom }).catch(() => {}); afficherJournaux(conteneur); } };
-    ligne.append(txt, rej, env, sup); conteneur.append(ligne);
+    ligne.append(c, txt, rej, env, sup); conteneur.append(ligne);
   }
+  majBarre();
 }

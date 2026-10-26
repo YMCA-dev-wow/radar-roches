@@ -13,7 +13,11 @@
 <style>
   footer { text-align: center; color: #4f7a76; font-size: 13px; margin-top: 26px; }
   .journal { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--ln); }
-  .journal > div { flex: 1; } .journal small { color: var(--mu); }
+  .journal > div { flex: 1; cursor: pointer; } .journal small { color: var(--mu); }
+  .journal .choix, .journauxSel input { width: 22px; height: 22px; accent-color: var(--ac); flex: none; }
+  .journauxSel { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--ln); position: sticky; top: -16px; background: var(--p1); z-index: 1; }
+  .journauxSel label { display: flex; align-items: center; gap: 6px; margin-right: auto; color: var(--mu); }
+  .journauxSel button:disabled { opacity: .4; }
 </style>
 </head>
 <body data-onglet="plus">

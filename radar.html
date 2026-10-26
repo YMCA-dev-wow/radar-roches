@@ -105,7 +105,7 @@
   <div class="carte">
     <div class="ligne" id="volAlertesLigne"><span>Volume des alertes<small>dans l'appli, en plus du volume « alarme » du téléphone (les boutons de volume règlent un autre volume, celui des médias)</small></span><span style="display:flex;align-items:center;gap:8px"><input type="range" id="volAlertes" min="10" max="100" step="10" value="100" style="width:110px"><b id="volAlertesTxt">100 %</b></span></div>
     <label class="ligne" id="volMaxLigne"><span>Alertes au volume maximum<small>volume « alarme » du téléphone poussé au maximum pendant le radar, rétabli à l'arrêt</small></span><input type="checkbox" id="volMax" checked></label>
-    <label class="ligne" id="sautsLigne"><span>Sauts (essai)<small>détection par l'accéléromètre du téléphone porté sur le tronc ; la voix annonce hauteur et temps de vol à la réception</small></span><input type="checkbox" id="sauts" checked></label>
+    <label class="ligne" id="sautsLigne"><span>Sauts (essai)<small>détection par l'accéléromètre du téléphone porté sur le tronc ; la voix annonce hauteur et temps de vol à la réception</small></span><input type="checkbox" id="sauts"></label>
     <button id="testSound">Écouter les sons</button>
     <div class="mu" style="margin-top:8px">Tintement doux descendant = pré-alerte · 1 bip = devant · 2 bips montants = tribord · 2 bips descendants = bâbord · les bips accélèrent en approchant · son continu = moins de 10 m · 3 bips très graves = GPS perdu.</div>
   </div>
@@ -556,6 +556,7 @@ document.addEventListener('visibilitychange', async () => {
   if (running && document.visibilityState === 'visible' && !wakeLock) try { wakeLock = await navigator.wakeLock.request('screen'); } catch {}
 });
 
+window.journalTuile = (k, msg) => JournalSession.ev('tuile', { k, erreur: msg });
 // Sauts (version d'essai) : détectés par Android (SautPlugin), notés dans le journal avec la courbe d'accélération,
 // annoncés à la voix : « Saut, 1,2 mètre, 1 seconde ». La hauteur balistique g·t²/8 est surestimée quand l'aile porte.
 let ecouteSauts = null;
@@ -565,8 +566,14 @@ async function demarrerSauts() {
   try {
     const r = await Natif.saut.demarrer();
     ecouteSauts = await Natif.saut.addListener('saut', s => {
+      const v = fix ? fix.speed * 3.6 : 0;
+      s.v = Math.round(v);
+      if (!s.vrai) { JournalSession.ev('saut', { ...s, ecarte: 'pompage' }); return; } // accélération pas allégée tout du long
+      if (v < 12) { JournalSession.ev('saut', { ...s, ecarte: 'vitesse' }); return; } // pompage dans les molles, chute, marche
       JournalSession.ev('saut', s);
-      if (voixActive && !muted) parler(`Saut, ${fr1v(s.h)} mètre${s.h >= 2 ? 's' : ''}, ${fr1v(Math.round(s.vol * 10) / 10)} seconde${s.vol >= 2 ? 's' : ''}`);
+      // les alertes passent avant : pas d'annonce de saut pendant une alerte, une pré-alerte ou une veille
+      const danger = analysis && (analysis.best || analysis.pre || analysis.lat);
+      if (voixActive && !muted && !danger && !voixEnCours()) parler(`Saut, ${fr1v(s.h)} mètre${s.h >= 2 ? 's' : ''}, ${fr1v(Math.round(s.vol * 10) / 10)} seconde${s.vol >= 2 ? 's' : ''}`);
     });
     JournalSession.ev('sauts', { actif: true, barometre: r.barometre });
   } catch (e) { JournalSession.ev('sauts', { actif: false, erreur: e.message }); }
@@ -590,6 +597,8 @@ async function demarrerJournal() {
 const veilleEtat = {};
 const SETTINGS = ['veille', 'bips', 'voix', 'volMax', 'volAlertes', 'sauts', 'relais', 'notifDiscretes', 'styleMontre', 'seuil', 'vmin', 'antic', 'preAlerte', 'smooth', 'live', 'testMode', 'testH', 'testNoL3d', 'simMode', 'simStart'];
 function saveSettings() { SETTINGS.forEach(k => store.set(k, $(k).type === 'checkbox' ? $(k).checked : $(k).value)); }
+// tout réglage modifié est enregistré aussitôt (sinon il revenait à sa valeur précédente au retour sur la page : « Sauts »)
+SETTINGS.forEach(k => $(k).addEventListener('change', () => saveSettings()));
 function loadSettings() { SETTINGS.forEach(k => { const v = store.get(k, null); if (v != null) $(k).type === 'checkbox' ? ($(k).checked = v) : ($(k).value = v); }); }
 function updHNow() { majMaree(); }
 $('testH').oninput = () => { $('testHTxt').textContent = (+$('testH').value).toFixed(1) + ' m'; majTest(); };
@@ -811,6 +820,7 @@ addEventListener('hashchange', route);
 // ---------- Démarrage ----------
 (async () => {
   loadSettings();
+  if (store.get('sautsV2', null) == null) { $('sauts').checked = false; store.set('sautsV2', 1); saveSettings(); } // détection d'essai coupée par défaut (faux sauts du 26/10)
   // sécurité : chaque lancement de l'appli repart sur la vraie marée et le vrai GPS (mode test et simulation désactivés).
   // Seulement au lancement : pas en passant d'un onglet à l'autre (la page radar se recharge, les réglages doivent tenir).
   let premiereOuverture = true;
