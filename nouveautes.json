@@ -10,7 +10,8 @@
         "La voix distingue « Roche » et « Haut-fond » ; une roche sur ta route est annoncée même après une annonce de haut-fond.",
         "Moins de 10 m : son continu pendant 5 s, puis le même son 1 s sur 2 si tu restes au-dessus.",
         "Sauts (essai) : coupés par défaut, réglage enfin mémorisé ; le pompage n'est plus pris pour un saut ; pas d'annonce de saut pendant une alerte.",
-        "Journaux de session : coche plusieurs journaux pour les rejouer à la suite, les envoyer en une fois ou les supprimer."
+        "Journaux de session : coche plusieurs journaux pour les rejouer à la suite, les envoyer en une fois ou les supprimer.",
+        "Relais montre (grille) : X = roche, S = fond lisse (sable, vase), O = rien."
       ]
     },
     {

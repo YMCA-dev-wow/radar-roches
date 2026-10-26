@@ -245,6 +245,7 @@ function analyser(pos, course, speed, W, opts) {
   const mpp = mPerPx(pos.lat), [px, py] = toPx(pos.lat, pos.lon);
   const rp = Math.ceil(R / mpp);
   const cells = [];                                                              // [dx, dy, niveau] en mètres, est/sud positifs
+  const natCells = [];                                                           // pour chaque cellule : 1 roche, 0 fond lisse
   let best = null, pre = null, lat = null, manquantes = 0;
   // roche : relief marqué (ou terre, ou roche saisie) ; sinon fond lisse (sable, vase). À choisir, la roche passe devant :
   // la voix dit « Roche » ou « Haut-fond », et une roche est annoncée même après un haut-fond dans le même épisode.
@@ -279,7 +280,7 @@ function analyser(pos, course, speed, W, opts) {
         if (!lvl) continue;
         const dx = (tx * 256 + u + 0.5 - px) * mpp, dy = (ty * 256 + v + 0.5 - py) * mpp, dist = Math.hypot(dx, dy);
         if (dist > R) continue;
-        if (affichage) cells.push(dx, dy, lvl);
+        if (affichage) { cells.push(dx, dy, lvl); natCells.push(rock ? 1 : 0); }
         if (lvl >= 2) consider(dx, dy, lvl, dist, rock);
       }
     }
@@ -304,7 +305,7 @@ function analyser(pos, course, speed, W, opts) {
       if (lvl >= 2) consider(n.x, n.y, lvl, n.d);
     }
   }
-  return { cells, zones, best, pre, lat, horizon, preH, latH, R, cA, cP, cV, manquantes };
+  return { cells, rochesCells: natCells, zones, best, pre, lat, horizon, preH, latH, R, cA, cP, cV, manquantes };
 }
 function nearestOnPoly(pts) { // point du polygone le plus proche de l'origine (0 si dedans)
   let inside = false, bd = Infinity, bx = 0, by = 0;
@@ -495,18 +496,19 @@ let styleMontre = 'grille'; // 'grille' | 'mots' | 'heures' | 'fleches'
 // Grille 3×3 (essai D validé sur l'Ambit 3) : chaque ligne est un « mot » sans espace, liée par des « _ », pour que la montre
 // passe à la ligne entre les lignes. Haut = devant ; X = danger dans ce secteur de 45° ; centre = distance du plus proche.
 const SECTEUR_CASE = [[0, 1], [0, 2], [1, 2], [2, 2], [2, 1], [2, 0], [1, 0], [0, 0]];
+// Grille : X = roche dans ce secteur, S = fond lisse seulement (sable, vase), O = rien
 function grilleAmbit(an, course) {
   const lim = Math.max(an.preH || 0, an.latH || 0, 2 * an.horizon), g = [['O', 'O', 'O'], ['O', '', 'O'], ['O', 'O', 'O']];
   let dmin = Infinity, relMin = 0;
-  const ajoute = (dx, dy) => {
+  const ajoute = (dx, dy, roche) => {
     const d = Math.hypot(dx, dy); if (d > lim) return;
     let rel = Math.atan2(dx, -dy) * 180 / Math.PI - course; rel = ((rel + 540) % 360) - 180;
     const [r, c] = SECTEUR_CASE[((Math.round(rel / 45) % 8) + 8) % 8];
-    g[r][c] = 'X'; if (d < dmin) { dmin = d; relMin = rel; }
+    g[r][c] = roche || g[r][c] === 'X' ? 'X' : 'S'; if (d < dmin) { dmin = d; relMin = rel; }
   };
-  const c = an.cells;
-  for (let i = 0; i < c.length; i += 3) if (c[i + 2] >= 2) ajoute(c[i], c[i + 1]);
-  for (const z of an.zones) if (z.lvl >= 2 && !z.pts) ajoute(z.dx, z.dy);
+  const c = an.cells, nat = an.rochesCells || [];
+  for (let i = 0; i < c.length; i += 3) if (c[i + 2] >= 2) ajoute(c[i], c[i + 1], nat[i / 3] !== 0);
+  for (const z of an.zones) if (z.lvl >= 2 && !z.pts) ajoute(z.dx, z.dy, true);
   if (!isFinite(dmin)) return null;
   const n = String(Math.round(dmin)), sep = n.length >= 3 ? '_' : '__';  // 3 chiffres : un seul « _ » pour tenir en largeur
   return {
