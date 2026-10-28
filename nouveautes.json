@@ -2,6 +2,18 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 19,
+      "date": "2026-10-28",
+      "titre": "Appli montre Saint-Malo : résumé de séance, nœuds, bandeau de saut",
+      "montre": true,
+      "points": [
+        "Vitesses en nœuds sur la montre, avec la vitesse max de la séance sur la page de données.",
+        "Après « Enregistrer », un résumé : durée, distance, vitesses max (2 s, 100, 250, 500 m), nombre de sauts, plus haut et plus long vol.",
+        "Après chaque saut, un bandeau « SAUT 1,2 m » pendant 10 s. Sauts comptés au-dessus de 12 km/h seulement.",
+        "Concerne l'appli Saint-Malo (Forerunner 255 et Fenix 8) : retélécharge-la (Plus → Carte et téléchargements) et remplace l'ancienne dans GARMIN → Apps."
+      ]
+    },
+    {
       "id": 18,
       "date": "2026-10-26",
       "titre": "Radar fiable plus loin, voix plus précise, journaux groupés",
