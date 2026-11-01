@@ -25,7 +25,8 @@ const JournalSession = (() => {
   async function ouvrir(entete) {
     if (!dispo) return;
     const d = new Date();
-    const n = `radar_${d.getFullYear()}-${deux(d.getMonth() + 1)}-${deux(d.getDate())}_${deux(d.getHours())}h${deux(d.getMinutes())}`;
+    // à la seconde près : deux lancements dans la même minute ne partagent plus le même fichier
+    const n = `radar_${d.getFullYear()}-${deux(d.getMonth() + 1)}-${deux(d.getDate())}_${deux(d.getHours())}h${deux(d.getMinutes())}m${deux(d.getSeconds())}`;
     try { nom = (await NJ().ouvrir({ nom: n })).nom; } catch { return; }
     ouvert = true; nPos = 0;
     ev('debut', entete);

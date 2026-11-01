@@ -2,6 +2,15 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 20,
+      "date": "2026-11-01",
+      "titre": "Petites corrections",
+      "points": [
+        "Une vitesse aberrante du GPS (saut de position après une courte coupure) ne déclenche plus de fausse alerte.",
+        "Deux lancements du radar dans la même minute ont maintenant chacun leur journal."
+      ]
+    },
+    {
       "id": 19,
       "date": "2026-10-28",
       "titre": "Appli montre Saint-Malo : résumé de séance, nœuds, bandeau de saut",

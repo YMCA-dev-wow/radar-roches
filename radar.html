@@ -319,6 +319,8 @@ function onFix(lat, lon, acc, speedGps, headingGps, t) {
     if (speed == null || isNaN(speed)) speed = Math.hypot(dx, dy) / ((b.t - a.t) / 1000);
     if ((course == null || isNaN(course)) && Math.hypot(dx, dy) > 3) course = (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
   }
+  // vitesse aberrante (saut de position GPS après une coupure : 199 km/h le 01/11, fausse alerte) : on garde la précédente
+  if (speed > 25) speed = fix ? fix.speed : 0;
   fix = { lat, lon, acc, speed: speed || 0, course: course ?? (fix ? fix.course : 0), t };
 }
 // GPS. Deux pièges constatés en mer (Firefox Android) :
