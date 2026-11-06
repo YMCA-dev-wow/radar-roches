@@ -13,11 +13,14 @@ function fondsCarte(map, conteneur, cle, defauts) {
     none: null,
   };
   const shom = geopf('GEOGRAPHICALGRIDSYSTEMS.COASTALMAPS', 'image/png', 16).setZIndex(5);
-  // Relief Litto3D Bretagne 2018-2021 (service WMS public du SHOM, licence ouverte)
-  const lidar = L.tileLayer.wms('https://services.data.shom.fr/INSPIRE/wms/r', {
-    layers: 'LITTO3D_BZH_2018_2021_PYR_3857_WMSR', format: 'image/png', transparent: true, version: '1.3.0',
-    maxZoom: 20, attribution: 'Litto3D® Shom – IGN',
-  }).setZIndex(6);
+  // Relief Litto3D (service WMS public du SHOM, licence ouverte) : Finistère 2014, puis Bretagne 2018-2021 (22, 35, 56)
+  // par-dessus. Le service refuse plusieurs couches dans une même requête : un calque WMS par levé.
+  const wms = (couche, z) => L.tileLayer.wms('https://services.data.shom.fr/INSPIRE/wms/r', {
+    layers: couche, format: 'image/png', transparent: true, version: '1.3.0', maxZoom: 20, attribution: 'Litto3D® Shom – IGN',
+  }).setZIndex(z);
+  const leves = [wms('LITTO3D_FINISTR_2014_PYR_3857_WMSR', 6), wms('LITTO3D_BZH_2018_2021_PYR_3857_WMSR', 7)];
+  const lidar = L.layerGroup(leves);
+  lidar.setOpacity = o => { leves.forEach(l => l.setOpacity(o)); return lidar; };
 
   const r = Object.assign({ base: 'ortho', baseOp: 1, shom: true, shomOp: 1, lidar: false, lidarOp: 0.8 }, defauts);
   try { Object.assign(r, JSON.parse(localStorage.getItem(cle)) || {}); } catch {}

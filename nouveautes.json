@@ -2,6 +2,14 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 25,
+      "date": "2026-11-06",
+      "titre": "Fond Relief Litto3D : Finistère ajouté",
+      "points": [
+        "Le fond « Relief Litto3D » (carte et éditeur de roches) couvre maintenant aussi le Finistère (levé 2014 : Iroise, Ouessant, Molène, Abers, Crozon…), en plus des Côtes-d'Armor, de l'Ille-et-Vilaine et du Morbihan."
+      ]
+    },
+    {
       "id": 24,
       "date": "2026-11-06",
       "titre": "Zones plus lisibles sur la carte",
