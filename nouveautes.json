@@ -2,6 +2,16 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 26,
+      "date": "2026-11-06",
+      "titre": "Nouvelle zone : La Torche – Concarneau",
+      "points": [
+        "Le radar du téléphone couvre maintenant la côte de la Torche à Concarneau et les Glénan (relief Litto3D, environ 70 Mo à télécharger depuis la carte).",
+        "Marée d'après le marégraphe de Concarneau, adaptée à chaque endroit selon les ports les plus proches (Saint-Guénolé, Le Guilvinec, Lesconil, Loctudy, Bénodet, Port-la-Forêt, Glénan).",
+        "Pas d'appli montre pour cette zone pour l'instant."
+      ]
+    },
+    {
       "id": 25,
       "date": "2026-11-06",
       "titre": "Fond Relief Litto3D : Finistère ajouté",
