@@ -419,7 +419,9 @@ function l3dTile(x, y) {
         const g = c.getContext('2d'); g.drawImage(img, 0, 0); res(g.getImageData(0, 0, 256, 256).data);
       };
       img.onerror = () => res(null);
-      img.src = zt.dossier + '/tuiles/' + zt.meta.zoom + '/' + k + '.png';
+      // appli : le relief n'est plus embarqué (téléchargé par zone pour le radar) ; l'éditeur le lit sur le site
+      if (window.androidBridge) img.crossOrigin = 'anonymous'; // pixels lus ensuite (site : en-tête CORS ouvert)
+      img.src = (window.androidBridge ? 'https://ymca-dev-wow.github.io/radar-roches/' : '') + zt.dossier + '/tuiles/' + zt.meta.zoom + '/' + k + '.png';
     }));
   }
   return l3dData.get(k);

@@ -2,6 +2,16 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 21,
+      "date": "2026-11-06",
+      "titre": "Relief téléchargé zone par zone",
+      "points": [
+        "Important : le relief des zones (roches, hauts-fonds) n'est plus dans l'appli. Télécharge celui de ton spot dans Plus → Zones, de préférence en Wi-Fi, une seule fois.",
+        "Le radar le lit ensuite sans réseau. Tant qu'une zone n'est pas téléchargée, l'accueil du radar affiche un avertissement rouge.",
+        "Les mises à jour de l'appli deviennent beaucoup plus légères, et de nouvelles zones pourront être ajoutées sans alourdir l'appli."
+      ]
+    },
+    {
       "id": 20,
       "date": "2026-11-01",
       "titre": "Petites corrections",

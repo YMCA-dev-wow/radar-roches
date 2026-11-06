@@ -63,7 +63,9 @@
     "zh": -6.774,
     "w": 0.0
    }
-  ]
+  ],
+  "version_tuiles": "662a67582162",
+  "taille_tuiles": 41981942
  },
  {
   "id": "cotes_armor",
@@ -186,6 +188,8 @@
     "retard": 3540,
     "w": 0.9219
    }
-  ]
+  ],
+  "version_tuiles": "f970b55a684c",
+  "taille_tuiles": 111929351
  }
 ]

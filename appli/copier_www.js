@@ -1,7 +1,7 @@
 // Copie les pages web du radar (dossier parent) dans www/, que Capacitor embarque dans l'APK.
 const fs = require('fs'), path = require('path');
 const src = path.resolve(__dirname, '..'), dst = path.join(__dirname, 'www');
-const FICHIERS = ['index.html', 'plus.html', 'theme.css', 'nav.js', 'fonds.js', 'nouveautes.js', 'nouveautes.json', 'journal.js', 'logo.svg', 'notice.html', 'maj.js', 'radar.html', 'rejeu.html', 'carte.html', 'noyau.js', 'diagnostic.js', 'editeur_zones.html', 'donnees/zones.json',
+const FICHIERS = ['index.html', 'plus.html', 'zones.js', 'theme.css', 'nav.js', 'fonds.js', 'nouveautes.js', 'nouveautes.json', 'journal.js', 'logo.svg', 'notice.html', 'maj.js', 'radar.html', 'rejeu.html', 'carte.html', 'noyau.js', 'diagnostic.js', 'editeur_zones.html', 'donnees/zones.json',
   'donnees/montres.json']; // applis montre (.prg) : téléchargées depuis le site, pas embarquées dans l'APK
 // données de chaque zone décrite dans donnees/zones.json : méta, têtes de roche, marées, tuiles
 const ZONES = JSON.parse(fs.readFileSync(path.join(src, 'donnees', 'zones.json'), 'utf8'));
@@ -14,7 +14,7 @@ for (const f of FICHIERS) {
   fs.mkdirSync(path.dirname(path.join(dst, f)), { recursive: true });
   fs.copyFileSync(path.join(src, f), path.join(dst, f));
 }
-for (const z of ZONES) fs.cpSync(path.join(src, z.dossier, 'tuiles'), path.join(dst, z.dossier, 'tuiles'), { recursive: true });
+// relief (tuiles) : plus embarqué, téléchargé zone par zone dans l'appli (Plus → Zones, ZonesPlugin)
 // bibliothèque Capacitor (registerPlugin…), chargée avant noyau.js dans les pages de l'appli seulement
 fs.copyFileSync(path.join(__dirname, 'node_modules', '@capacitor', 'core', 'dist', 'capacitor.js'), path.join(dst, 'capacitor.js'));
 for (const [page, script] of [['radar.html', 'noyau.js'], ['rejeu.html', 'noyau.js'], ['plus.html', 'maj.js']]) {

@@ -191,6 +191,7 @@
 
 <script src="noyau.js"></script>
 <script src="journal.js"></script>
+<script src="zones.js"></script>
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
@@ -532,6 +533,8 @@ function arreter() {
   route(); demarrerGpsAccueil(); majMaree();
 }
 $('start').onclick = async () => {
+  if (APPLI && zone && ['absente', 'maj'].includes(ZonesLocales.statut(zone)) &&
+    !confirm(`Le relief de ${zone.nom} n'est pas téléchargé${ZonesLocales.statut(zone) === 'maj' ? ' dans sa dernière version' : ''} : sans réseau, le radar ne verra pas les roches.\n\nTélécharge-le dans Plus → Zones. Démarrer quand même ?`)) return;
   saveSettings();
   if (!SON_NATIF) audio(); // le navigateur n'autorise l'audio qu'après un appui
   arreterGpsAccueil(); majTest();
@@ -722,6 +725,9 @@ let batterie = null, appareil = null;
 // Appli : l'optimisation de la batterie d'Android peut endormir le radar écran éteint ; on vérifie à chaque retour sur la page
 async function lireAppareil() { if (!APPLI) return; try { appareil = await Natif.journal.appareil(); } catch { appareil = null; } majVerifs(); }
 lireAppareil(); document.addEventListener('visibilitychange', () => { if (!document.hidden) lireAppareil(); });
+// état des zones téléchargées (relief) : au démarrage et à chaque retour sur la page
+const lireZones = async () => { if (APPLI && ZONES.length) { await ZonesLocales.lire(ZONES); majVerifs(); } };
+document.addEventListener('visibilitychange', () => { if (!document.hidden) lireZones(); });
 if (navigator.getBattery) navigator.getBattery().then(b => { batterie = b; b.onlevelchange = majVerifs; majVerifs(); }).catch(() => {});
 function majVerifs() {
   const v = [], ch = (cls, txt) => v.push(`<span class="chip ${cls}">${txt}</span>`);
@@ -733,6 +739,9 @@ function majVerifs() {
     { ok: '✓ Marée recalée', hors: '✓ Recalage récent', ko: '! Prédiction seule', off: '! Prédiction seule', attente: '… Marée' }[etatRecal]);
   ch($('testMode').checked ? 'dan' : 'ok', $('testMode').checked ? '⚠ Mode test actif' : '✓ Mode test coupé');
   if (batterie) { const pc = Math.round(batterie.level * 100); ch(pc > 30 || batterie.charging ? 'ok' : 'ko', (pc > 30 ? '✓' : '!') + ' Batterie ' + pc + ' %'); }
+  // relief de la zone non téléchargé : le radar ne verrait pas les roches sans réseau
+  if (APPLI && zone && ['absente', 'maj'].includes(ZonesLocales.statut(zone)))
+    v.push(`<a class="chip dan" href="plus.html#zones">⚠ Relief ${zone.nom} ${ZonesLocales.statut(zone) === 'maj' ? 'à mettre à jour' : 'non téléchargé'} : toucher</a>`);
   if (appareil && !appareil.batterieLibre) v.push('<button class="chip dan" id="corrigerBatterie">⚠ Optimisation batterie : toucher pour l\'autoriser</button>');
   if (appareil && appareil.economie) ch('ko', '! Économie d\'énergie active');
   $('verifs').innerHTML = v.join('');
@@ -838,6 +847,7 @@ addEventListener('hashchange', route);
   }, 8000);
   try {
     await chargerDonnees();
+    lireZones(); // relief téléchargé ou non (avertissement sur l'accueil)
     const r = store.get('recal', null);
     if (r && r.jour === new Date().toDateString() && PORTS.some(p => p.id === r.port)) { $('offPort').value = r.port; r.rows.forEach(offRow); }
     applyRecal(); $('start').disabled = false; $('dataInfo').textContent = '';

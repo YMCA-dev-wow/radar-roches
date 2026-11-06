@@ -16,6 +16,8 @@ import java.nio.ByteBuffer;
  * Constaté sur l'eau (26/10) : écran éteint, la page ne termine plus le décodage des nouvelles tuiles (chargement en
  * attente indéfiniment) ; le radar devenait aveugle hors de la zone préchargée au départ. Ici, lecture directe dans les
  * fichiers de l'appli, sans passer par l'affichage : fonctionne écran éteint.
+ * Lecture : zone téléchargée (fichiers de l'appli / zones / …), sinon fichiers embarqués ; absente : rejet (la page
+ * va alors la chercher sur le site si le réseau le permet).
  * Renvoie les pixels RVBA (256 × 256 × 4 octets) en base64, sans prémultiplication ni conversion de couleur.
  */
 @CapacitorPlugin(name = "Tuiles")
@@ -26,7 +28,9 @@ public class TuilesPlugin extends Plugin {
         if (chemin.startsWith("/")) chemin = chemin.substring(1);
         final String c = chemin;
         getBridge().execute(() -> {   // hors du fil de l'interface
-            try (InputStream in = getContext().getAssets().open("public/" + c)) {
+            // d'abord la zone téléchargée (ZonesPlugin), sinon les fichiers de l'appli (anciennes versions)
+            java.io.File local = new java.io.File(ZonesPlugin.racine(getContext()), c);
+            try (InputStream in = local.exists() ? new java.io.FileInputStream(local) : getContext().getAssets().open("public/" + c)) {
                 BitmapFactory.Options o = new BitmapFactory.Options();
                 o.inPremultiplied = false; o.inScaled = false; o.inPreferredConfig = Bitmap.Config.ARGB_8888;
                 Bitmap b = BitmapFactory.decodeStream(in, null, o);

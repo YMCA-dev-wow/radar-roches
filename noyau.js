@@ -112,6 +112,8 @@ let meta = null;
 const tiles = new Map(); // 'x/y' -> Uint8ClampedArray | null | Promise (zone active)
 // chargementEnAttente : fichiers pas encore reçus (affichés par le diagnostic si le chargement traîne)
 const chargementEnAttente = new Set();
+// Site publié : relief des zones à télécharger (appli), ou à lire en ligne quand une zone n'est pas téléchargée
+const SITE = 'https://ymca-dev-wow.github.io/radar-roches/';
 async function chargerDonnees() {
   const lire = (f, type) => {
     chargementEnAttente.add(f);
@@ -157,7 +159,10 @@ function loadTile(x, y) {
   const k = x + '/' + y;
   if (tiles.has(k)) return tiles.get(k) instanceof Promise ? tiles.get(k) : Promise.resolve();
   if (!meta.set.has(k)) { tiles.set(k, null); return Promise.resolve(); }
-  const zt = zone, url = zt.dossier + '/tuiles/' + meta.zoom + '/' + k + '.png';
+  const zt = zone, chemin = zt.dossier + '/tuiles/' + meta.zoom + '/' + k + '.png';
+  // Appli : le relief n'est plus dans l'appli mais téléchargé par zone (ZonesPlugin) ; s'il manque, on le cherche sur le
+  // site quand le réseau le permet (rejeu, essais à terre). Sur l'eau sans réseau, seule une zone téléchargée compte.
+  const url = APPLI ? SITE + chemin : chemin;
   // Décodage par fetch + createImageBitmap + OffscreenCanvas : il fonctionne page cachée (écran éteint), alors qu'une
   // balise <img> n'est plus décodée tant que la page n'est pas affichée (constaté sur l'eau le 17/10 : radar aveugle
   // hors des tuiles chargées écran allumé). <img> reste en secours pour les navigateurs qui n'ont pas ces fonctions.
@@ -180,14 +185,14 @@ function loadTile(x, y) {
   // Appli : décodage par Android (TuilesPlugin). Le 26/10, même par createImageBitmap, les tuiles demandées écran éteint
   // ne finissaient jamais de se charger : radar aveugle au-delà de la zone préchargée au départ.
   const parNatif = async () => {
-    const r = await Natif.tuiles.lire({ chemin: url });
+    const r = await Natif.tuiles.lire({ chemin });
     const s = atob(r.rvba), d = new Uint8ClampedArray(s.length);
     for (let i = 0; i < s.length; i++) d[i] = s.charCodeAt(i);
     return d;
   };
   const sansDelai = (pr, ms) => Promise.race([pr, new Promise((_, rej) => setTimeout(() => rej(new Error('délai')), ms))]);
   const navigateur = () => typeof createImageBitmap === 'function' && typeof OffscreenCanvas === 'function' && location.protocol !== 'file:' ? parBitmap() : parImage();
-  const p = (APPLI && Natif.tuiles ? sansDelai(parNatif(), 8000).catch(e => { if (window.journalTuile) journalTuile(k, e.message); return navigateur(); }) : navigateur())
+  const p = (APPLI && Natif.tuiles ? sansDelai(parNatif(), 8000).catch(e => navigateur().catch(e2 => { if (window.journalTuile) journalTuile(k, e.message + ' / réseau : ' + e2.message); throw e2; })) : navigateur())
     .then(d => { if (zone === zt) tiles.set(k, d); }, () => { if (zone === zt) tiles.set(k, null); }); // zone changée pendant le chargement : on jette
   tiles.set(k, p);
   return p;
