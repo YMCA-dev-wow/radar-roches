@@ -2,6 +2,16 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 24,
+      "date": "2026-11-06",
+      "titre": "Zones plus lisibles sur la carte",
+      "points": [
+        "Chaque zone du téléphone est encadrée en pointillés, colorés selon son état : vert téléchargée, gris à télécharger, orange mise à jour. Le cadre reste lisible sur la photo aérienne.",
+        "Son nom, son état et sa taille sont toujours affichés ; ⌚ signale une appli montre. En vue d'ensemble, les zones deviennent des pastilles : touche le nom ou la pastille pour télécharger.",
+        "En zoomant, la couverture exacte du relief apparaît. Les limites des applis montre sont affichables en cochant « Limites des applis montre »."
+      ]
+    },
+    {
       "id": 23,
       "date": "2026-11-06",
       "titre": "Nouvelle zone : Brest Iroise",

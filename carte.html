@@ -57,22 +57,28 @@
   /* noms des zones sur la carte (téléphone en haut de la zone, montre en bas de son cadre) */
   .lbl span { position: absolute; white-space: nowrap; transform: translate(-50%, 4px); font-size: 12px; font-weight: 650; padding: 2px 7px; border-radius: 8px;
     background: rgba(7, 19, 24, .82); border: 1px solid var(--ln); color: var(--tx); pointer-events: none; }
-  .lbl.montre span { transform: translate(-50%, calc(-100% - 4px)); color: #e3b5ff; border-color: #bf5af288; }
-  .petit .lbl { display: none; }
+  .lbl.tel span { transform: translate(-50%, calc(-100% - 6px)); pointer-events: auto; cursor: pointer; border-width: 2px; }
+  .lbl.montre span { transform: translate(-50%, calc(-100% - 4px)); color: #e3b5ff; border-color: #bf5af288; font-weight: 500; }
+  /* vue d'ensemble : les zones deviennent des pastilles touchables (façon Maps.me) */
+  .lbl.pin span { transform: translate(-9px, -50%); display: flex; align-items: center; gap: 6px; pointer-events: auto; cursor: pointer; padding: 2px 8px 2px 2px; border-radius: 999px; }
+  .lbl.pin i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #071318; box-shadow: 0 0 0 1px #fff8; }
+  .petit .lbl.tel, .petit .lbl.montre, .grand .lbl.pin { display: none; }
+  .legendeCarte { background: rgba(7, 19, 24, .85); color: var(--tx); border: 1px solid var(--ln); border-radius: 10px; padding: 6px 9px; font-size: 12px; line-height: 1.7; }
+  .legendeCarte i { display: inline-block; width: 16px; height: 0; border-top: 3px dashed; margin-right: 6px; vertical-align: middle; }
 </style>
 </head>
 <body data-onglet="plus">
 <header><a class="retour" href="index.html" id="retour">‹</a><h1>Carte et téléchargements</h1></header>
 <div class="carteBloc"><div id="map"></div><div class="astuce" id="astuce">Touche une zone pour la télécharger</div></div>
 <div class="couches">
-  <label><input type="checkbox" id="cCouv" checked><span class="pastille" style="background:#30d15866;border:1px solid #30d158"></span>Relief téléphone</label>
-  <label><input type="checkbox" id="cMontre" checked><span class="pastille" style="border:2px dashed var(--montre)"></span>Applis montre</label>
+  <label><input type="checkbox" id="cCouv" checked><span class="pastille" style="border:2px dashed #30d158"></span>Zones téléphone</label>
+  <label><input type="checkbox" id="cMontre"><span class="pastille" style="border:2px solid var(--montre)"></span>Limites des applis montre</label>
   <label><input type="checkbox" id="cMes" checked><span class="pastille" style="background:#5ee6d6"></span>Mes roches</label>
   <label><input type="checkbox" id="cPartage" checked><span class="pastille" style="border:2px solid var(--partage)"></span>Jeux partagés</label>
 </div>
 <main>
   <details class="section" id="secTel">
-    <summary><span class="pastille" style="background:#30d15866;border:1px solid #30d158"></span>Téléphone : relief des zones<small id="resTel"></small></summary>
+    <summary><span class="pastille" style="border:2px dashed #30d158"></span>Téléphone : relief des zones<small id="resTel"></small></summary>
     <div class="corps">
       <div class="sub" id="telInfo">Le radar du téléphone a besoin du relief (roches, hauts-fonds) de ta zone. Il se télécharge une fois, de préférence en
         Wi-Fi, puis le radar le lit sans réseau : télécharge celui de ton spot <b>avant</b> d'aller sur l'eau.</div>
@@ -81,7 +87,7 @@
     </div>
   </details>
   <details class="section" id="secMontre">
-    <summary><span class="pastille" style="border:2px dashed var(--montre)"></span>Montre Garmin : applis par zone<small id="resMontre"></small></summary>
+    <summary><span class="pastille" style="border:2px solid var(--montre)"></span>Montre Garmin : applis par zone<small id="resMontre"></small></summary>
     <div class="corps">
       <div class="maMontre"><span class="mu">Ma montre</span><select id="maMontre"></select></div>
       <div id="listeMontres"></div>
@@ -179,21 +185,42 @@ L.control.scale({ imperial: false }).addTo(map);
 let vue = null;
 try { vue = JSON.parse(localStorage.getItem('carte.vue')); } catch {}
 if (vue) map.setView([vue.lat, vue.lon], vue.z); else map.setView([48.75, -2.8], 9);
-const majPetit = () => map.getContainer().classList.toggle('petit', map.getZoom() < 9);
-majPetit();
-map.on('zoomend', majPetit);
+const ZOOM_PASTILLES = 8, ZOOM_RELIEF = 11;
+const majPetit = () => {
+  const c = map.getContainer(), p = map.getZoom() < ZOOM_PASTILLES;
+  c.classList.toggle('petit', p); c.classList.toggle('grand', !p);
+  majRelief();
+};
 map.on('moveend', () => { const c = map.getCenter(); try { localStorage.setItem('carte.vue', JSON.stringify({ lat: c.lat, lon: c.lng, z: map.getZoom() })); } catch {} listes(); });
 
-const couches = { couv: L.layerGroup().addTo(map), montre: L.layerGroup().addTo(map), mes: L.layerGroup().addTo(map), partage: L.layerGroup().addTo(map) };
-[['cCouv', 'couv'], ['cMontre', 'montre'], ['cMes', 'mes'], ['cPartage', 'partage']].forEach(([c, k]) =>
-  $(c).onchange = e => e.target.checked ? couches[k].addTo(map) : map.removeLayer(couches[k]));
+const couches = { couv: L.layerGroup().addTo(map), montre: L.layerGroup(), mes: L.layerGroup().addTo(map), partage: L.layerGroup().addTo(map) };
+const relief = L.layerGroup();   // détail de la couverture (tuiles Litto3D) : seulement en zoom proche
 const visible = k => map.hasLayer(couches[k]);
+function majRelief() { visible('couv') && map.getZoom() >= ZOOM_RELIEF ? relief.addTo(map) : map.removeLayer(relief); }
+[['cCouv', 'couv'], ['cMontre', 'montre'], ['cMes', 'mes'], ['cPartage', 'partage']].forEach(([c, k]) =>
+  $(c).onchange = e => { e.target.checked ? couches[k].addTo(map) : map.removeLayer(couches[k]); majRelief(); });
+// légende flottante
+const legende = L.control({ position: 'bottomleft' });
+legende.onAdd = () => Object.assign(L.DomUtil.create('div', 'legendeCarte'), { innerHTML: (ZonesLocales.appli ?
+  '<div><i style="color:#30d158"></i>téléchargée</div><div><i style="color:#c9d2d8"></i>à télécharger</div><div><i style="color:#ff9f0a"></i>mise à jour</div>' :
+  '<div><i style="color:#30d158"></i>zone du radar</div>') + '<div>⌚ appli montre</div>' });
+legende.addTo(map);
+majPetit();
+map.on('zoomend', majPetit);
 const dansVue = b => map.getBounds().intersects(L.latLngBounds([b[0], b[1]], [b[2], b[3]]));
 const contient = (b, ll) => ll.lat >= b[0] && ll.lat <= b[2] && ll.lng >= b[1] && ll.lng <= b[3];
 const texte = (tag, t, cls) => { const e = document.createElement(tag); e.textContent = t; if (cls) e.className = cls; return e; };
 const taille = o => o > 1e6 ? (o / 1e6).toFixed(1).replace('.', ',') + ' Mo' : Math.round(o / 1e3) + ' ko';
-const etiquette = (ll, t, cls) => L.marker(ll, { interactive: false, keyboard: false,
-  icon: L.divIcon({ className: 'lbl ' + (cls || ''), iconSize: [0, 0], html: '<span></span>' }) }).on('add', function () { this.getElement().firstChild.textContent = t; });
+// étiquette sur la carte ; contenu(el) remplit son <span> à chaque affichage (et via .maj())
+function etiquette(ll, contenu, cls, clic) {
+  const m = L.marker(ll, { interactive: !!clic, keyboard: false, bubblingMouseEvents: false,
+    icon: L.divIcon({ className: 'lbl ' + (cls || ''), iconSize: [0, 0], html: '<span></span>' }) });
+  const remplir = typeof contenu === 'string' ? s => { s.textContent = contenu; } : contenu;
+  m.maj = () => { const e = m.getElement(); if (e) remplir(e.firstChild); };
+  m.on('add', m.maj);
+  if (clic) m.on('click', clic);
+  return m;
+}
 // Montrer un endroit : la carte est en haut de la page, on y remonte
 function voir(b, opts) {
   fermerFeuille();
@@ -214,8 +241,14 @@ let zones = [];
 const tuile2lat = (y, z) => Math.atan(Math.sinh(Math.PI * (1 - 2 * y / 2 ** z))) * 180 / Math.PI;
 const lon2tx = (lon, z) => Math.floor((lon + 180) / 360 * 2 ** z);
 const lat2ty = (lat, z) => { const r = lat * Math.PI / 180; return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * 2 ** z); };
-const COULEUR_ZONE = { ok: '#30d158', web: '#30d158', maj: '#ff9f0a', encours: '#64d2ff', absente: '#9aa5ad', inconnu: '#9aa5ad' };
+const COULEUR_ZONE = { ok: '#30d158', web: '#30d158', maj: '#ff9f0a', encours: '#64d2ff', absente: '#c9d2d8', inconnu: '#c9d2d8' };
 const ETAT_COURT = { ok: '✓', maj: 'mise à jour', encours: 'en cours…', absente: 'à télécharger', inconnu: '', web: '' };
+const centre = b => [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2];
+const aMontre = z => montres.some(a => a.id.split(':')[0] === z.id);
+function texteZone(z) {
+  const st = ZonesLocales.statut(z);
+  return [z.nom, ETAT_COURT[st], z.taille_tuiles && st !== 'ok' ? moZone(z.taille_tuiles) : ''].filter(Boolean).join(' · ') + (aMontre(z) ? '  ⌚' : '');
+}
 async function chargerZones() {
   zones = await (await fetch('donnees/zones.json')).json();
   for (const z of zones) {
@@ -230,23 +263,28 @@ async function chargerZones() {
       for (let i = 0; i < xs.length;) {
         let j = i; while (j + 1 < xs.length && xs[j + 1] === xs[j] + 1) j++;
         const lon0 = xs[i] / 2 ** m.zoom * 360 - 180, lon1 = (xs[j] + 1) / 2 ** m.zoom * 360 - 180;
-        z._rects.push(L.rectangle([[tuile2lat(y + 1, m.zoom), lon0], [tuile2lat(y, m.zoom), lon1]], { stroke: false, fillOpacity: .28, interactive: false }).addTo(couches.couv));
+        z._rects.push(L.rectangle([[tuile2lat(y + 1, m.zoom), lon0], [tuile2lat(y, m.zoom), lon1]], { stroke: false, fillOpacity: .35, interactive: false }).addTo(relief));
         i = j + 1;
       }
     }
-    z._lbl = etiquette([z.bornes[2], (z.bornes[1] + z.bornes[3]) / 2], z.nom).addTo(couches.couv);
+    // cadre de la zone : liseré sombre (lisible sur la photo aérienne) + pointillé coloré selon l'état
+    const b = [[z.bornes[0], z.bornes[1]], [z.bornes[2], z.bornes[3]]];
+    L.rectangle(b, { color: '#000', opacity: .55, weight: 6, fill: false, interactive: false }).addTo(couches.couv);
+    z._cadre = L.rectangle(b, { weight: 3, dashArray: '9 7', fill: false, interactive: false }).addTo(couches.couv);
+    const ouvrir = () => ouvrirIci(L.latLng(centre(z.bornes)), z);
+    z._lbl = etiquette([z.bornes[2], (z.bornes[1] + z.bornes[3]) / 2], s => { s.textContent = texteZone(z); s.style.borderColor = COULEUR_ZONE[ZonesLocales.statut(z)]; }, 'tel', ouvrir).addTo(couches.couv);
+    z._pin = etiquette(centre(z.bornes), s => { s.innerHTML = '<i></i><b></b>'; s.firstChild.style.background = COULEUR_ZONE[ZonesLocales.statut(z)]; s.lastChild.textContent = z.nom + (aMontre(z) ? ' ⌚' : ''); }, 'pin', ouvrir).addTo(couches.couv);
   }
   await ZonesLocales.lire(zones);
 }
-const couvre = (z, ll) => z._tuiles && contient(z.bornes, ll) && z._tuiles.has(lon2tx(ll.lng, z.meta.zoom) + '/' + lat2ty(ll.lat, z.meta.zoom));
+const couvre = (z, ll) => contient(z.bornes, ll);
 // couleurs de la carte, liste de la section Téléphone et résumé, après chaque changement d'état
 function majTel() {
   for (const z of zones) {
     const st = ZonesLocales.statut(z);
-    z._rects.forEach(r => r.setStyle({ fillColor: COULEUR_ZONE[st] }));
-    const el = z._lbl.getElement();
-    if (el) el.firstChild.textContent = z.nom + (ETAT_COURT[st] ? ' · ' + ETAT_COURT[st] : '');
-    z._lbl.off('add').on('add', function () { this.getElement().firstChild.textContent = z.nom + (ETAT_COURT[ZonesLocales.statut(z)] ? ' · ' + ETAT_COURT[ZonesLocales.statut(z)] : ''); });
+    z._rects.forEach(r => r.setStyle({ fillColor: st === 'absente' || st === 'inconnu' ? '#6f7c85' : COULEUR_ZONE[st] }));
+    z._cadre.setStyle({ color: COULEUR_ZONE[st] });
+    z._lbl.maj(); z._pin.maj();
   }
   const lz = $('listeZones'); lz.innerHTML = '';
   zones.forEach(z => lz.append(ligneZone(z, { voir: z => voir(z.bornes) })));
@@ -254,8 +292,8 @@ function majTel() {
     const n = zones.filter(z => ZonesLocales.statut(z) === 'ok').length;
     $('resTel').textContent = `${n} / ${zones.length} téléchargée${n > 1 ? 's' : ''}`;
     $('legendeTel').innerHTML = '';
-    for (const [c, t] of [['#30d158', 'téléchargée'], ['#9aa5ad', 'à télécharger'], ['#ff9f0a', 'mise à jour disponible']])
-      $('legendeTel').append(Object.assign(document.createElement('span'), { innerHTML: `<i class="pastille" style="background:${c}66;border:1px solid ${c}"></i>${t}` }));
+    for (const [c, t] of [['#30d158', 'téléchargée'], ['#c9d2d8', 'à télécharger'], ['#ff9f0a', 'mise à jour disponible']])
+      $('legendeTel').append(Object.assign(document.createElement('span'), { innerHTML: `<i class="pastille" style="border:2px dashed ${c}"></i>${t}` }));
   } else {
     $('resTel').textContent = zones.length + ' zones';
     $('telInfo').textContent = 'Zones couvertes par le radar du téléphone (relevé Litto3D). Sur ordinateur, le relief est lu en ligne ; dans l\'appli Android, il se télécharge ici, zone par zone.';
@@ -269,7 +307,7 @@ let montres = [];
 async function chargerMontres() {
   montres = await (await fetch('donnees/montres.json')).json();
   for (const a of montres) {
-    L.rectangle([[a.bbox[0], a.bbox[1]], [a.bbox[2], a.bbox[3]]], { color: '#bf5af2', weight: 2, dashArray: '6 6', fill: false, interactive: false }).addTo(couches.montre);
+    L.rectangle([[a.bbox[0], a.bbox[1]], [a.bbox[2], a.bbox[3]]], { color: '#bf5af2', weight: 1.5, fill: false, interactive: false }).addTo(couches.montre);
     etiquette([a.bbox[0], (a.bbox[1] + a.bbox[3]) / 2], '⌚ ' + (a.partie || a.zone), 'montre').addTo(couches.montre);
   }
 }
@@ -486,15 +524,16 @@ function fermerFeuille() {
   feuille.el.remove(); feuille = null;
   if (repere) { map.removeLayer(repere); repere = null; }
 }
-map.on('click', e => {
-  const ll = e.latlng;
-  const zt = visible('couv') ? zones.filter(z => couvre(z, ll)) : [];
-  const mt = visible('montre') ? montres.filter(a => contient(a.bbox, ll)) : [];
+map.on('click', e => ouvrirIci(e.latlng));
+// seule : la zone touchée par son étiquette ou sa pastille (sinon tout ce qui couvre l'endroit)
+function ouvrirIci(ll, seule) {
+  const zt = seule ? [seule] : visible('couv') ? zones.filter(z => couvre(z, ll)) : [];
+  const mt = seule ? montres.filter(a => a.id.split(':')[0] === seule.id) : montres.filter(a => contient(a.bbox, ll));
   const pt = visible('partage') ? partages.filter(j => contient(j.bbox, ll)) : [];
   fermerFeuille();
   if (!zt.length && !mt.length && !pt.length) {
     L.popup({ className: 'etiquette', closeButton: false, autoClose: true }).setLatLng(ll)
-      .setContent(zones.length ? 'Rien à télécharger ici : touche une zone colorée ou un cadre violet.' : 'Catalogue des zones indisponible.').openOn(map);
+      .setContent(zones.length ? 'Rien à télécharger ici : touche l\'intérieur d\'un cadre pointillé ou le nom d\'une zone.' : 'Catalogue des zones indisponible.').openOn(map);
     return;
   }
   repere = L.circleMarker(ll, { radius: 7, color: '#fff', weight: 2, fillColor: '#5ee6d6', fillOpacity: 1, interactive: false }).addTo(map);
@@ -507,13 +546,13 @@ map.on('click', e => {
     const noms = [...new Set([...zt.map(z => z.nom), ...mt.map(a => a.zone), ...pt.map(j => j.nom)])];
     corps.append(Object.assign(texte('h2', noms.join(' · ')), { style: 'margin:0;font-size:20px;text-transform:none;letter-spacing:0;color:var(--tx)' }));
     // téléphone
-    corps.append(Object.assign(document.createElement('h3'), { innerHTML: '<span class="pastille" style="background:#30d15866;border:1px solid #30d158"></span>Téléphone (radar)' }));
+    corps.append(Object.assign(document.createElement('h3'), { innerHTML: '<span class="pastille" style="border:2px dashed #30d158"></span>Téléphone (radar)' }));
     if (zt.length) {
       zt.forEach(z => corps.append(ligneZone(z)));
       if (!ZonesLocales.appli) corps.append(texte('div', 'Dans l\'appli Android, le relief de cette zone se télécharge ici, pour que le radar le lise sans réseau.', 'sub'));
     } else corps.append(texte('div', 'Le radar du téléphone ne couvre pas cet endroit.', 'vide'));
     // montre
-    corps.append(Object.assign(document.createElement('h3'), { innerHTML: '<span class="pastille" style="border:2px dashed var(--montre)"></span>Montre Garmin' }));
+    corps.append(Object.assign(document.createElement('h3'), { innerHTML: '<span class="pastille" style="border:2px solid var(--montre)"></span>Montre Garmin' }));
     if (mt.length) {
       const l = document.createElement('div'); l.className = 'maMontre';
       l.append(texte('span', 'Ma montre', 'mu'), selectMontre());
@@ -529,7 +568,7 @@ map.on('click', e => {
     f.onclick = fermerFeuille; corps.append(f);
   } };
   feuille.rafraichir();
-});
+}
 
 // ---------- Partager ----------
 function selection() {
@@ -575,6 +614,7 @@ $('pEnvoyer').onclick = async () => {
   if (location.hash === '#zones') $('secTel').open = true;
   if (location.hash === '#moderation' || location.hash === '#partager') $('secPartage').open = true;
   await Promise.allSettled([chargerZones().then(majTel), chargerMontres().then(majMontres), chargerPartages()]);
+  majTel(); majRelief();   // ⌚ des étiquettes : une fois les applis montre connues
   majModeration(); listes();
   if (location.hash === '#zones') $('secTel').scrollIntoView({ block: 'start' });
   if (location.hash === '#partager') $('partager').click();
