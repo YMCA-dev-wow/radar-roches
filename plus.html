@@ -13,10 +13,6 @@
 <style>
   footer { text-align: center; color: #4f7a76; font-size: 13px; margin-top: 26px; }
   .journal { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--ln); }
-  .zoneLigne { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--ln); }
-  .zoneLigne > div { flex: 1; } .zoneLigne small { color: var(--mu); } .zoneLigne small.ok { color: var(--ok); } .zoneLigne small.ko { color: var(--warn); }
-  .zoneLigne .barre { height: 6px; background: var(--p2); border-radius: 3px; margin-top: 6px; overflow: hidden; }
-  .zoneLigne .barre i { display: block; height: 100%; width: 0; background: var(--ac); }
   .journal > div { flex: 1; cursor: pointer; } .journal small { color: var(--mu); }
   .journal .choix, .journauxSel input { width: 22px; height: 22px; accent-color: var(--ac); flex: none; }
   .journauxSel { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--ln); position: sticky; top: -16px; background: var(--p1); z-index: 1; }
@@ -32,8 +28,7 @@
 </div>
 <script>
 const ENTREES = [
-  ['zones', '#zones', 'Zones (relief à télécharger)', 'à faire avant d\'aller sur l\'eau, en Wi-Fi'],
-  ['carte', 'carte.html', 'Carte et téléchargements', 'zones couvertes, applis montre, roches partagées'],
+  ['carte', 'carte.html', 'Carte et téléchargements', 'relief à télécharger, applis montre, roches partagées'],
   ['rejeu', 'rejeu.html', 'Rejeu de session', 'rejouer un fichier FIT ou GPX'],
   ['profils', 'radar.html#profils', 'Profils de navigation', 'créer, modifier, dupliquer'],
   ['reglages', 'radar.html#avance', 'Réglages avancés et essais', 'marée, sons, montre, mode test, simulation'],
@@ -48,27 +43,14 @@ for (const [ic, href, titre, sous] of ENTREES) {
   a.querySelector('.t').textContent = titre; a.querySelector('small').textContent = sous;
   if (href === '#nouveautes') a.onclick = e => { e.preventDefault(); nouveautes.ouvrir(true); };
   if (href === '#journaux') a.onclick = e => { e.preventDefault(); ouvrirJournaux(); };
-  if (href === '#zones') a.onclick = e => { e.preventDefault(); ouvrirZones(); };
   document.getElementById('menu').append(a);
 }
 </script>
 <script src="maj.js"></script>
 <script>verifierMaj(document.getElementById('maj'));</script>
 <script src="journal.js"></script>
-<script src="zones.js"></script>
 <script>
-// Zones : relief de chaque zone à télécharger une fois (lu ensuite sans réseau par le radar)
-function ouvrirZones() {
-  const f = document.createElement('div'); f.className = 'feuille on';
-  f.innerHTML = '<div class="in"><h2 style="margin-top:0">Zones</h2><div class="sub">Le relief (roches, hauts-fonds) de chaque zone se télécharge une fois, ' +
-    'de préférence en Wi-Fi, puis le radar le lit sans réseau. Télécharge la zone de ton spot <b>avant</b> d\'aller sur l\'eau.</div>' +
-    '<div id="listeZones" style="margin-top:8px">…</div><button class="btn" style="width:100%;margin-top:16px" id="fermerZones">Fermer</button></div>';
-  document.body.append(f);
-  f.querySelector('#fermerZones').onclick = () => f.remove();
-  f.onclick = e => { if (e.target === f) f.remove(); };
-  afficherZones(f.querySelector('#listeZones'));
-}
-if (location.hash === '#zones') setTimeout(ouvrirZones, 0);   // lien depuis l'avertissement du radar
+if (location.hash === '#zones') location.replace('carte.html#zones');   // ancien lien : les zones sont dans la carte
 
 // Journaux de session : un par lancement du radar, à envoyer (WhatsApp, e-mail…) pour analyse
 function ouvrirJournaux() {

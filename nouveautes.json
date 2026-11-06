@@ -2,6 +2,16 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 22,
+      "date": "2026-11-06",
+      "titre": "Téléchargements depuis la carte",
+      "points": [
+        "Le relief des zones se télécharge maintenant depuis Plus → Carte et téléchargements : touche ta zone sur la carte, puis « Télécharger ». Une seule fenêtre propose aussi l'appli montre de l'endroit.",
+        "Sur la carte, les zones du téléphone sont colorées selon leur état (vert : téléchargée, gris : à télécharger, orange : mise à jour), à côté des cadres violets des applis montre : on voit où elles se recoupent.",
+        "Page plus courte : sections repliables Téléphone, Montre, Jeux de roches partagés et Fond de carte."
+      ]
+    },
+    {
       "id": 21,
       "date": "2026-11-06",
       "titre": "Relief téléchargé zone par zone",

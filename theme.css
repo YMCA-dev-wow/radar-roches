@@ -57,3 +57,8 @@ a.chip { text-decoration: none; }
 .barre-nav a { color: var(--mu); font-size: 11px; text-align: center; text-decoration: none; flex: 1; max-width: 140px; }
 .barre-nav a svg { display: block; margin: 0 auto 2px; }
 .barre-nav a.on { color: var(--ac); }
+/* zones (relief) à télécharger : zones.js */
+.zoneLigne { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--ln); }
+.zoneLigne > div { flex: 1; } .zoneLigne small { color: var(--mu); } .zoneLigne small.ok { color: var(--ok); } .zoneLigne small.ko { color: var(--warn); }
+.zoneLigne .barre { height: 6px; background: var(--p2); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+.zoneLigne .barre i { display: block; height: 100%; width: 0; background: var(--ac); }

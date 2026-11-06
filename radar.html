@@ -534,7 +534,7 @@ function arreter() {
 }
 $('start').onclick = async () => {
   if (APPLI && zone && ['absente', 'maj'].includes(ZonesLocales.statut(zone)) &&
-    !confirm(`Le relief de ${zone.nom} n'est pas téléchargé${ZonesLocales.statut(zone) === 'maj' ? ' dans sa dernière version' : ''} : sans réseau, le radar ne verra pas les roches.\n\nTélécharge-le dans Plus → Zones. Démarrer quand même ?`)) return;
+    !confirm(`Le relief de ${zone.nom} n'est pas téléchargé${ZonesLocales.statut(zone) === 'maj' ? ' dans sa dernière version' : ''} : sans réseau, le radar ne verra pas les roches.\n\nTélécharge-le dans Plus → Carte et téléchargements. Démarrer quand même ?`)) return;
   saveSettings();
   if (!SON_NATIF) audio(); // le navigateur n'autorise l'audio qu'après un appui
   arreterGpsAccueil(); majTest();
@@ -741,7 +741,7 @@ function majVerifs() {
   if (batterie) { const pc = Math.round(batterie.level * 100); ch(pc > 30 || batterie.charging ? 'ok' : 'ko', (pc > 30 ? '✓' : '!') + ' Batterie ' + pc + ' %'); }
   // relief de la zone non téléchargé : le radar ne verrait pas les roches sans réseau
   if (APPLI && zone && ['absente', 'maj'].includes(ZonesLocales.statut(zone)))
-    v.push(`<a class="chip dan" href="plus.html#zones">⚠ Relief ${zone.nom} ${ZonesLocales.statut(zone) === 'maj' ? 'à mettre à jour' : 'non téléchargé'} : toucher</a>`);
+    v.push(`<a class="chip dan" href="carte.html#zones">⚠ Relief ${zone.nom} ${ZonesLocales.statut(zone) === 'maj' ? 'à mettre à jour' : 'non téléchargé'} : toucher</a>`);
   if (appareil && !appareil.batterieLibre) v.push('<button class="chip dan" id="corrigerBatterie">⚠ Optimisation batterie : toucher pour l\'autoriser</button>');
   if (appareil && appareil.economie) ch('ko', '! Économie d\'énergie active');
   $('verifs').innerHTML = v.join('');

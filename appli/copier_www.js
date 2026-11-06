@@ -17,7 +17,7 @@ for (const f of FICHIERS) {
 // relief (tuiles) : plus embarqué, téléchargé zone par zone dans l'appli (Plus → Zones, ZonesPlugin)
 // bibliothèque Capacitor (registerPlugin…), chargée avant noyau.js dans les pages de l'appli seulement
 fs.copyFileSync(path.join(__dirname, 'node_modules', '@capacitor', 'core', 'dist', 'capacitor.js'), path.join(dst, 'capacitor.js'));
-for (const [page, script] of [['radar.html', 'noyau.js'], ['rejeu.html', 'noyau.js'], ['plus.html', 'maj.js']]) {
+for (const [page, script] of [['radar.html', 'noyau.js'], ['rejeu.html', 'noyau.js'], ['plus.html', 'maj.js'], ['carte.html', 'fonds.js']]) {
   const p = path.join(dst, page), html = fs.readFileSync(p, 'utf8'), balise = `<script src="${script}"></script>`;
   if (!html.includes(balise)) throw new Error(page + ' : balise ' + script + ' introuvable');
   fs.writeFileSync(p, html.replace(balise, '<script src="capacitor.js"></script>\n' + balise));
