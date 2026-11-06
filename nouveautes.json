@@ -2,6 +2,16 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 23,
+      "date": "2026-11-06",
+      "titre": "Nouvelle zone : Brest Iroise",
+      "points": [
+        "Le radar du téléphone couvre maintenant Ouessant, l'archipel de Molène et la côte du Conquet aux Abers (relief Litto3D, environ 90 Mo à télécharger depuis la carte). La rade de Brest n'est pas encore couverte.",
+        "Marée d'après le marégraphe du Conquet, adaptée à chaque endroit selon les ports les plus proches : le marnage va d'environ 5,5 m vers Camaret à près de 7 m aux Abers.",
+        "Pas d'appli montre pour cette zone pour l'instant."
+      ]
+    },
+    {
       "id": 22,
       "date": "2026-11-06",
       "titre": "Téléchargements depuis la carte",

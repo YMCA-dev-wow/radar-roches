@@ -200,8 +200,8 @@ const store = {
   set(k, v) { try { localStorage.setItem('radar.' + k, JSON.stringify(v)); } catch {} },
 };
 
-function niveauCourant(lon, t) {
-  return $('testMode').checked ? +$('testH').value : niveauEau(lon, t);
+function niveauCourant(lon, t, lat) {
+  return $('testMode').checked ? +$('testH').value : niveauEau(lon, t, undefined, lat);
 }
 function opts(affichage = true) {
   return { seuil: +$('seuil').value, smooth: $('smooth').checked, antic: +$('antic').value, roches: mesRoches, affichage, preAlerte: $('preAlerte').checked, veille: $('veille').checked,
@@ -440,9 +440,9 @@ function tick() {
     if (!dernierPrechargement || Math.hypot((fix.lon - dernierPrechargement.lon) * 111320 * Math.cos(fix.lat * Math.PI / 180), (fix.lat - dernierPrechargement.lat) * 110540) > 500 || dernierPrechargement.zone !== zone) {
       dernierPrechargement = { lat: fix.lat, lon: fix.lon, zone }; prechargerTuiles(fix.lat, fix.lon);
     }
-    const W = niveauCourant(fix.lon, t);
+    const W = niveauCourant(fix.lon, t, fix.lat);
     analysis = analyser(fix, fix.course, fix.speed, W, opts()); analysis.at = now; analysis.W = W;
-    const W30 = niveauCourant(fix.lon, t + 30 * 60000);
+    const W30 = niveauCourant(fix.lon, t + 30 * 60000, fix.lat);
     $('sH').textContent = isNaN(W) ? '–' : W.toFixed(1);
     $('sTrend').textContent = $('testMode').checked ? '(test)' : (W30 > W + 0.05 ? '↑' : W30 < W - 0.05 ? '↓' : '→');
     $('sV').textContent = (fix.speed * 3.6).toFixed(0);
@@ -467,10 +467,10 @@ function tick() {
     sonnerMenace(b, analysis.horizon, armed, p);
     annoncer(b, p, armed, Date.now(), analysis.horizon, fix.speed);
     annoncerVeille(nouvelleVeille(veilleEtat, analysis, armed, t));
-    relaisPas(t, analysis, fix.course, armed, tt => niveauCourant(fix.lon, tt), true);
+    relaisPas(t, analysis, fix.course, armed, tt => niveauCourant(fix.lon, tt, fix.lat), true);
     if (fix.t !== fixJournal) { fixJournal = fix.t; journalPosition(fix, analysis, armed); }
   }
-  if (gpsAge > 5 && fix) relaisPas(t, analysis, 0, false, tt => niveauCourant(fix.lon, tt), false);
+  if (gpsAge > 5 && fix) relaisPas(t, analysis, 0, false, tt => niveauCourant(fix.lon, tt, fix.lat), false);
   $('msg').textContent = message;
   $('msg').className = gpsAge > 5 || !analysis ? '' : analysis.best ? 'alerte' : analysis.pre ? 'pre' : analysis.lat ? 'veille' : '';
 }
@@ -548,7 +548,7 @@ $('start').onclick = async () => {
   bipsActifs = $('bips').checked; voixActive = $('voix').checked; if (voixActive) parler('Radar actif'); // le premier appel doit suivre un appui
   relais.actif = $('relais').checked; notifDiscretes = $('notifDiscretes').checked;
   muted = false; $('bMute').classList.remove('on'); $('bMute').firstChild.textContent = 'Muet'; // chaque session démarre son actif
-  relaisDemarrer(Date.now(), tt => niveauCourant(sim ? sim.lon : MALO.lon, tt), $('seuil').value,
+  relaisDemarrer(Date.now(), tt => niveauCourant(sim ? sim.lon : MALO.lon, tt, sim ? sim.lat : MALO.lat), $('seuil').value,
     $('live').checked && !$('liveInfo').textContent.startsWith('✓') ? '\nMaregraphe injoignable' : '');
   surveillerBatterie();
   if (APPLI) { Natif.veille.garder().catch(() => {}); if (!sim) $('msg').textContent = 'Tu peux éteindre l’écran : le radar continue.'; return; }
@@ -688,11 +688,11 @@ function majChipZone() {
 }
 function majMaree() {
   if (!tide || !zone) return;
-  const lon = fix ? fix.lon : gpsAccueil ? gpsAccueil.lon : MALO.lon, t = Date.now(), h = niveauCourant(lon, t);
+  const pos = fix || gpsAccueil || MALO, lon = pos.lon, lat = pos.lat, t = Date.now(), h = niveauCourant(lon, t, lat);
   $('hNow').textContent = isNaN(h) ? 'hors table' : fr(h) + ' m';
   const svg = $('courbe');
   if ($('testMode').checked) { $('sens').textContent = 'hauteur forcée'; $('extremes').textContent = ''; svg.innerHTML = ''; return; }
-  const f = tt => niveauEau(lon, tt);
+  const f = tt => niveauEau(lon, tt, undefined, lat);
   $('sens').textContent = f(t + 600000) > h ? '↑ montante' : '↓ descendante';
   const e1 = prochainExtreme(f, t), e2 = e1 && prochainExtreme(f, e1.t + 600000);
   $('extremes').innerHTML = [e1, e2].filter(Boolean).map(e => `${e.type} ${hhmm(e.t)} · ${fr(e.h)} m`).join('<br>');

@@ -356,8 +356,8 @@ function completer(out) {
 function hauteurAt(p) {
   const mode = $('tideMode').value;
   if (mode === 'forcee') return +$('forceH').value;
-  if (mode === 'mesure' && tMeasured) return niveauEau(p.lon, p.t, tMeasured);
-  return niveauEau(p.lon, p.t);
+  if (mode === 'mesure' && tMeasured) return niveauEau(p.lon, p.t, tMeasured, p.lat);
+  return niveauEau(p.lon, p.t, undefined, p.lat);
 }
 
 async function chargerMaree() {
@@ -410,8 +410,8 @@ async function calculer() {
   notifs = [];
   const etatR = { actif: true }, envoi = (titre, texte, t) => notifs.push({ t, titre, texte });
   // marée des messages : prédiction (comme sur l'eau), les mesures ne couvrant que la durée de la session
-  const niv = lon => $('tideMode').value === 'forcee' ? () => +$('forceH').value : tt => niveauEau(lon, tt);
-  relaisDemarrer(pts[0].t, niv(pts[0].lon), $('seuil').value, '', etatR, envoi);
+  const niv = p => $('tideMode').value === 'forcee' ? () => +$('forceH').value : tt => niveauEau(p.lon, tt, undefined, p.lat);
+  relaisDemarrer(pts[0].t, niv(pts[0]), $('seuil').value, '', etatR, envoi);
   for (let i = 0; i < pts.length; i++) {
     if (token !== calcToken) return;
     const p = pts[i];
@@ -421,7 +421,7 @@ async function calculer() {
     let an = analyser(p, p.cap, p.v, p.W, o);
     const armedP = p.v >= vmin;
     if (armedP && (dangerSignale(an) || etatR.suivi)) an = analyser(p, p.cap, p.v, p.W, opts(true)); // grille complète (suivi des secteurs)
-    relaisPas(p.t, an, p.cap, armedP, niv(p.lon), true, etatR, envoi);
+    relaisPas(p.t, an, p.cap, armedP, niv(p), true, etatR, envoi);
     p.best = an.best;
     p.lvl = niveauAlerte(p.best, p.v >= vmin);
     p.pre = !p.lvl && !!an.pre && p.v >= vmin;

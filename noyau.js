@@ -73,9 +73,21 @@ function hPortPredit(P, t) { // prédiction (sans météo) au port P, recalée s
 }
 // Niveau de l'eau exprimé dans le zéro hydro de référence de la zone (celui des tuiles), à la longitude lon.
 // hFn(g, t) permet de remplacer la prédiction des marégraphes (ex. hauteurs mesurées pour rejouer une ancienne session).
-function niveauEau(lon, t, hFn) {
+// Zones « distance » (côtes non orientées est-ouest, ex. Iroise) : moyenne des ports pondérée par l'inverse du carré de
+// la distance (lat requise) ; sinon interpolation linéaire entre ports voisins en longitude.
+function niveauEau(lon, t, hFn, lat) {
   const W = P => (hFn ? hauteurPort(P, t, hFn) : hPortPredit(P, t)) + P.zh - zone.zh_ref;
   const add = hFn ? 0 : surge;
+  if (zone.interp === 'distance' && isFinite(lat)) {
+    const k = Math.cos(lat * Math.PI / 180);
+    let s = 0, sw = 0;
+    for (const P of PORTS) {
+      const d2 = (P.lat - lat) ** 2 + ((P.lon - lon) * k) ** 2;
+      if (d2 < 1e-8) return W(P) + add;
+      s += W(P) / d2; sw += 1 / d2;
+    }
+    return s / sw + add;
+  }
   if (lon <= PORTS[0].lon) return W(PORTS[0]) + add;
   for (let i = 0; i < PORTS.length - 1; i++) {
     const a = PORTS[i], b = PORTS[i + 1];
@@ -148,7 +160,7 @@ function zonePour(lat, lon) {
 // Change de zone active (renvoie vrai si elle a changé) ; les pages écoutent l'évènement « zone »
 function activerZone(z) {
   if (!z || z === zone || !z.tables || !z.meta) return false; // zone pas encore chargée (position GPS arrivée avant les données)
-  zone = z; PORTS = z.ports; MALO = PORTS[Math.floor(PORTS.length / 2)];
+  zone = z; PORTS = z.ports; MALO = PORTS.find(p => p.id === z.port_central) || PORTS[Math.floor(PORTS.length / 2)];
   meta = z.meta; jauges = z.tables; tide = jauges[0];
   surge = 0; recal = null; tiles.clear();
   try { localStorage.setItem('radar.zone', z.id); } catch {}
