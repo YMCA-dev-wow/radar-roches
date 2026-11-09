@@ -2,6 +2,14 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 27,
+      "date": "2026-11-09",
+      "titre": "Rejeu : tes séances en un toucher",
+      "points": [
+        "Dans le rejeu, le menu « Mes séances (téléphone) » liste les journaux du téléphone : coche une ou plusieurs séances puis « Rejouer », sans repasser par Plus → Journaux de session. Plusieurs séances se rejouent à la suite."
+      ]
+    },
+    {
       "id": 26,
       "date": "2026-11-06",
       "titre": "Nouvelle zone : La Torche – Concarneau",

@@ -24,6 +24,15 @@
   html.appli footer { bottom: 63px !important; }
   button.on { outline: 2px solid var(--accent); }
   input[type=number] { width: 70px; }
+  /* journaux du téléphone : menu déroulant à cases, rejeu direct */
+  .mesJ { position: relative; }
+  .mesJPan { position: absolute; top: calc(100% + 6px); left: 0; z-index: 3500; width: min(360px, calc(100vw - 24px)); max-height: 60vh; overflow: auto;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px; box-shadow: 0 10px 30px #000a; }
+  .mesJPan .tete { display: flex; gap: 8px; align-items: center; position: sticky; top: -8px; background: var(--panel); padding: 4px 0 8px; border-bottom: 1px solid var(--line); }
+  .mesJPan .tete button { flex: 1; }
+  .mesJPan label { display: flex; padding: 9px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .mesJPan label b { font-weight: 600; } .mesJPan label small { color: var(--muted); margin-left: auto; }
+  .mesJPan label.charge b::after { content: ' · affiché'; color: var(--accent); font-weight: 400; }
   label { display: inline-flex; gap: 6px; align-items: center; }
   #app { display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: 1fr 340px; grid-template-areas: "h h" "m s" "f s"; height: 100%; }
   #app > header { grid-area: h; } #app > main { display: contents; } #app > footer { grid-area: f; } #map { grid-area: m; } #side { grid-area: s; }
@@ -98,6 +107,7 @@
     <h1>Rejeu de session</h1>
     <button class="primary" id="gpxBtn">Ouvrir une trace (FIT, GPX ou journal)…</button>
     <input type="file" id="gpxFile" accept=".gpx,.fit,.jsonl,application/gpx+xml" hidden>
+    <div class="mesJ" id="mesJ" hidden><button id="mesJBtn">Mes séances (téléphone) ▾</button><div class="mesJPan" id="mesJPan" hidden></div></div>
     <span class="sub" id="info">Charge une ancienne session (FIT de préférence : heures et vitesse exactes) pour rejouer les alertes du radar.</span>
     <span style="flex:1"></span>
   </header>
@@ -781,18 +791,55 @@ async function ouvrirTrace(txt, nom) {
     $('gpxBtn').disabled = true;
   }
   const q = new URLSearchParams(location.search), nj = q.get('journal'), njs = q.get('journaux');
-  if (nj && APPLI) {
-    try { await ouvrirTrace((await Natif.journal.lire({ nom: nj })).texte, nj); }
-    catch (err) { $('info').textContent = 'Journal illisible : ' + err.message; }
-  }
-  if (njs && APPLI) { // plusieurs séances à la suite (sélection dans Plus → Journaux de session), réglages de la première
-    try {
-      const noms = njs.split(',').filter(Boolean), textes = [];
-      for (const n of noms) textes.push((await Natif.journal.lire({ nom: n })).texte);
-      await ouvrirTrace(textes.join('\n'), noms.length + ' journaux');
-    } catch (err) { $('info').textContent = 'Journaux illisibles : ' + err.message; }
-  }
+  if (APPLI && (nj || njs)) await rejouerJournaux(nj ? [nj] : njs.split(',').filter(Boolean));
+  if (APPLI) $('mesJ').hidden = false;
 })();
+
+// Journaux de session du téléphone : un ou plusieurs (à la suite, réglages de la première séance), sans passer par Plus
+let journauxAffiches = [];
+async function rejouerJournaux(noms) {
+  try {
+    const textes = [];
+    for (const n of noms) textes.push((await Natif.journal.lire({ nom: n })).texte);
+    await ouvrirTrace(textes.join('\n'), noms.length > 1 ? noms.length + ' journaux' : noms[0]);
+    journauxAffiches = noms;
+    history.replaceState(null, '', 'rejeu.html?' + (noms.length > 1 ? 'journaux=' + noms.map(encodeURIComponent).join(',') : 'journal=' + encodeURIComponent(noms[0])));
+  } catch (err) { $('info').textContent = (noms.length > 1 ? 'Journaux illisibles : ' : 'Journal illisible : ') + err.message; }
+}
+$('mesJBtn').onclick = async e => {
+  e.stopPropagation();
+  const pan = $('mesJPan');
+  if (!pan.hidden) { pan.hidden = true; return; }
+  pan.hidden = false; pan.textContent = 'Lecture…';
+  let l = [];
+  try { l = (await Natif.journal.liste()).journaux || []; } catch (err) { pan.textContent = 'Lecture impossible : ' + err.message; return; }
+  pan.innerHTML = '';
+  if (!l.length) { pan.textContent = 'Aucun journal : un journal est créé à chaque lancement du radar.'; return; }
+  const choisis = new Set(journauxAffiches.filter(n => l.some(j => j.nom === n)));
+  const tete = document.createElement('div'); tete.className = 'tete';
+  const bRej = document.createElement('button'); bRej.className = 'primary';
+  const bAucun = document.createElement('button'); bAucun.textContent = 'Aucun';
+  tete.append(bRej, bAucun); pan.append(tete);
+  const maj = () => { bRej.textContent = choisis.size > 1 ? `Rejouer les ${choisis.size} à la suite` : 'Rejouer'; bRej.disabled = !choisis.size; };
+  const cases = [];
+  for (const j of l) { // du plus récent au plus ancien
+    const lab = document.createElement('label'); if (journauxAffiches.includes(j.nom)) lab.className = 'charge';
+    const c = document.createElement('input'); c.type = 'checkbox'; c.checked = choisis.has(j.nom);
+    c.onchange = () => { c.checked ? choisis.add(j.nom) : choisis.delete(j.nom); maj(); };
+    const b = document.createElement('b');
+    b.textContent = new Date(j.date).toLocaleString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    const s = document.createElement('small'); s.textContent = Math.max(1, Math.round(j.taille / 1024)) + ' Ko';
+    lab.append(c, b, s); pan.append(lab); cases.push(c);
+  }
+  bAucun.onclick = () => { choisis.clear(); cases.forEach(c => c.checked = false); maj(); };
+  bRej.onclick = async () => {
+    const noms = l.filter(j => choisis.has(j.nom)).sort((a, b) => a.date - b.date).map(j => j.nom);   // ordre chronologique
+    pan.hidden = true;
+    await rejouerJournaux(noms);
+  };
+  maj();
+};
+document.addEventListener('click', e => { if (!$('mesJ').contains(e.target)) $('mesJPan').hidden = true; });
 </script>
 </body>
 </html>
