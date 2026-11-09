@@ -26,6 +26,9 @@ jobs:
           distribution: temurin
           java-version: 21
 
+      # cache de Gradle (distribution et dépendances) : un build ne dépend plus des serveurs de Gradle à chaque fois
+      - uses: gradle/actions/setup-gradle@v4
+
       - name: Dépendances et pages web
         working-directory: appli
         run: |
@@ -53,8 +56,13 @@ jobs:
           TACHE=assembleDebug; SORTIE=debug/app-debug.apk
           if [ -n "$ANDROID_KEYSTORE_FILE" ]; then TACHE=assembleRelease; SORTIE=release/app-release.apk; fi
           set +e
-          ./gradlew $TACHE --no-daemon --console=plain > "$RUNNER_TEMP/gradle.log" 2>&1
-          CODE=$?
+          # jusqu'à 3 essais : pannes réseau passagères (téléchargement de Gradle ou des dépendances)
+          for ESSAI in 1 2 3; do
+            ./gradlew $TACHE --no-daemon --console=plain > "$RUNNER_TEMP/gradle.log" 2>&1
+            CODE=$?
+            if [ $CODE -eq 0 ] || ! grep -qE 'SocketTimeoutException|timed out|Server returned HTTP response code: 5|Could not GET|Could not resolve|Connection reset' "$RUNNER_TEMP/gradle.log"; then break; fi
+            echo "Essai $ESSAI : erreur réseau, nouvel essai dans 60 s"; sleep 60
+          done
           set -e
           tail -n 60 "$RUNNER_TEMP/gradle.log"
           if [ $CODE -ne 0 ]; then
