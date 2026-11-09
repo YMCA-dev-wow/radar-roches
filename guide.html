@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<script src="diagnostic.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#071318">
+<title>Premiers pas – Radar roches</title>
+<link rel="icon" href="logo.svg">
+<link rel="stylesheet" href="theme.css">
+<script src="nav.js"></script>
+<style>
+  main { max-width: 680px; margin: 0 auto; padding: 0 16px 100px; line-height: 1.55; }
+  header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; max-width: 680px; margin: 0 auto; }
+  header h1 { flex: 1; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--ac); margin: 26px 0 8px; }
+  ol, ul { padding-left: 22px; margin: 6px 0; } li { margin: 7px 0; }
+  .encadre { background: var(--p1); border: 1px solid var(--ln); border-radius: 14px; padding: 12px 14px; margin: 10px 0; }
+  .sons { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; }
+  .sons b { color: var(--tx); white-space: nowrap; } .sons span { color: var(--mu); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  td, th { padding: 7px 6px; border-bottom: 1px solid var(--ln); text-align: left; vertical-align: top; }
+  th { color: var(--mu); font-weight: 500; }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+</style>
+</head>
+<body data-onglet="plus">
+<header><a class="retour" href="plus.html">‹</a><h1>Premiers pas</h1></header>
+<main>
+  <p>L'essentiel pour ta première session. Tout le détail est dans la <a href="notice.html">notice</a>.</p>
+
+  <h2>🏠 À la maison, en Wi-Fi (5 min)</h2>
+  <ol>
+    <li><b>Télécharge ta zone</b> : Plus → Carte et téléchargements → touche le cadre de ton spot → <b>Télécharger</b>.
+      Indispensable : sur l'eau, il n'y a souvent pas de réseau.</li>
+    <li><b>Écoute les sons une fois</b> : sur l'accueil du radar, <b>🔊 Écouter les sons</b>.</li>
+    <li><b>Autorisations</b> : au premier « Démarrer », Android demande la position. Réponds <b>« Toujours autoriser »</b> et accepte les notifications.
+      Si une étiquette rouge <b>« Optimisation batterie »</b> apparaît sur l'accueil, touche-la et choisis <b>« Sans restriction »</b>.
+      Sans ça, le radar s'endort écran éteint.</li>
+  </ol>
+
+  <h2>🎒 Le téléphone</h2>
+  <ul>
+    <li><b>Chargé</b> : le radar consomme environ 5 % de batterie par heure.</li>
+    <li>Dans une <b>pochette étanche</b>, porté <b>sur toi</b> : poche poitrine de la combinaison, harnais ou gilet. Pas dans un sac ni sur la planche :
+      il faut l'entendre, et le garder en cas de chute.</li>
+    <li><b>Son au maximum</b>. Les alertes passent par le volume « alarme », poussé au maximum pendant la séance.</li>
+    <li>Tu peux <b>verrouiller l'écran</b> : le radar continue.</li>
+    <li>Bonus : tu gardes sur toi de quoi appeler les secours (<b>196</b> depuis un portable, ou 112) ou prévenir quelqu'un.</li>
+  </ul>
+
+  <h2>🏖️ Sur la plage (2 min)</h2>
+  <ol>
+    <li><b>Choisis ton profil</b> (voir plus bas). Pour une première fois : <b>Prudent</b>.</li>
+    <li>Touche <b>Démarrer</b> : un petit carillon, puis la voix dit « Radar actif ».</li>
+    <li>Verrouille l'écran, range le téléphone, va naviguer.</li>
+  </ol>
+
+  <h2>🌊 Sur l'eau : les sons</h2>
+  <div class="encadre sons">
+    <b>Tintement doux</b><span>danger plus loin sur ta route : sois attentif</span>
+    <b>1 bip</b><span>danger devant</span>
+    <b>2 bips montants</b><span>à droite (tribord)</span>
+    <b>2 bips descendants</b><span>à gauche (bâbord)</span>
+    <b>Bips de plus en plus rapides</b><span>tu t'en approches</span>
+    <b>Son continu</b><span>moins de 10 m : change de cap tout de suite</span>
+    <b>Glissando grave</b><span>danger proche sur le côté, à garder en tête avant de virer</span>
+    <b>3 bips très graves</b><span>GPS perdu : le radar ne voit plus rien, navigue à vue</span>
+    <b>La voix</b><span>« Roche à tribord, 40 mètres, 6 secondes »</span>
+  </div>
+  <ul>
+    <li>Pas d'alerte en dessous de la vitesse du profil (tu peux marcher dans l'eau ou attendre au départ sans que ça sonne).</li>
+    <li><b>Couper le son un moment</b> : appui long sur <b>Muet</b>. <b>Arrêter</b> : <b>glisser</b> le bouton d'arrêt jusqu'au bout.</li>
+  </ul>
+
+  <h2>📊 Après la session</h2>
+  <ul>
+    <li>Onglet <b>Rejeu</b> → <b>Mes séances</b> : revois ta trace, les roches croisées et chaque alerte sur la carte.</li>
+    <li>Un souci ? Plus → Avancé → Journaux de session → <b>Envoyer</b> le journal de la séance à ton contact.</li>
+  </ul>
+
+  <h2>⚙️ Les profils</h2>
+  <p>Un profil regroupe les réglages d'alerte. Touche le cadre <b>Profil</b> de l'accueil pour en changer ; chacun se modifie avec le crayon.</p>
+  <table>
+    <tr><th>Réglage</th><th>Ce qu'il fait</th></tr>
+    <tr><td><b>Eau minimale sous la planche</b></td><td>Hauteur d'eau sous laquelle c'est un danger. Compte ce qui dépasse sous la planche : aileron, ou mât et aile du foil.</td></tr>
+    <tr><td><b>Alerte … s avant</b></td><td>Combien de secondes de navigation avant le danger l'alerte commence (à ta vitesse du moment). Plus c'est long, plus tu as le temps de réagir.</td></tr>
+    <tr><td><b>Radar actif dès</b></td><td>Vitesse en dessous de laquelle rien ne sonne (départ, pause, marche dans l'eau).</td></tr>
+    <tr><td><b>Angle d'alerte</b></td><td>Largeur du secteur surveillé devant toi, de chaque côté de ta route.</td></tr>
+    <tr><td><b>Pré-alerte</b></td><td>Le tintement doux, plus tôt et plus loin (jusqu'à deux fois la distance d'alerte).</td></tr>
+    <tr><td><b>Veille sur les côtés</b></td><td>Dangers proches hors de ta route, utile avant un virement ou un empannage.</td></tr>
+    <tr><td><b>Sons</b></td><td>Bips et/ou voix. Garde la voix au début : les bips s'apprennent avec le temps.</td></tr>
+    <tr><td><b>Fonds lisses</b></td><td>Alerte aussi pour le sable et la vase peu profonds (pas seulement les roches).</td></tr>
+  </table>
+  <p>Profils fournis : <b>Foil</b> (2 m d'eau, 7 s), <b>Planche</b> (1,5 m, 6 s), <b>Kite</b> (1 m, 8 s), <b>Prudent</b> (3 m, 12 s, fonds lisses).
+    Un profil que tu n'as jamais modifié suit les améliorations des mises à jour ; dès que tu le modifies, il reste tel quel.</p>
+
+  <h2>⚠️ À garder en tête</h2>
+  <div class="encadre">
+    <ul>
+      <li>Le radar ne connaît que les <b>zones couvertes</b> (Plus → Carte) et le fond <b>tel qu'il a été mesuré</b> (relevés de 2014 à 2021 selon les secteurs) :
+        bancs de sable et vase bougent.</li>
+      <li>Il ne détecte ni les bouées, ni les bateaux, ni les autres usagers.</li>
+      <li>La marée est une prévision, recalée sur le marégraphe quand il y a du réseau au départ : quelques dizaines de centimètres d'écart sont possibles.</li>
+      <li><b>C'est une aide à la vigilance, pas un pilote</b> : garde les yeux ouverts.</li>
+    </ul>
+  </div>
+
+  <div class="actions">
+    <a class="btn prim" href="radar.html#accueil">Revoir l'accueil</a>
+    <a class="btn" href="notice.html">Notice complète</a>
+  </div>
+</main>
+</body>
+</html>

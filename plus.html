@@ -13,7 +13,8 @@
 <style>
   footer { text-align: center; color: #4f7a76; font-size: 13px; margin-top: 26px; }
   .journal { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--ln); }
-  .journal > div { flex: 1; cursor: pointer; } .journal small { color: var(--mu); }
+  .journal > div { flex: 1; cursor: pointer; }
+  .groupeMenu { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--mu); margin: 22px 4px 10px; } .journal small { color: var(--mu); }
   .journal .choix, .journauxSel input { width: 22px; height: 22px; accent-color: var(--ac); flex: none; }
   .journauxSel { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--ln); position: sticky; top: -16px; background: var(--p1); z-index: 1; }
   .journauxSel label { display: flex; align-items: center; gap: 6px; margin-right: auto; color: var(--mu); }
@@ -27,17 +28,22 @@
   <footer id="maj"></footer>
 </div>
 <script>
+// null : titre de groupe (les réglages fins et outils de testeur sont regroupés sous « Avancé »)
 const ENTREES = [
+  ['guide', 'guide.html', 'Premiers pas', 'l\'essentiel avant ta première session'],
   ['carte', 'carte.html', 'Carte et téléchargements', 'relief à télécharger, applis montre, roches partagées'],
-  ['rejeu', 'rejeu.html', 'Rejeu de session', 'rejouer un fichier FIT ou GPX'],
+  ['roches', 'editeur_zones.html', 'Mes roches', 'marquer les roches et hauts-fonds que le relevé ne voit pas'],
   ['profils', 'radar.html#profils', 'Profils de navigation', 'créer, modifier, dupliquer'],
-  ['reglages', 'radar.html#avance', 'Réglages avancés et essais', 'marée, sons, montre, mode test, simulation'],
-  ['moderation', 'carte.html#moderation', 'Modération', 'jeux de roches partagés à valider'],
-  ['journal', '#journaux', 'Journaux de session', 'à envoyer pour analyser un problème'],
+  ['notice', 'notice.html', 'Notice', 'tout le détail : réglages, dépannage'],
   ['nouveautes', '#nouveautes', 'Nouveautés', 'ce qui a changé à chaque version'],
-  ['notice', 'notice.html', 'Notice', 'installation, réglages, dépannage'],
+  null,
+  ['reglages', 'radar.html#avance', 'Réglages avancés et essais', 'marée, sons, montre, mode test, simulation'],
+  ['journal', '#journaux', 'Journaux de session', 'à envoyer pour analyser un problème'],
+  ['moderation', 'carte.html#moderation', 'Modération', 'jeux de roches partagés à valider'],
 ];
-for (const [ic, href, titre, sous] of ENTREES) {
+for (const e of ENTREES) {
+  if (!e) { const h = document.createElement('h2'); h.className = 'groupeMenu'; h.textContent = 'Avancé'; document.getElementById('menu').append(h); continue; }
+  const [ic, href, titre, sous] = e;
   const a = document.createElement('a'); a.href = href;
   a.innerHTML = `<span class="ic">${icone(ic)}</span><span><span class="t"></span><small></small></span>`;
   a.querySelector('.t').textContent = titre; a.querySelector('small').textContent = sous;

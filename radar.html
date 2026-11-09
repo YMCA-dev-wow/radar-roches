@@ -18,6 +18,25 @@
   .centre { text-align: center; }
   #setup .carte { margin-bottom: 12px; }
   #carteProfil { cursor: pointer; }
+  /* profil : une ligne par réglage */
+  .lignesProfil { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin-top: 8px; font-size: 13px; }
+  .lignesProfil span { color: var(--mu); } .lignesProfil b { font-weight: 600; text-align: right; }
+  .liensAccueil { display: flex; justify-content: center; gap: 10px; margin-top: 6px; }
+  .liensAccueil a, .liensAccueil button { font-size: 13px; padding: 7px 12px; border-radius: 999px; }
+  /* démo des sons : étape en cours */
+  .etapesSons { list-style: none; padding: 0; margin: 10px 0 0; }
+  .etapesSons li { padding: 7px 10px; border-radius: 10px; color: var(--mu); font-size: 14px; transition: background .2s, color .2s; }
+  .etapesSons li.on { background: var(--p2); color: var(--tx); }
+  .etapesSons li b { color: var(--ac); }
+  /* premier lancement : quelques écrans d'accueil */
+  .guideAccueil { position: fixed; inset: 0; z-index: 60; background: var(--bg, #071318); display: flex; flex-direction: column; padding: 18px 18px 22px; overflow: auto; }
+  .guideAccueil .points { display: flex; justify-content: center; gap: 7px; margin-bottom: 14px; }
+  .guideAccueil .points i { width: 8px; height: 8px; border-radius: 50%; background: var(--ln); } .guideAccueil .points i.on { background: var(--ac); }
+  .guideAccueil h2 { font-size: 22px; margin: 6px 0 10px; text-transform: none; letter-spacing: 0; color: var(--tx); }
+  .guideAccueil .corps { flex: 1; font-size: 15px; line-height: 1.5; }
+  .guideAccueil .corps ul { padding-left: 20px; margin: 8px 0; } .guideAccueil .corps li { margin: 6px 0; }
+  .guideAccueil .encadre { background: var(--p1); border: 1px solid var(--ln); border-radius: 14px; padding: 12px 14px; margin: 12px 0; font-size: 14px; }
+  .guideAccueil .bas { display: flex; gap: 10px; margin-top: 16px; } .guideAccueil .bas button { flex: 1; justify-content: center; padding: 13px; }
   #courbe { width: 100%; height: 54px; margin-top: 8px; display: block; }
   .verifs { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 6px; }
   .demarrer { display: flex; align-items: center; justify-content: center; width: 168px; height: 168px; margin: 14px auto 10px; border-radius: 50%;
@@ -77,12 +96,13 @@
 
   <div class="carte" id="carteProfil" role="button" tabindex="0">
     <div class="row"><span class="mu">Profil</span><b id="nomProfil" style="color:var(--ac)">…</b></div>
-    <div id="resumeProfil" style="margin-top:4px"></div>
+    <div id="resumeProfil" class="lignesProfil"></div>
   </div>
 
   <div class="verifs" id="verifs"></div>
   <button id="start" class="demarrer" disabled>Démarrer</button>
   <div class="mu centre" id="dataInfo">Chargement des données…</div>
+  <div class="liensAccueil"><button id="demoSonsBtn">🔊 Écouter les sons</button><a class="btn" href="guide.html">Premiers pas</a></div>
 </div>
 
 <!-- ================= Réglages avancés (#avance) ================= -->
@@ -292,10 +312,41 @@ $('geoFile').onchange = async e => {
   e.target.value = '';
 };
 
-$('testSound').onclick = () => {
-  if (APPLI && $('volMax').checked) { Natif.son.volumeMax({ on: true }).catch(() => {}); setTimeout(() => { if (!running) Natif.son.volumeMax({ on: false }).catch(() => {}); }, 9000); }
-  demoSons(); if ($('voix').checked) setTimeout(() => parler('Roche à tribord, 40 mètres, 6 secondes'), 5000);
-};
+// Démo commentée : chaque son avec sa signification, l'étape en cours mise en évidence
+const ETAPES_SONS = [
+  [0, '<b>Tintement doux</b> : danger plus loin sur ta route, sois attentif', t => tintement(t)],
+  [2.6, '<b>1 bip</b> : danger devant', t => motif(0, 2, t)],
+  [4.6, '<b>2 bips montants</b> : à droite (tribord)', t => motif(40, 2, t)],
+  [6.6, '<b>2 bips descendants</b> : à gauche (bâbord)', t => motif(-40, 2, t)],
+  [8.6, 'Les bips <b>accélèrent</b> en approchant', t => { motif(0, 1, t); motif(0, 2, t + 0.9); motif(0, 3, t + 1.6); motif(0, 3, t + 2.0); }],
+  [11.6, '<b>Son continu</b> : moins de 10 m, change de cap', () => { continu(true); setTimeout(() => continu(false), 1800); }],
+  [14.4, '<b>Glissando grave</b> : danger proche sur le côté (veille)', t => sonVeille('tribord', t)],
+  [16.4, '<b>3 bips très graves</b> : GPS perdu, le radar ne voit plus rien', t => gpsPerdu(t)],
+  [18.6, 'La <b>voix</b> précise : « Roche à tribord, 40 mètres, 6 secondes »', () => parler('Roche à tribord, 40 mètres, 6 secondes')],
+];
+let demoMinuteurs = [];
+function demoSonsGuidee(liste) {
+  demoMinuteurs.forEach(clearTimeout); demoMinuteurs = [];
+  if (!SON_NATIF) audio();
+  if (APPLI && $('volMax').checked) { Natif.son.volumeMax({ on: true }).catch(() => {}); demoMinuteurs.push(setTimeout(() => { if (!running) Natif.son.volumeMax({ on: false }).catch(() => {}); }, 24000)); }
+  if (liste) liste.innerHTML = ETAPES_SONS.map(e => '<li>' + e[1] + '</li>').join('');
+  ETAPES_SONS.forEach(([s, , jouer], i) => demoMinuteurs.push(setTimeout(() => {
+    if (liste) [...liste.children].forEach((li, j) => li.classList.toggle('on', i === j));
+    jouer(horlogeSon() + 0.05);
+  }, s * 1000)));
+  if (liste) demoMinuteurs.push(setTimeout(() => [...liste.children].forEach(li => li.classList.remove('on')), 22000));
+}
+function feuilleSons() {
+  const f = document.createElement('div'); f.className = 'feuille on';
+  f.innerHTML = '<div class="in"><h2 style="margin-top:0">Les sons du radar</h2><div class="sub">Monte le son. Écoute chaque son avec sa signification (20 s).</div>' +
+    '<ul class="etapesSons"></ul><button class="btn prim" style="width:100%;margin-top:12px">Rejouer</button><button class="btn" style="width:100%;margin-top:8px">Fermer</button></div>';
+  const [rej, ferm] = f.querySelectorAll('button'), liste = f.querySelector('ul');
+  const fermer = () => { demoMinuteurs.forEach(clearTimeout); continu(false); f.remove(); };
+  rej.onclick = () => demoSonsGuidee(liste); ferm.onclick = fermer; f.onclick = e => { if (e.target === f) fermer(); };
+  document.body.append(f); demoSonsGuidee(liste);
+}
+$('testSound').onclick = feuilleSons;
+$('demoSonsBtn').onclick = feuilleSons;
 if (!APPLI) { $('volMaxLigne').hidden = true; $('volAlertesLigne').hidden = true; $('sautsLigne').hidden = true; }
 const appliquerVolume = () => { $('volAlertesTxt').textContent = $('volAlertes').value + ' %'; if (APPLI) Natif.son.gain({ v: $('volAlertes').value / 100 }).catch(() => {}); };
 $('volAlertes').oninput = appliquerVolume; $('volAlertes').onchange = () => { appliquerVolume(); saveSettings(); };
@@ -520,6 +571,7 @@ function frame() {
   g.addEventListener('contextmenu', e => e.preventDefault());
 })();
 function arreter() {
+  const nomJournal = APPLI && JournalSession.ouvert ? JournalSession.nom : null, duree = Date.now() - debutSeance;
   running = false; window.radarEnCours = false; continu(false); clearInterval(tickTimer);
   stopGps(); sim = null; $('sim').hidden = true;
   if (APPLI) {
@@ -531,6 +583,27 @@ function arreter() {
   if (wakeLock) wakeLock.release().catch(() => {}); wakeLock = null;
   $('run').hidden = true; document.body.classList.remove('navigation');
   route(); demarrerGpsAccueil(); majMaree();
+  if (nomJournal && duree > 3 * 60000 && !store.get('finSeanceNon', false)) finDeSeance(nomJournal, duree);
+}
+// Après une séance : la revoir dans le rejeu (trace, roches croisées, chaque alerte)
+let debutSeance = 0;
+function finDeSeance(nom, duree) {
+  const premiere = !store.get('seanceRevue', false);
+  const f = document.createElement('div'); f.className = 'feuille on';
+  const h = Math.floor(duree / 3600000), m = Math.round(duree % 3600000 / 60000);
+  f.innerHTML = '<div class="in"><h2 style="margin-top:0">Séance terminée</h2><div class="sub"></div>' +
+    '<p style="line-height:1.5"></p><button class="btn prim" style="width:100%;padding:13px">Revoir ta séance</button>' +
+    '<button class="btn" style="width:100%;margin-top:8px;justify-content:center">Plus tard</button>' +
+    '<label class="ligne" style="margin-top:10px"><span class="mu">Ne plus proposer (le rejeu reste dans l\'onglet Rejeu)</span><input type="checkbox"></label></div>';
+  f.querySelector('.sub').textContent = (h ? h + ' h ' + String(m).padStart(2, '0') : m + ' min') + ' sur l\'eau';
+  f.querySelector('p').textContent = premiere
+    ? 'Revois ta trace sur la carte : les roches et hauts-fonds que tu as croisés, et à quel moment le radar t\'a prévenu. C\'est la meilleure façon de comprendre ses alertes.'
+    : 'Ta trace, les roches croisées et chaque alerte, sur la carte.';
+  const [revoir, tard] = f.querySelectorAll('button'), non = f.querySelector('input');
+  const fermer = () => { if (non.checked) store.set('finSeanceNon', true); f.remove(); };
+  revoir.onclick = () => { store.set('seanceRevue', true); fermer(); location.href = 'rejeu.html?journal=' + encodeURIComponent(nom); };
+  tard.onclick = fermer; f.onclick = e => { if (e.target === f) fermer(); };
+  document.body.append(f);
 }
 $('start').onclick = async () => {
   if (APPLI && zone && ['absente', 'maj'].includes(ZonesLocales.statut(zone)) &&
@@ -541,7 +614,7 @@ $('start').onclick = async () => {
   if (APPLI) { appliquerVolume(); demarrerJournal(); demarrerSauts(); const t = horlogeSon() + 0.15; tone(880, 880, t, 0.12, 0.8, 'triangle'); tone(1320, 1320, t + 0.16, 0.2, 0.8, 'triangle'); } // carillon : le son marche
   $('setup').hidden = true; $('avance').hidden = true; $('fProfils').classList.remove('on');
   document.body.classList.add('navigation'); $('run').hidden = false; resize();
-  fix = null; lastFixes = []; analysis = null; last = null; running = true; window.radarEnCours = true; dernierPrechargement = null;
+  fix = null; lastFixes = []; analysis = null; last = null; running = true; window.radarEnCours = true; dernierPrechargement = null; debutSeance = Date.now();
   if ($('simMode').checked) startSim(); else startGps();
   clearInterval(tickTimer); tickTimer = setInterval(tick, 100);
   requestAnimationFrame(frame);
@@ -754,12 +827,31 @@ setInterval(() => { if (!running) { majVerifs(); majChipZone(); } }, 5000);
 // Les champs du profil actif sont les champs du radar eux-mêmes (seuil, antic, vmin…) : le calcul n'a pas changé.
 const CHAMPS = ['seuil', 'antic', 'vmin', 'coneAlerte', 'preAlerte', 'conePre', 'veille', 'coneVeille', 'bips', 'voix', 'smooth'];
 const ANGLES_DEFAUT = { coneAlerte: 50, conePre: 10, coneVeille: 110 }; // profils créés avant les angles réglables
+// ref : profil fourni par l'appli ; tant que l'utilisateur ne l'a pas modifié (modifie absent), une mise à jour de
+// l'appli peut en changer les valeurs. Un profil modifié, dupliqué ou créé n'est jamais touché.
 const PROFILS_DEFAUT = [
-  { nom: 'Foil', seuil: 2, antic: 7, vmin: 8, preAlerte: true, veille: true, bips: true, voix: true, smooth: false },
-  { nom: 'Planche', seuil: 1.5, antic: 6, vmin: 10, preAlerte: true, veille: true, bips: true, voix: false, smooth: false },
-  { nom: 'Kite', seuil: 1, antic: 8, vmin: 12, preAlerte: true, veille: false, bips: true, voix: true, smooth: false },
-  { nom: 'Prudent', seuil: 3, antic: 12, vmin: 5, preAlerte: true, veille: true, bips: true, voix: true, smooth: true },
+  { ref: 'foil', nom: 'Foil', seuil: 2, antic: 7, vmin: 8, preAlerte: true, veille: true, bips: true, voix: true, smooth: false },
+  { ref: 'planche', nom: 'Planche', seuil: 1.5, antic: 6, vmin: 10, preAlerte: true, veille: true, bips: true, voix: true, smooth: false },
+  { ref: 'kite', nom: 'Kite', seuil: 1, antic: 8, vmin: 12, preAlerte: true, veille: false, bips: true, voix: true, smooth: false },
+  { ref: 'prudent', nom: 'Prudent', seuil: 3, antic: 12, vmin: 5, preAlerte: true, veille: true, bips: true, voix: true, smooth: true },
 ];
+// valeurs livrées par les versions précédentes (pour reconnaître un profil jamais modifié, enregistré avant le champ ref)
+const PROFILS_ANCIENS = { Planche: { voix: false } };
+const egalProfil = (p, d) => CHAMPS.every(k => (k in ANGLES_DEFAUT ? (p[k] ?? ANGLES_DEFAUT[k]) == (d[k] ?? ANGLES_DEFAUT[k]) : typeof d[k] === 'boolean' ? !!p[k] === !!d[k] : +p[k] === +d[k]));
+function mettreAJourProfils() {
+  let change = false;
+  for (const p of profils) {
+    if (p.modifie) continue;
+    if (!p.ref) { // enregistré par une ancienne version : profil livré si identique à une version livrée
+      const d = PROFILS_DEFAUT.find(d => d.nom === p.nom);
+      if (!d) { p.modifie = true; change = true; continue; }
+      if (egalProfil(p, d) || egalProfil(p, { ...d, ...(PROFILS_ANCIENS[d.nom] || {}) })) p.ref = d.ref; else { p.modifie = true; change = true; continue; }
+    }
+    const d = PROFILS_DEFAUT.find(d => d.ref === p.ref);
+    if (d && !egalProfil(p, d)) { Object.assign(p, d); change = true; }
+  }
+  if (change || profils.some(p => p.ref && !p.modifie)) store.set('profils', profils);
+}
 let profils = [], profilActif = 0, profilEdite = null;
 const valeur = id => $(id).type === 'checkbox' ? $(id).checked : +$(id).value;
 function initProfils() {
@@ -767,8 +859,10 @@ function initProfils() {
   if (!Array.isArray(profils) || !profils.length) { // première fois : le profil Foil reprend les réglages en place
     profils = PROFILS_DEFAUT.map(p => ({ ...p }));
     CHAMPS.forEach(k => { if (store.get(k, null) != null) profils[0][k] = valeur(k); });
+    if (!egalProfil(profils[0], PROFILS_DEFAUT[0])) profils[0].modifie = true;   // réglages déjà en place : à garder
     store.set('profils', profils);
   }
+  mettreAJourProfils();
   profilActif = Math.min(store.get('profilActif', 0), profils.length - 1);
   appliquerProfil(profilActif);
 }
@@ -782,7 +876,25 @@ function resumeProfil(p) {
   const angles = (p.coneAlerte || 50) != 50 || (p.conePre || 10) != 10 || (p.coneVeille || 110) != 110 ? ` · angles ${p.coneAlerte || 50}/${p.conePre || 10}/${p.coneVeille || 110}°` : '';
   return `${fr(+p.seuil)} m d'eau · ${p.antic} s · dès ${p.vmin} km/h${angles} · ` + [p.bips && 'bips', p.voix && 'voix', p.veille && 'veille', p.preAlerte && 'pré-alerte', p.smooth && 'fonds lisses'].filter(Boolean).join(', ');
 }
-function majProfil() { $('nomProfil').textContent = profils[profilActif].nom + ' ▾'; $('resumeProfil').textContent = resumeProfil(profils[profilActif]); }
+// accueil : une ligne par réglage, quelques mots par valeur (le détail des réglages est dans Premiers pas et la notice)
+function lignesProfil(p) {
+  const oui = (b, x) => b ? 'oui' + (x ? ' · ' + x : '') : 'non';
+  return [
+    ['Eau minimale sous la planche', fr(+p.seuil) + ' m'],
+    ['Alerte', p.antic + ' s avant le danger'],
+    ['Radar actif dès', p.vmin + ' km/h'],
+    ['Angle d\'alerte', '±' + (p.coneAlerte || 50) + '°'],
+    ['Pré-alerte (tintement)', oui(p.preAlerte, '±' + (p.conePre || 10) + '°')],
+    ['Veille sur les côtés', oui(p.veille, '±' + (p.coneVeille || 110) + '°')],
+    ['Sons', [p.bips && 'bips', p.voix && 'voix'].filter(Boolean).join(' + ') || 'aucun'],
+    ['Fonds lisses (sable, vase)', oui(p.smooth)],
+  ];
+}
+function majProfil() {
+  $('nomProfil').textContent = profils[profilActif].nom + ' ▾';
+  const r = $('resumeProfil'); r.innerHTML = '';
+  for (const [k, v] of lignesProfil(profils[profilActif])) r.append(Object.assign(document.createElement('span'), { textContent: k }), Object.assign(document.createElement('b'), { textContent: v }));
+}
 function rendreProfils() {
   const l = $('listeProfils'); l.innerHTML = '';
   profils.forEach((p, i) => {
@@ -799,7 +911,7 @@ function editerProfil(i) {
 }
 function enregistrerProfil() {
   if (profilEdite == null) return;
-  const p = profils[profilEdite];
+  const p = profils[profilEdite]; p.modifie = true;
   CHAMPS.forEach(k => p[k] = valeur(k)); p.nom = $('pNom').value.trim() || 'Sans nom';
   store.set('profils', profils); saveSettings(); majProfil(); rendreProfils();
 }
@@ -810,8 +922,8 @@ function fermerProfils() { $('fProfils').classList.remove('on'); profilEdite = n
 $('carteProfil').onclick = ouvrirProfils;
 $('fermerProfils').onclick = fermerProfils;
 $('fProfils').onclick = e => { if (e.target === $('fProfils')) fermerProfils(); };
-$('nouveauProfil').onclick = () => { profils.push({ ...PROFILS_DEFAUT[0], nom: 'Nouveau profil' }); store.set('profils', profils); rendreProfils(); editerProfil(profils.length - 1); rendreProfils(); };
-$('dupliquerProfil').onclick = () => { if (profilEdite == null) return; profils.push({ ...profils[profilEdite], nom: profils[profilEdite].nom + ' (copie)' }); store.set('profils', profils); editerProfil(profils.length - 1); rendreProfils(); };
+$('nouveauProfil').onclick = () => { profils.push({ ...PROFILS_DEFAUT[0], ref: undefined, modifie: true, nom: 'Nouveau profil' }); store.set('profils', profils); rendreProfils(); editerProfil(profils.length - 1); rendreProfils(); };
+$('dupliquerProfil').onclick = () => { if (profilEdite == null) return; profils.push({ ...profils[profilEdite], ref: undefined, modifie: true, nom: profils[profilEdite].nom + ' (copie)' }); store.set('profils', profils); editerProfil(profils.length - 1); rendreProfils(); };
 $('supprimerProfil').onclick = () => {
   if (profilEdite == null || profils.length < 2) return;
   if (!confirm('Supprimer le profil « ' + profils[profilEdite].nom + ' » ?')) return;
@@ -824,9 +936,60 @@ function route() {
   const h = location.hash, av = h === '#avance';
   $('setup').hidden = av; $('avance').hidden = !av;
   if (h === '#profils') ouvrirProfils();
+  if (h === '#accueil') { history.replaceState(null, '', location.pathname); guideAccueil(); }
   scrollTo(0, 0);
 }
 addEventListener('hashchange', route);
+
+// ---------- Accueil du premier lancement : 4 écrans ----------
+function guideAccueil(apres) {
+  const g = document.createElement('div'); g.className = 'guideAccueil';
+  document.body.append(g);
+  let i = 0;
+  const ecrans = [
+    { titre: 'Radar roches', html: `<p>Tu navigues, il surveille les cailloux.</p>
+      <ul><li>Il connaît le <b>relief du fond au mètre près</b> (relevé laser Litto3D du Shom et de l'IGN) et la <b>marée de l'instant</b>.</li>
+      <li>S'il reste trop peu d'eau <b>sur ta route</b>, il te prévient <b>avant</b>, au son : où est le danger, à quelle distance.</li>
+      <li>Le téléphone reste <b>dans sa pochette, écran éteint</b>, sur toi : pas besoin de le regarder. Et tu gardes de quoi appeler en cas de pépin.</li></ul>
+      <div class="encadre"><b>Ses limites</b> : il ne connaît que les zones couvertes (onglet Plus → Carte) et le fond tel qu'il a été mesuré (2014 à 2021 selon
+      les secteurs) : sable et vase bougent, bouées, bateaux et autres usagers ne sont pas détectés. <b>C'est une aide à la vigilance, pas un pilote</b>.</div>` },
+    { titre: 'Ta zone', html: `<p>Le radar a besoin de la <b>carte des roches de ton spot</b>. Télécharge-la maintenant, de préférence en Wi-Fi : sur l'eau, il n'y a souvent pas de réseau.</p>
+      <div class="encadre" id="gaZone"></div>
+      <p class="mu">Autre spot ? Toutes les zones sont dans <b>Plus → Carte et téléchargements</b> : touche un cadre pour le télécharger.</p>`,
+      init: c => {
+        const z = zone, el = c.querySelector('#gaZone');
+        if (!z) { el.textContent = 'Zones en cours de chargement…'; return; }
+        el.append(Object.assign(document.createElement('div'), { className: 'mu', textContent: 'Zone choisie d\'après ta position (ou la dernière utilisée) :' }), ligneZone(z));
+      } },
+    { titre: 'Les sons', html: `<p>Sur l'eau, tout passe par le son : un tintement prévient de loin, des bips disent <b>où</b> est le danger, une voix précise.
+      Écoute-les une fois, son monté :</p><button class="btn prim" id="gaSons" style="width:100%;padding:13px">🔊 Écouter les sons (20 s)</button>
+      <ul class="etapesSons" id="gaListe"></ul>`,
+      init: c => { const l = c.querySelector('#gaListe'); l.innerHTML = ETAPES_SONS.map(e => '<li>' + e[1] + '</li>').join(''); c.querySelector('#gaSons').onclick = () => demoSonsGuidee(l); } },
+    { titre: 'Avant d\'aller à l\'eau', html: `<ul>
+      <li><b>Autorisations</b> : au premier « Démarrer », Android demande la position : réponds <b>« Toujours autoriser »</b>, et accepte les notifications.
+        Si une étiquette rouge « Optimisation batterie » apparaît sur l'accueil, touche-la et choisis <b>« Sans restriction »</b>. Sans ça, le radar s'endort écran éteint.</li>
+      <li><b>Le téléphone</b> : chargé, dans une <b>pochette étanche</b>, porté <b>sur toi</b> (poche poitrine de la combinaison, harnais ou gilet), pas dans le sac.
+        Son au maximum. Tu peux <b>verrouiller l'écran</b> : le radar continue.</li>
+      <li><b>Sur la plage</b> : choisis ton profil (Prudent pour une première fois), touche <b>Démarrer</b>, attends « Radar actif ».
+        Pour couper le son un moment : appui long sur <b>Muet</b>. Pour arrêter : <b>glisser</b> le bouton.</li>
+      <li><b>Après</b> : revois ta séance dans l'onglet <b>Rejeu</b>.</li></ul>
+      <p class="mu">Tout est repris dans <b>Plus → Premiers pas</b>.</p>` },
+  ];
+  const fin = () => { demoMinuteurs.forEach(clearTimeout); continu(false); store.set('accueilVu', true); g.remove(); if (apres) apres(); };
+  const afficher = () => {
+    const e = ecrans[i];
+    g.innerHTML = `<div class="points">${ecrans.map((_, j) => `<i class="${j === i ? 'on' : ''}"></i>`).join('')}</div><h2></h2><div class="corps">${e.html}</div>
+      <div class="bas"><button class="btn" id="gaPrec"></button><button class="btn prim" id="gaSuiv"></button></div>`;
+    g.querySelector('h2').textContent = e.titre;
+    const prec = g.querySelector('#gaPrec'), suiv = g.querySelector('#gaSuiv');
+    prec.textContent = i ? 'Retour' : 'Passer'; suiv.textContent = i < ecrans.length - 1 ? 'Suivant' : 'C\'est parti';
+    prec.onclick = () => { if (i) { i--; afficher(); } else fin(); };
+    suiv.onclick = () => { if (i < ecrans.length - 1) { i++; afficher(); } else fin(); };
+    if (e.init) e.init(g);
+    g.scrollTop = 0;
+  };
+  afficher();
+}
 
 // ---------- Démarrage ----------
 (async () => {
@@ -839,7 +1002,9 @@ addEventListener('hashchange', route);
   if (premiereOuverture) { $('testMode').checked = false; $('simMode').checked = false; saveSettings(); }
   styleMontre = $('styleMontre').value; $('testH').oninput(); $('simMode').onchange(); showGeoInfo();
   initProfils(); route(); demarrerGpsAccueil(); majVerifs();
-  if (premiereOuverture && window.androidBridge) nouveautes.ouvrir(); // après une mise à jour : quoi de neuf
+  // premier lancement (ou nouvel accueil jamais vu) : quelques écrans d'accueil, puis les nouveautés
+  const accueilAFaire = !store.get('accueilVu', false) && (window.androidBridge || /[?&]accueil/.test(location.search));
+  if (!accueilAFaire && premiereOuverture && window.androidBridge) nouveautes.ouvrir(); // après une mise à jour : quoi de neuf
   addEventListener('load', () => diagEtat().then(t => $('diagInfo').textContent = t));
   setTimeout(() => { // chargement anormalement long : dire ce qui manque
     if (chargementEnAttente.size) $('dataInfo').textContent = 'Chargement bloqué sur : ' + [...chargementEnAttente].join(', ');
@@ -851,6 +1016,7 @@ addEventListener('hashchange', route);
     const r = store.get('recal', null);
     if (r && r.jour === new Date().toDateString() && PORTS.some(p => p.id === r.port)) { $('offPort').value = r.port; r.rows.forEach(offRow); }
     applyRecal(); $('start').disabled = false; $('dataInfo').textContent = '';
+    if (accueilAFaire) guideAccueil(() => { if (window.androidBridge) nouveautes.ouvrir(); });
     await recalageDirect(); updHNow(); setInterval(updHNow, 60000);
   } catch (err) {
     $('dataInfo').innerHTML = '<span class="err">' + (location.protocol === 'file:'

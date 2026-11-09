@@ -56,7 +56,7 @@ Garde la carte marine en tête et ta vigilance : l'appli ne la remplace pas.</di
   <li><a href="#montre">Appli montre Garmin</a></li>
   <li><a href="#test">Utilisation en test (à terre)</a></li>
   <li><a href="#carte">Carte, téléchargements et roches partagées</a></li>
-  <li><a href="#editeur">Ajouter ses propres roches (onglet Roches)</a></li>
+  <li><a href="#editeur">Ajouter ses propres roches (Plus → Mes roches)</a></li>
   <li><a href="#rejeu">Rejouer une session</a></li>
   <li><a href="#web">Version web (ordinateur)</a></li>
   <li><a href="#maj">Mises à jour</a></li>
@@ -99,8 +99,10 @@ Par défaut, seules les <b>roches</b> déclenchent une alerte ; les fonds lisses
 </ol>
 
 <h2 id="radar">3. Utiliser le radar (téléphone)</h2>
-<p>L'appli s'ouvre sur le radar. En bas, trois onglets : <b>Radar</b>, <b>Roches</b> (tes roches, § 9) et <b>Plus</b>
-(carte et téléchargements, rejeu, profils, réglages avancés, modération, notice, version de l'appli).</p>
+<p>Au premier lancement, quatre écrans d'accueil présentent l'appli, sa zone, les sons et ce qu'il faut faire avant d'aller à l'eau (à revoir dans
+<b>Plus → Premiers pas</b>). L'appli s'ouvre ensuite sur le radar. En bas, trois onglets : <b>Radar</b>, <b>Rejeu</b> (§ 10) et <b>Plus</b>
+(premiers pas, carte et téléchargements, mes roches § 9, profils, notice, nouveautés ; sous « Avancé » : réglages avancés, journaux de session, modération).
+Après une séance de plus de 3 minutes, l'appli propose de la revoir dans le rejeu.</p>
 <h3>L'accueil : prêt à partir</h3>
 <ul>
   <li><b>Carte de marée</b> : hauteur d'eau maintenant, sens (montante ou descendante), deux prochaines pleines et basses mers, courbe des prochaines heures,
@@ -132,7 +134,8 @@ Par défaut, seules les <b>roches</b> déclenchent une alerte ; les fonds lisses
 <h2 id="reglages">4. Profils et réglages</h2>
 <h3>Profils de navigation</h3>
 <p>Un profil regroupe les réglages d'alerte. Quatre profils sont fournis, tous modifiables : <b>Foil</b> (2 m d'eau, 7 s), <b>Planche</b> (1,5 m, 6 s),
-<b>Kite</b> (1 m, 8 s) et <b>Prudent</b> (3 m, 12 s, fonds lisses compris). Touche la carte « Profil » de l'accueil (ou <b>Plus → Profils</b>) :</p>
+<b>Kite</b> (1 m, 8 s) et <b>Prudent</b> (3 m, 12 s, fonds lisses compris). L'accueil affiche chaque réglage du profil actif. Un profil fourni que tu n'as
+jamais modifié suit les améliorations des mises à jour ; dès que tu le modifies, il reste tel quel. Touche la carte « Profil » de l'accueil (ou <b>Plus → Profils</b>) :</p>
 <ul>
   <li>touche un profil pour l'utiliser ;</li>
   <li>touche le crayon ✎ pour le modifier : nom et réglages ci-dessous, enregistrés aussitôt ;</li>
@@ -159,7 +162,7 @@ Par défaut, seules les <b>roches</b> déclenchent une alerte ; les fonds lisses
   <tr><td>Écouter les sons</td><td>Fait entendre chaque son avant de partir.</td></tr>
   <tr><td>Relayer sur la montre</td><td>Envoie des notifications Android (relayées par l'appli de ta montre) : démarrage, dangers et leur déplacement, GPS perdu, batterie faible. Inutile avec l'appli montre Garmin.
     Format « grille » : 3 × 3 cases autour de toi, cap vers le haut, distance du plus proche au centre ; <b>X</b> = roche, <b>S</b> = fond lisse (sable, vase), <b>O</b> = rien.</td></tr>
-  <tr><td>Mes roches</td><td>Import d'un fichier GeoJSON de roches (les roches de l'onglet Roches sont déjà utilisées automatiquement).</td></tr>
+  <tr><td>Mes roches</td><td>Import d'un fichier GeoJSON de roches (les roches de Plus → Mes roches sont déjà utilisées automatiquement).</td></tr>
   <tr><td>Essais</td><td>Test GPS, mode test, simulation : voir § 7.</td></tr>
 </table>
 
@@ -248,7 +251,7 @@ elles apparaissent dans les statistiques, rubrique Connect IQ / Radar roches.
   <li><b>Plus → Réglages avancés et essais</b>. <b>Tester le GPS (30 s)</b> : à faire à terre ; il faut environ une position par seconde.</li>
   <li><b>Mode test : hauteur d'eau forcée</b> : remplace la marée par la hauteur choisie (pour vérifier les alertes à une marée donnée).</li>
   <li><b>Ignorer le relevé Litto3D</b> : avec le mode test, seules tes roches de test comptent (essai sur un parking).</li>
-  <li><b>Roches de test</b> : dans l'onglet Roches, coche « test » avant d'ajouter une roche (◎ Ici la pose à ta position) ; elles ne servent qu'en mode test et ne sont jamais partagées.</li>
+  <li><b>Roches de test</b> : dans Plus → Mes roches, coche « test » avant d'ajouter une roche (◎ Ici la pose à ta position) ; elles ne servent qu'en mode test et ne sont jamais partagées.</li>
   <li><b>Simulation</b> : sans GPS, une planche virtuelle se déplace (flèches à l'écran) depuis un point de départ choisi.</li>
   <li>Pour un essai à pied, mets <b>Alertes à partir de</b> à 0 km/h, puis remets 8 km/h.</li>
 </ul>
@@ -278,7 +281,7 @@ montre (violet), tes roches (turquoise), jeux de roches partagés (orange). Sect
   <li><b>Modération</b> (réservée, Plus → Modération) : connexion modérateur, jeux en attente en rouge pointillé, aperçu, valider ou refuser.</li>
 </ul>
 
-<h2 id="editeur">9. Ajouter ses propres roches (onglet Roches)</h2>
+<h2 id="editeur">9. Ajouter ses propres roches (Plus → Mes roches)</h2>
 <p>Pour une roche absente du relevé laser ou une zone mal couverte. La carte occupe tout l'écran ; le panneau du bas se replie, s'ouvre à mi-hauteur
 ou en grand (touche la barrette ou le titre « Mes roches »). Sur ordinateur, le panneau est sur le côté (<a href="#web">version web</a>).</p>
 <ol>
@@ -348,7 +351,7 @@ ou en grand (touche la barrette ou le titre « Mes roches »). Sur ordinateur, l
   <tr><td>L'écran s'allume pendant la navigation</td><td>Ce sont les notifications du relais montre : laisse « Notifications discrètes » coché (Plus → Réglages avancés → Montre), ou coupe le relais si tu n'as pas de montre.
     Dans la pochette, mets l'écran <b>vers l'extérieur</b> et active, s'il existe, le réglage Android « Protection contre les appuis accidentels » (mode poche). Muet demande un appui maintenu.</td></tr>
   <tr><td>Pas de son, ou trop faible</td><td>Les alertes passent par le volume <b>alarme</b> du téléphone, poussé au maximum pendant le radar (réglage « Alertes au volume maximum »).
-    Teste avant de partir : Plus → Réglages avancés → <b>Écouter les sons</b>, téléphone dans sa pochette. Sous une combinaison et un gilet, le son est très étouffé :
+    Teste avant de partir : <b>🔊 Écouter les sons</b> sur l'accueil du radar, téléphone dans sa pochette. Sous une combinaison et un gilet, le son est très étouffé :
     place la pochette au-dessus du gilet (bras, épaule, harnais), ou utilise une montre.</td></tr>
   <tr><td>Signaler un problème</td><td><b>Plus → Journaux de session</b> : un journal par lancement du radar (positions, alertes, sons joués, écran allumé ou éteint, état du téléphone).
     Touche <b>Envoyer</b> sur celui de la séance et partage-le (WhatsApp, e-mail). Il contient tes positions.

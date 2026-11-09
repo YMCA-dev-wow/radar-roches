@@ -99,11 +99,11 @@
   }
 </style>
 </head>
-<body data-onglet="plus">
+<body data-onglet="rejeu">
 <div id="app">
   <header>
     <a href="index.html" id="retour" style="color:var(--muted);text-decoration:none;font-size:22px;line-height:1">‹</a>
-    <script>if (window.androidBridge) document.getElementById('retour').href = 'plus.html';</script>
+    <script>if (window.androidBridge) document.getElementById('retour').hidden = true; // onglet de l'appli : pas de retour</script>
     <h1>Rejeu de session</h1>
     <button class="primary" id="gpxBtn">Ouvrir une trace (FIT, GPX ou journal)…</button>
     <input type="file" id="gpxFile" accept=".gpx,.fit,.jsonl,application/gpx+xml" hidden>
@@ -154,7 +154,7 @@
   <footer>
     <div id="ctrl">
       <button id="play" disabled>▶</button>
-      <select id="speed"><option>1</option><option>2</option><option selected>5</option><option>10</option><option>30</option><option>60</option></select><span class="sub">× vitesse</span>
+      <select id="speed"><option selected>1</option><option>2</option><option>5</option><option>10</option><option>30</option><option>60</option></select><span class="sub">× vitesse</span>
       <span id="clock">–</span>
       <label class="suivre"><input type="checkbox" id="follow"> Suivre</label>
       <span class="zoom"><button id="zMoins" title="Zoom arrière">−</button><button id="zPlus" title="Zoom avant (ou pincer la frise)">+</button><button id="zTout">Tout</button><button id="zHaut" title="Hauteur de la frise">↕</button></span>

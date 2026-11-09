@@ -1,5 +1,5 @@
-// Barre de navigation du bas de l'appli (Radar, Roches, Plus) et petites icônes communes, sans dépendance réseau.
-// L'onglet actif vient de <body data-onglet="radar|roches|plus">. La barre n'apparaît que dans l'appli Android :
+// Barre de navigation du bas de l'appli (Radar, Rejeu, Plus ; l'éditeur de roches est dans Plus) et petites icônes communes, sans dépendance réseau.
+// L'onglet actif vient de <body data-onglet="radar|rejeu|plus">. La barre n'apparaît que dans l'appli Android :
 // la version web (ordinateur) a sa propre page d'accueil.
 (function () {
   const svg = (d, t = 24) => `<svg width="${t}" height="${t}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
@@ -15,6 +15,7 @@
     zones: '<path d="M12 3 v10 M8 9 l4 4 4-4"/><path d="M4 15 l3 5 h10 l3-5"/>',
     journal: '<path d="M6 3 h9 l4 4 v14 H6 z"/><path d="M9 10 h7 M9 14 h7 M9 18 h4"/>',
     nouveautes: '<path d="M12 3 l2.2 5.6 L20 9.3 l-4.5 3.9 L17 19 l-5-3.2 L7 19 l1.5-5.8 L4 9.3 l5.8-.7 z"/>',
+    guide: '<path d="M4 5 h6 a2 2 0 0 1 2 2 v13 a2 2 0 0 0-2-2 H4 z"/><path d="M20 5 h-6 a2 2 0 0 0-2 2 v13 a2 2 0 0 1 2-2 h6 z"/>',
     notice: '<path d="M5 4 h10 l4 4 v12 H5 z"/><path d="M14 4 v5 h5 M8 13 h8 M8 17 h6"/>',
     montre: '<rect x="7" y="6" width="10" height="12" rx="3"/><path d="M9 6 l1-3 h4 l1 3 M9 18 l1 3 h4 l1-3"/>',
     telecharger: '<path d="M12 4 v11 M7 10 l5 5 5-5 M5 20 h14"/>',
@@ -26,7 +27,7 @@
   const appli = !!window.androidBridge;
   document.documentElement.classList.toggle('appli', appli);
   if (!appli) return;
-  const onglets = [['radar', 'radar.html', 'Radar'], ['roches', 'editeur_zones.html', 'Roches'], ['plus', 'plus.html', 'Plus']];
+  const onglets = [['radar', 'radar.html', 'Radar'], ['rejeu', 'rejeu.html', 'Rejeu'], ['plus', 'plus.html', 'Plus']];
   document.addEventListener('DOMContentLoaded', () => {
     if (document.body.dataset.sansBarre != null) return;
     const actif = document.body.dataset.onglet || 'plus';

@@ -2,6 +2,18 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 28,
+      "date": "2026-11-09",
+      "titre": "Prise en main plus simple",
+      "points": [
+        "Onglets : Radar, Rejeu, Plus. L'éditeur de roches est dans Plus → Mes roches ; les outils de réglage fin sont regroupés sous « Avancé ».",
+        "Nouveau : Plus → Premiers pas, l'essentiel avant une première session (zone, sons, port du téléphone, profils, limites). Quatre écrans d'accueil le résument au premier lancement.",
+        "Accueil du radar : chaque réglage du profil est affiché, et « 🔊 Écouter les sons » fait entendre chaque son avec sa signification.",
+        "Profil Planche : la voix est activée. Les profils fournis que tu n'as jamais modifiés suivent les mises à jour ; un profil modifié reste tel quel.",
+        "Après une séance, l'appli propose de la revoir dans le rejeu. Le rejeu démarre maintenant à vitesse réelle (×1)."
+      ]
+    },
+    {
       "id": 27,
       "date": "2026-11-09",
       "titre": "Rejeu : tes séances en un toucher",
