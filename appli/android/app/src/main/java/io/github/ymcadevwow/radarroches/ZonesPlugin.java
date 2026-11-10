@@ -6,24 +6,27 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 /**
  * Relief des zones (tuiles Litto3D) téléchargé à la demande, comme les cartes de Maps.me : l'appli ne contient plus que
  * les pages, les marées et la description des zones ; chaque zone est téléchargée une fois (Wi-Fi conseillé) dans les
  * fichiers de l'appli, puis lue sur place, sans réseau (TuilesPlugin).
+ * Le site publie le relief d'une zone en quelques paquets (relief_N.pack : PNG des tuiles mis bout à bout, index
+ * relief.json) ; chaque paquet est lu d'un bout à l'autre et redécoupé en tuiles au fil du téléchargement.
  * Dossier : fichiers de l'appli / zones / <dossier de la zone> / tuiles / 16 / x / y.png, plus « version.txt » une fois
- * la zone complète (même version que donnees/zones.json : sinon, mise à jour proposée).
+ * la zone complète (même version que donnees/zones.json : sinon, mise à jour proposée). Reprise : un paquet terminé est
+ * marqué (paquet_<nom>.ok) et n'est pas retéléchargé tant que la version ne change pas.
  */
 @CapacitorPlugin(name = "Zones")
 public class ZonesPlugin extends Plugin {
@@ -46,6 +49,14 @@ public class ZonesPlugin extends Plugin {
         f.delete();
     }
 
+    private static String lire(File f) {
+        try { return f.exists() ? new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8).trim() : null; } catch (Exception e) { return null; }
+    }
+
+    private static void ecrire(File f, String s) throws IOException {
+        try (FileOutputStream o = new FileOutputStream(f)) { o.write(s.getBytes(StandardCharsets.UTF_8)); }
+    }
+
     // État de chaque zone : version complète présente (ou null), place occupée
     @PluginMethod
     public void etat(PluginCall call) {
@@ -53,10 +64,9 @@ public class ZonesPlugin extends Plugin {
         JSObject r = new JSObject();
         if (dossiers != null) for (int i = 0; i < dossiers.length(); i++) {
             String d = dossiers.optString(i);
-            File z = new File(racine(getContext()), d), v = new File(z, "version.txt");
+            File z = new File(racine(getContext()), d);
             JSObject o = new JSObject();
-            try { o.put("version", v.exists() ? new String(Files.readAllBytes(v.toPath()), StandardCharsets.UTF_8).trim() : null); }
-            catch (Exception e) { o.put("version", null); }
+            o.put("version", lire(new File(z, "version.txt")));
             o.put("taille", taille(z));
             o.put("enCours", d.equals(enCours));
             r.put(d, o);
@@ -64,52 +74,54 @@ public class ZonesPlugin extends Plugin {
         call.resolve(r);
     }
 
-    // Téléchargement d'une zone : liste des tuiles « x/y », adresse du site, version. Reprise possible (tuiles déjà là
-    // conservées si la version n'a pas changé). Avancement : évènement « progres » ; fin : résolution de l'appel.
+    // Téléchargement d'une zone : { dossier, base (adresse du site), version, zoom, packs: [{ nom, taille, tuiles: [[ "x/y",
+    // début, longueur ], …] }] } (tuiles triées par position dans le paquet). Avancement : évènement « progres » (tuiles
+    // écrites / total) ; fin : résolution de l'appel { erreurs, annule, taille, version si complète }.
     @PluginMethod
     public void telecharger(PluginCall call) {
         final String dossier = call.getString("dossier"), base = call.getString("base"), version = call.getString("version", "1");
         final int zoom = call.getInt("zoom", 16);
-        final JSArray tuiles = call.getArray("tuiles");
-        if (dossier == null || base == null || tuiles == null) { call.reject("paramètres manquants"); return; }
+        final JSArray packs = call.getArray("packs");
+        if (dossier == null || base == null || packs == null) { call.reject("paramètres manquants"); return; }
         if (enCours != null) { call.reject("un téléchargement est déjà en cours (" + enCours + ")"); return; }
         enCours = dossier; annule = false;
         call.setKeepAlive(true);
         new Thread(() -> {
             File z = new File(racine(getContext()), dossier), v = new File(z, "version.txt"), vEnCours = new File(z, "version_en_cours.txt");
             try {
-                // nouvelle version : on repart de zéro (sinon on complète ce qui manque)
-                String prec = vEnCours.exists() ? new String(Files.readAllBytes(vEnCours.toPath()), StandardCharsets.UTF_8).trim() : null;
-                if (v.exists() && !version.equals(new String(Files.readAllBytes(v.toPath()), StandardCharsets.UTF_8).trim())) effacer(z);
-                else if (prec != null && !version.equals(prec)) effacer(z);
+                // nouvelle version : on repart de zéro (sinon on reprend les paquets non terminés)
+                String fin = lire(v), prec = lire(vEnCours);
+                if ((fin != null && !version.equals(fin)) || (prec != null && !version.equals(prec))) effacer(z);
                 z.mkdirs(); v.delete();
-                try (FileOutputStream o = new FileOutputStream(vEnCours)) { o.write(version.getBytes(StandardCharsets.UTF_8)); }
-                final int n = tuiles.length();
-                final AtomicInteger fait = new AtomicInteger(0), erreurs = new AtomicInteger(0);
-                ExecutorService pool = Executors.newFixedThreadPool(6);
-                for (int i = 0; i < n; i++) {
-                    final String t = tuiles.optString(i);
-                    pool.execute(() -> {
-                        if (annule) return;
-                        File f = new File(z, "tuiles/" + zoom + "/" + t + ".png");
-                        if (!(f.exists() && f.length() > 0)) {
-                            boolean ok = false;
-                            for (int essai = 0; essai < 3 && !ok && !annule; essai++) ok = charger(base + dossier + "/tuiles/" + zoom + "/" + t + ".png", f);
-                            if (!ok) erreurs.incrementAndGet();
+                ecrire(vEnCours, version);
+                int total = 0;
+                for (int i = 0; i < packs.length(); i++) total += packs.getJSONObject(i).getJSONArray("tuiles").length();
+                int fait = 0, erreurs = 0;
+                for (int i = 0; i < packs.length() && !annule; i++) {
+                    JSONObject p = packs.getJSONObject(i);
+                    String nom = p.getString("nom");
+                    JSONArray tuiles = p.getJSONArray("tuiles");
+                    File ok = new File(z, "paquet_" + nom + ".ok");
+                    if (version.equals(lire(ok))) { fait += tuiles.length(); progres(dossier, fait, total, erreurs); continue; }
+                    boolean reussi = false;
+                    for (int essai = 0; essai < 3 && !reussi && !annule; essai++) {
+                        try {
+                            int n = decouper(base + dossier + "/" + nom, tuiles, new File(z, "tuiles/" + zoom), dossier, fait, total, erreurs);
+                            if (n == tuiles.length()) { reussi = true; ecrire(ok, version); }
+                        } catch (Exception e) {
+                            if (!annule) try { Thread.sleep(2000L * (essai + 1)); } catch (InterruptedException ignore) {}
                         }
-                        int k = fait.incrementAndGet();
-                        if (k % 25 == 0 || k == n) {
-                            JSObject p = new JSObject(); p.put("dossier", dossier); p.put("fait", k); p.put("total", n); p.put("erreurs", erreurs.get());
-                            notifyListeners("progres", p);
-                        }
-                    });
+                    }
+                    if (!reussi && !annule) erreurs += tuiles.length();
+                    fait += tuiles.length();
+                    progres(dossier, fait, total, erreurs);
                 }
-                pool.shutdown();
-                pool.awaitTermination(2, TimeUnit.HOURS);
-                JSObject r = new JSObject(); r.put("dossier", dossier); r.put("erreurs", erreurs.get()); r.put("annule", annule); r.put("taille", taille(z));
-                if (!annule && erreurs.get() == 0) {
-                    try (FileOutputStream o = new FileOutputStream(v)) { o.write(version.getBytes(StandardCharsets.UTF_8)); }
+                JSObject r = new JSObject(); r.put("dossier", dossier); r.put("erreurs", erreurs); r.put("annule", annule); r.put("taille", taille(z));
+                if (!annule && erreurs == 0) {
+                    ecrire(v, version);
                     vEnCours.delete();
+                    File[] l = z.listFiles();
+                    if (l != null) for (File x : l) if (x.getName().startsWith("paquet_")) x.delete();
                     r.put("version", version);
                 }
                 enCours = null;
@@ -118,22 +130,39 @@ public class ZonesPlugin extends Plugin {
         }, "radar-zones").start();
     }
 
-    private static boolean charger(String adresse, File f) {
-        HttpURLConnection c = null;
+    private void progres(String dossier, int fait, int total, int erreurs) {
+        JSObject p = new JSObject(); p.put("dossier", dossier); p.put("fait", fait); p.put("total", total); p.put("erreurs", erreurs);
+        notifyListeners("progres", p);
+    }
+
+    // Lit le paquet d'un bout à l'autre et écrit chaque tuile à sa place ; renvoie le nombre de tuiles écrites
+    private int decouper(String adresse, JSONArray tuiles, File dest, String dossier, int fait0, int total, int erreurs) throws Exception {
+        HttpURLConnection c = (HttpURLConnection) new URL(adresse).openConnection();
+        c.setConnectTimeout(15000); c.setReadTimeout(30000);
         try {
-            f.getParentFile().mkdirs();
-            c = (HttpURLConnection) new URL(adresse).openConnection();
-            c.setConnectTimeout(15000); c.setReadTimeout(30000);
-            if (c.getResponseCode() == 404) return true;   // tuile absente du site : rien à garder
-            if (c.getResponseCode() != 200) return false;
-            File tmp = new File(f.getPath() + ".tmp");
-            try (InputStream in = c.getInputStream(); FileOutputStream out = new FileOutputStream(tmp)) {
-                byte[] b = new byte[16384]; int r;
-                while ((r = in.read(b)) > 0) out.write(b, 0, r);
+            if (c.getResponseCode() != 200) throw new IOException("HTTP " + c.getResponseCode());
+            int n = 0;
+            try (InputStream in = new BufferedInputStream(c.getInputStream(), 65536)) {
+                long pos = 0;
+                for (int i = 0; i < tuiles.length(); i++) {
+                    if (annule) return n;
+                    JSONArray t = tuiles.getJSONArray(i);
+                    String k = t.getString(0); long debut = t.getLong(1); int lon = t.getInt(2);
+                    while (pos < debut) { long s = in.skip(debut - pos); if (s <= 0) { if (in.read() < 0) throw new IOException("paquet tronqué"); s = 1; } pos += s; }
+                    byte[] b = new byte[lon];
+                    int lu = 0;
+                    while (lu < lon) { int r = in.read(b, lu, lon - lu); if (r < 0) throw new IOException("paquet tronqué"); lu += r; }
+                    pos += lon;
+                    File f = new File(dest, k + ".png"), tmp = new File(dest, k + ".png.tmp");
+                    f.getParentFile().mkdirs();
+                    try (FileOutputStream o = new FileOutputStream(tmp)) { o.write(b); }
+                    if (!tmp.renameTo(f)) { f.delete(); if (!tmp.renameTo(f)) throw new IOException("écriture impossible"); }
+                    n++;
+                    if (n % 25 == 0) progres(dossier, fait0 + n, total, erreurs);
+                }
             }
-            return tmp.renameTo(f);
-        } catch (Exception e) { return false; }
-        finally { if (c != null) c.disconnect(); }
+            return n;
+        } finally { c.disconnect(); }
     }
 
     @PluginMethod

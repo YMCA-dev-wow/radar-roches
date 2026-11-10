@@ -2,6 +2,16 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 30,
+      "date": "2026-11-10",
+      "titre": "Téléchargement des zones plus rapide",
+      "points": [
+        "Le relief d'une zone se télécharge maintenant en quelques gros fichiers au lieu de milliers de petits : plus rapide, et prêt pour couvrir toute la Bretagne.",
+        "Les zones déjà téléchargées restent valables, rien à refaire. Les anciennes versions de l'appli ne peuvent plus télécharger de zone : mets l'appli à jour.",
+        "Rejeu : tes séances sont en haut du menu « Mes séances », les exemples en dessous."
+      ]
+    },
+    {
       "id": 29,
       "date": "2026-11-10",
       "titre": "Rejeu : deux séances d'exemple",

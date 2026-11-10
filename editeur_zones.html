@@ -157,6 +157,7 @@
 <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.min.js"></script>
 <script src="https://unpkg.com/leaflet-imageoverlay-rotated@0.2.1/Leaflet.ImageOverlay.Rotated.js"></script>
 <script src="fonds.js"></script>
+<script src="relief.js"></script>
 <script>
 // ---------- Modèle ----------
 // Une feature = { id, kind: 'point'|'zone', geom: [lat,lng] | [[lat,lng],...], nom, ref: 'decouvre'|'sonde',
@@ -412,17 +413,8 @@ function l3dTile(x, y) {
   const k = x + '/' + y;
   if (!l3dData.has(k)) {
     const zt = l3dZones.find(z => z.meta.set.has(k));
-    l3dData.set(k, !zt ? Promise.resolve(null) : new Promise(res => {
-      const img = new Image();
-      img.onload = () => {
-        const c = document.createElement('canvas'); c.width = c.height = 256;
-        const g = c.getContext('2d'); g.drawImage(img, 0, 0); res(g.getImageData(0, 0, 256, 256).data);
-      };
-      img.onerror = () => res(null);
-      // appli : le relief n'est plus embarqué (téléchargé par zone pour le radar) ; l'éditeur le lit sur le site
-      if (window.androidBridge) img.crossOrigin = 'anonymous'; // pixels lus ensuite (site : en-tête CORS ouvert)
-      img.src = (window.androidBridge ? 'https://ymca-dev-wow.github.io/radar-roches/' : '') + zt.dossier + '/tuiles/' + zt.meta.zoom + '/' + k + '.png';
-    }));
+    // relief lu sur le site, dans les paquets de la zone (relief.js) ; dans l'appli aussi (il n'est plus embarqué)
+    l3dData.set(k, !zt ? Promise.resolve(null) : Relief.pixels(zt.dossier, zt.meta.zoom, k).catch(() => null));
   }
   return l3dData.get(k);
 }

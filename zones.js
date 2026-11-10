@@ -26,15 +26,22 @@ const ZonesLocales = (() => {
     return e.version ? 'maj' : 'absente';
   }
   const signaler = () => window.dispatchEvent(new Event('zones-change'));
+  // Le site publie le relief en paquets (relief.json + relief_N.pack) : l'index dit où se trouve chaque tuile, Android
+  // télécharge chaque paquet et le redécoupe en tuiles (ZonesPlugin)
   async function telecharger(z, progres) {
-    const m = z.meta || await (await fetch(z.dossier + '/meta.json')).json();
+    const r = await fetch(SITE_Z + z.dossier + '/relief.json', { cache: 'no-store' });
+    if (!r.ok) throw new Error('index du relief introuvable (HTTP ' + r.status + ')');
+    const idx = await r.json();
+    const packs = idx.packs.map(p => ({ nom: p.nom, taille: p.taille, tuiles: [] }));
+    for (const [k, [p, debut, n]] of Object.entries(idx.tuiles)) packs[p].tuiles.push([k, debut, n]);
+    packs.forEach(p => p.tuiles.sort((a, b) => a[1] - b[1]));
     const ecoute = await P().addListener('progres', p => {
       if (p.dossier !== z.dossier) return;
       if (progres) progres(p.fait, p.total, p.erreurs);
       window.dispatchEvent(new CustomEvent('zones-progres', { detail: p }));
     });
     try {
-      return await P().telecharger({ dossier: z.dossier, base: SITE_Z, version: String(z.version_tuiles), zoom: m.zoom, tuiles: m.tuiles.map(t => t[0] + '/' + t[1]) });
+      return await P().telecharger({ dossier: z.dossier, base: SITE_Z, version: String(z.version_tuiles), zoom: idx.zoom, packs });
     } finally { ecoute.remove(); await lire(); signaler(); }
   }
   const annuler = () => P().annuler();

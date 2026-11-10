@@ -183,6 +183,7 @@
 <div id="busy" hidden></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="relief.js"></script>
 <script src="noyau.js"></script>
 <script>
 'use strict';
@@ -846,20 +847,24 @@ $('mesJBtn').onclick = async e => {
   const pan = $('mesJPan');
   if (!pan.hidden) { pan.hidden = true; return; }
   pan.hidden = false; pan.innerHTML = '';
-  pan.append(Object.assign(document.createElement('div'), { className: 'groupe', textContent: 'Exemples' }));
-  for (const [n, titre, sous] of EXEMPLES) {
-    const b = document.createElement('button'); b.className = 'ex' + (journauxAffiches.includes('exemple' + n) ? ' on' : '');
-    b.innerHTML = '<span></span><small></small>'; b.firstChild.textContent = titre; b.lastChild.textContent = sous;
-    b.onclick = () => { pan.hidden = true; ouvrirExemple(n, true); };
-    pan.append(b);
-  }
-  if (!APPLI) { pan.append(Object.assign(document.createElement('div'), { className: 'groupe', textContent: 'Tes séances : dans l\'appli Android, ou « Ouvrir une trace »' })); return; }
+  // tes séances d'abord (dès la première, c'est elles qu'on rejoue), les exemples en bas
+  const exemples = () => {
+    pan.append(Object.assign(document.createElement('div'), { className: 'groupe', textContent: 'Exemples' }));
+    for (const [n, titre, sous] of EXEMPLES) {
+      const b = document.createElement('button'); b.className = 'ex' + (journauxAffiches.includes('exemple' + n) ? ' on' : '');
+      b.innerHTML = '<span></span><small></small>'; b.firstChild.textContent = titre; b.lastChild.textContent = sous;
+      b.onclick = () => { pan.hidden = true; ouvrirExemple(n, true); };
+      pan.append(b);
+    }
+  };
+  const vide = t => pan.append(Object.assign(document.createElement('div'), { className: 'sub', textContent: t, style: 'padding:4px' }));
+  if (!APPLI) { vide("Tes séances : dans l'appli Android, ou « Ouvrir une trace » ci-dessus."); exemples(); return; }
   pan.append(Object.assign(document.createElement('div'), { className: 'groupe', textContent: 'Mes séances (téléphone)' }));
   let l = [];
-  try { l = (await Natif.journal.liste()).journaux || []; } catch (err) { pan.append('Lecture impossible : ' + err.message); return; }
-  if (!l.length) { pan.append('Aucun journal : un journal est créé à chaque lancement du radar.'); return; }
+  try { l = (await Natif.journal.liste()).journaux || []; } catch (err) { vide('Lecture impossible : ' + err.message); exemples(); return; }
+  if (!l.length) { vide('Pas encore de séance : un journal est créé à chaque lancement du radar.'); exemples(); return; }
   const choisis = new Set(journauxAffiches.filter(n => l.some(j => j.nom === n)));
-  const tete = document.createElement('div'); tete.className = 'tete'; tete.style.position = 'static';
+  const tete = document.createElement('div'); tete.className = 'tete';
   const bRej = document.createElement('button'); bRej.className = 'primary';
   const bAucun = document.createElement('button'); bAucun.textContent = 'Aucun';
   tete.append(bRej, bAucun); pan.append(tete);
@@ -881,6 +886,7 @@ $('mesJBtn').onclick = async e => {
     await rejouerJournaux(noms);
   };
   maj();
+  exemples();
 };
 document.addEventListener('click', e => { if (!$('mesJ').contains(e.target)) $('mesJPan').hidden = true; });
 </script>

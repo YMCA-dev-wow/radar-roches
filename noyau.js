@@ -174,26 +174,8 @@ function loadTile(x, y) {
   const zt = zone, chemin = zt.dossier + '/tuiles/' + meta.zoom + '/' + k + '.png';
   // Appli : le relief n'est plus dans l'appli mais téléchargé par zone (ZonesPlugin) ; s'il manque, on le cherche sur le
   // site quand le réseau le permet (rejeu, essais à terre). Sur l'eau sans réseau, seule une zone téléchargée compte.
-  const url = APPLI ? SITE + chemin : chemin;
-  // Décodage par fetch + createImageBitmap + OffscreenCanvas : il fonctionne page cachée (écran éteint), alors qu'une
-  // balise <img> n'est plus décodée tant que la page n'est pas affichée (constaté sur l'eau le 17/10 : radar aveugle
-  // hors des tuiles chargées écran allumé). <img> reste en secours pour les navigateurs qui n'ont pas ces fonctions.
-  const parImage = () => new Promise((res, rej) => {
-    const img = new Image();
-    img.onload = () => {
-      const c = document.createElement('canvas'); c.width = c.height = 256;
-      const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
-      res(g.getImageData(0, 0, 256, 256).data);
-    };
-    img.onerror = rej; img.src = url;
-  });
-  const parBitmap = async () => {
-    const r = await fetch(url); if (!r.ok) throw new Error('HTTP ' + r.status);
-    const bmp = await createImageBitmap(await r.blob(), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
-    const c = new OffscreenCanvas(256, 256), g = c.getContext('2d', { willReadFrequently: true });
-    g.drawImage(bmp, 0, 0); if (bmp.close) bmp.close();
-    return g.getImageData(0, 0, 256, 256).data;
-  };
+  // Site : le relief est publié en paquets, lus tuile par tuile (relief.js, décodage par createImageBitmap : il
+  // fonctionne page cachée, écran éteint, contrairement à une balise <img>).
   // Appli : décodage par Android (TuilesPlugin). Le 26/10, même par createImageBitmap, les tuiles demandées écran éteint
   // ne finissaient jamais de se charger : radar aveugle au-delà de la zone préchargée au départ.
   const parNatif = async () => {
@@ -203,7 +185,7 @@ function loadTile(x, y) {
     return d;
   };
   const sansDelai = (pr, ms) => Promise.race([pr, new Promise((_, rej) => setTimeout(() => rej(new Error('délai')), ms))]);
-  const navigateur = () => typeof createImageBitmap === 'function' && typeof OffscreenCanvas === 'function' && location.protocol !== 'file:' ? parBitmap() : parImage();
+  const navigateur = () => Relief.pixels(zt.dossier, meta.zoom, k);
   const p = (APPLI && Natif.tuiles ? sansDelai(parNatif(), 8000).catch(e => navigateur().catch(e2 => { if (window.journalTuile) journalTuile(k, e.message + ' / réseau : ' + e2.message); throw e2; })) : navigateur())
     .then(d => { if (zone === zt) tiles.set(k, d); }, () => { if (zone === zt) tiles.set(k, null); }); // zone changée pendant le chargement : on jette
   tiles.set(k, p);
