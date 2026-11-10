@@ -2,6 +2,15 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 29,
+      "date": "2026-11-10",
+      "titre": "Rejeu : deux séances d'exemple",
+      "points": [
+        "Onglet Rejeu → Mes séances → Exemples : deux séances réelles au Sillon, commentées. Exemple 1 : alerte entendue, roche évitée. Exemple 2 : pas d'alerte, collision avec roche (séance d'avant le radar).",
+        "Un bandeau indique quoi regarder et à quel moment ; la lecture démarre en vitesse réelle."
+      ]
+    },
+    {
       "id": 28,
       "date": "2026-11-09",
       "titre": "Prise en main plus simple",

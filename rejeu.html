@@ -33,6 +33,14 @@
   .mesJPan label { display: flex; padding: 9px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
   .mesJPan label b { font-weight: 600; } .mesJPan label small { color: var(--muted); margin-left: auto; }
   .mesJPan label.charge b::after { content: ' · affiché'; color: var(--accent); font-weight: 400; }
+  .mesJPan .groupe { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 10px 4px 2px; }
+  .mesJPan .ex { display: block; width: 100%; text-align: left; margin: 6px 0; padding: 9px 10px; }
+  .mesJPan .ex small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+  /* séance d'exemple : ce qu'il faut regarder */
+  #bandeauEx { flex-basis: 100%; background: #0d2a2e; border: 1px solid var(--accent); border-radius: 12px; padding: 8px 34px 8px 12px; position: relative; font-size: 13px; }
+  #bandeauEx b { color: var(--accent); } #bandeauEx .lieu { color: var(--muted); font-size: 12px; }
+  #bandeauEx ul { margin: 4px 0 0; padding-left: 18px; } #bandeauEx li { margin: 2px 0; }
+  #bandeauEx .x { position: absolute; top: 4px; right: 4px; padding: 2px 9px; }
   label { display: inline-flex; gap: 6px; align-items: center; }
   #app { display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: 1fr 340px; grid-template-areas: "h h" "m s" "f s"; height: 100%; }
   #app > header { grid-area: h; } #app > main { display: contents; } #app > footer { grid-area: f; } #map { grid-area: m; } #side { grid-area: s; }
@@ -107,9 +115,10 @@
     <h1>Rejeu de session</h1>
     <button class="primary" id="gpxBtn">Ouvrir une trace (FIT, GPX ou journal)…</button>
     <input type="file" id="gpxFile" accept=".gpx,.fit,.jsonl,application/gpx+xml" hidden>
-    <div class="mesJ" id="mesJ" hidden><button id="mesJBtn">Mes séances (téléphone) ▾</button><div class="mesJPan" id="mesJPan" hidden></div></div>
+    <div class="mesJ" id="mesJ"><button id="mesJBtn">Mes séances ▾</button><div class="mesJPan" id="mesJPan" hidden></div></div>
     <span class="sub" id="info">Charge une ancienne session (FIT de préférence : heures et vitesse exactes) pour rejouer les alertes du radar.</span>
     <span style="flex:1"></span>
+    <div id="bandeauEx" hidden></div>
   </header>
   <main>
     <div id="map"></div>
@@ -324,13 +333,13 @@ function lireFIT(buf) {
 }
 // Journal de session de l'appli (.jsonl) : une position par ligne « pos » (la, lo, v en km/h) ; l'en-tête « debut »
 // donne les réglages du radar pendant la séance, repris dans le rejeu pour retrouver les mêmes alertes
-let reglagesJournal = null, sautsJournal = [];
+let reglagesJournal = null, sautsJournal = [], exempleJournal = null;
 function lireJournal(txt) {
-  const out = []; reglagesJournal = null; sautsJournal = [];
+  const out = []; reglagesJournal = null; sautsJournal = []; exempleJournal = null;
   for (const l of txt.split('\n')) {
     if (!l.trim()) continue;
     let e; try { e = JSON.parse(l); } catch { continue; }
-    if (e.type === 'debut') reglagesJournal = reglagesJournal || e.reglages || null; // plusieurs journaux : réglages de la première séance
+    if (e.type === 'debut') { reglagesJournal = reglagesJournal || e.reglages || null; exempleJournal = exempleJournal || e.exemple || null; } // plusieurs journaux : réglages de la première séance
     else if (e.type === 'saut' && !e.ecarte) sautsJournal.push(e); // les candidats écartés (pompage, vitesse) restent dans le journal
     else if (e.type === 'pos' && isFinite(e.la) && isFinite(e.lo) && !e.sim) out.push({ t: e.t, lat: e.la, lon: e.lo, vDev: e.v != null ? e.v / 3.6 : null });
   }
@@ -770,6 +779,7 @@ async function ouvrirTrace(txt, nom) {
   if (!journal) sautsJournal = [];
   pts = journal ? lireJournal(txt) : typeof txt === 'string' ? lireGPX(txt, nom) : lireFIT(txt);
   const repris = journal ? appliquerReglagesJournal() : '';
+  if (typeof afficherBandeauEx === 'function') afficherBandeauEx(journal ? exempleJournal : null);
   $('vRow').hidden = !sansHeure;
   dernierGPX = [txt, nom];
   if (pts.length < 10) throw new Error('trop peu de points');
@@ -792,8 +802,33 @@ async function ouvrirTrace(txt, nom) {
   }
   const q = new URLSearchParams(location.search), nj = q.get('journal'), njs = q.get('journaux');
   if (APPLI && (nj || njs)) await rejouerJournaux(nj ? [nj] : njs.split(',').filter(Boolean));
-  if (APPLI) $('mesJ').hidden = false;
+  if (q.get('exemple')) await ouvrirExemple(q.get('exemple'), false);   // lien depuis l'accueil ou Premiers pas
 })();
+
+// Séances d'exemple livrées avec l'appli (outils/exemples_rejeu.py) : un rejeu commenté, sans avoir encore navigué
+const EXEMPLES = [
+  ['1', 'Exemple 1 : alerte entendue, roche évitée', 'Sillon · séance réelle avec le radar · 2 min 30'],
+  ['2', 'Exemple 2 : pas d\'alerte, collision avec roche', 'Sillon · séance sans le radar · 2 min 40'],
+];
+function afficherBandeauEx(ex) {
+  const b = $('bandeauEx');
+  if (!ex) { b.hidden = true; return; }
+  b.innerHTML = '<b></b> <span class="lieu"></span><ul></ul><button class="x" title="Fermer">✕</button>';
+  b.querySelector('b').textContent = ex.titre; b.querySelector('.lieu').textContent = ex.lieu || '';
+  for (const n of ex.notes || []) b.querySelector('ul').append(Object.assign(document.createElement('li'), { textContent: n }));
+  b.querySelector('.x').onclick = () => { b.hidden = true; };
+  b.hidden = false;
+}
+async function ouvrirExemple(n, lancer) {
+  try {
+    const txt = await (await fetch(`donnees/exemples/exemple${n}.jsonl`)).text();
+    await ouvrirTrace(txt, 'Exemple ' + n);
+    journauxAffiches = ['exemple' + n];
+    afficherBandeauEx(exempleJournal);
+    history.replaceState(null, '', 'rejeu.html?exemple=' + n);
+    if (lancer) togglePlay(true);   // appui sur le menu : le son peut démarrer tout de suite
+  } catch (err) { $('info').textContent = 'Exemple illisible : ' + err.message; }
+}
 
 // Journaux de session du téléphone : un ou plusieurs (à la suite, réglages de la première séance), sans passer par Plus
 let journauxAffiches = [];
@@ -810,13 +845,21 @@ $('mesJBtn').onclick = async e => {
   e.stopPropagation();
   const pan = $('mesJPan');
   if (!pan.hidden) { pan.hidden = true; return; }
-  pan.hidden = false; pan.textContent = 'Lecture…';
+  pan.hidden = false; pan.innerHTML = '';
+  pan.append(Object.assign(document.createElement('div'), { className: 'groupe', textContent: 'Exemples' }));
+  for (const [n, titre, sous] of EXEMPLES) {
+    const b = document.createElement('button'); b.className = 'ex' + (journauxAffiches.includes('exemple' + n) ? ' on' : '');
+    b.innerHTML = '<span></span><small></small>'; b.firstChild.textContent = titre; b.lastChild.textContent = sous;
+    b.onclick = () => { pan.hidden = true; ouvrirExemple(n, true); };
+    pan.append(b);
+  }
+  if (!APPLI) { pan.append(Object.assign(document.createElement('div'), { className: 'groupe', textContent: 'Tes séances : dans l\'appli Android, ou « Ouvrir une trace »' })); return; }
+  pan.append(Object.assign(document.createElement('div'), { className: 'groupe', textContent: 'Mes séances (téléphone)' }));
   let l = [];
-  try { l = (await Natif.journal.liste()).journaux || []; } catch (err) { pan.textContent = 'Lecture impossible : ' + err.message; return; }
-  pan.innerHTML = '';
-  if (!l.length) { pan.textContent = 'Aucun journal : un journal est créé à chaque lancement du radar.'; return; }
+  try { l = (await Natif.journal.liste()).journaux || []; } catch (err) { pan.append('Lecture impossible : ' + err.message); return; }
+  if (!l.length) { pan.append('Aucun journal : un journal est créé à chaque lancement du radar.'); return; }
   const choisis = new Set(journauxAffiches.filter(n => l.some(j => j.nom === n)));
-  const tete = document.createElement('div'); tete.className = 'tete';
+  const tete = document.createElement('div'); tete.className = 'tete'; tete.style.position = 'static';
   const bRej = document.createElement('button'); bRej.className = 'primary';
   const bAucun = document.createElement('button'); bAucun.textContent = 'Aucun';
   tete.append(bRej, bAucun); pan.append(tete);

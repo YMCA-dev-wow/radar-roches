@@ -963,7 +963,8 @@ function guideAccueil(apres) {
       } },
     { titre: 'Les sons', html: `<p>Sur l'eau, tout passe par le son : un tintement prévient de loin, des bips disent <b>où</b> est le danger, une voix précise.
       Écoute-les une fois, son monté :</p><button class="btn prim" id="gaSons" style="width:100%;padding:13px">🔊 Écouter les sons (20 s)</button>
-      <ul class="etapesSons" id="gaListe"></ul>`,
+      <ul class="etapesSons" id="gaListe"></ul>
+      <p class="mu">Pour voir le radar en action sur de vraies séances : onglet <b>Rejeu</b> → <b>Mes séances</b> → <b>Exemples</b>.</p>`,
       init: c => { const l = c.querySelector('#gaListe'); l.innerHTML = ETAPES_SONS.map(e => '<li>' + e[1] + '</li>').join(''); c.querySelector('#gaSons').onclick = () => demoSonsGuidee(l); } },
     { titre: 'Avant d\'aller à l\'eau', html: `<ul>
       <li><b>Autorisations</b> : au premier « Démarrer », Android demande la position : réponds <b>« Toujours autoriser »</b>, et accepte les notifications.
