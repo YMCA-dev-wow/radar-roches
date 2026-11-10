@@ -26,7 +26,9 @@
   input[type=number] { width: 70px; }
   /* journaux du téléphone : menu déroulant à cases, rejeu direct */
   .mesJ { position: relative; }
-  .mesJPan { position: absolute; top: calc(100% + 6px); left: 0; z-index: 3500; width: min(360px, calc(100vw - 24px)); max-height: 60vh; overflow: auto;
+  /* fixé à l'écran (et non sous le bouton) : jamais plus large que la fenêtre, quel que soit l'endroit du bouton ;
+     haut et gauche placés à l'ouverture (placerMenuJ) */
+  .mesJPan { position: fixed; z-index: 3500; width: min(380px, calc(100vw - 24px)); max-height: 60vh; overflow: auto; box-sizing: border-box;
     background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px; box-shadow: 0 10px 30px #000a; }
   .mesJPan .tete { display: flex; gap: 8px; align-items: center; position: sticky; top: -8px; background: var(--panel); padding: 4px 0 8px; border-bottom: 1px solid var(--line); }
   .mesJPan .tete button { flex: 1; }
@@ -846,6 +848,11 @@ $('mesJBtn').onclick = async e => {
   e.stopPropagation();
   const pan = $('mesJPan');
   if (!pan.hidden) { pan.hidden = true; return; }
+  // sous le bouton, aligné sur lui si la place le permet, sinon décalé pour rester dans l'écran (12 px de marge)
+  const r = $('mesJBtn').getBoundingClientRect(), largeur = Math.min(380, innerWidth - 24);
+  pan.style.top = (r.bottom + 6) + 'px';
+  pan.style.left = Math.max(12, Math.min(r.left, innerWidth - 12 - largeur)) + 'px';
+  pan.style.maxHeight = Math.max(200, innerHeight - r.bottom - 90) + 'px';   // au-dessus de la barre d'onglets
   pan.hidden = false; pan.innerHTML = '';
   // tes séances d'abord (dès la première, c'est elles qu'on rejoue), les exemples en bas
   const exemples = () => {

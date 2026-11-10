@@ -2,6 +2,14 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 31,
+      "date": "2026-11-10",
+      "titre": "Petite correction",
+      "points": [
+        "Rejeu : le menu « Mes séances » tient dans la largeur de l'écran, plus besoin de le faire glisser pour le lire."
+      ]
+    },
+    {
       "id": 30,
       "date": "2026-11-10",
       "titre": "Téléchargement des zones plus rapide",
