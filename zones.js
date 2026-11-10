@@ -6,7 +6,7 @@
 // « zones-change » quand l'état d'une zone a changé (fin de téléchargement, suppression).
 'use strict';
 const ZonesLocales = (() => {
-  const SITE_Z = 'https://ymca-dev-wow.github.io/radar-roches/';
+  const RELIEF_Z = 'https://ymca-dev-wow.github.io/radar-roches-relief/';   // relief en paquets (site à part)
   const appli = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform() && window.Capacitor.registerPlugin);
   const P = () => (typeof Natif !== 'undefined' && Natif && Natif.zones) || (window.zonesNatif = window.zonesNatif || window.Capacitor.registerPlugin('Zones'));
   let etat = {}, dernieres = [];
@@ -29,7 +29,7 @@ const ZonesLocales = (() => {
   // Le site publie le relief en paquets (relief.json + relief_N.pack) : l'index dit où se trouve chaque tuile, Android
   // télécharge chaque paquet et le redécoupe en tuiles (ZonesPlugin)
   async function telecharger(z, progres) {
-    const r = await fetch(SITE_Z + z.dossier + '/relief.json', { cache: 'no-store' });
+    const r = await fetch(RELIEF_Z + z.dossier + '/relief.json', { cache: 'no-store' });
     if (!r.ok) throw new Error('index du relief introuvable (HTTP ' + r.status + ')');
     const idx = await r.json();
     const packs = idx.packs.map(p => ({ nom: p.nom, taille: p.taille, tuiles: [] }));
@@ -41,7 +41,7 @@ const ZonesLocales = (() => {
       window.dispatchEvent(new CustomEvent('zones-progres', { detail: p }));
     });
     try {
-      return await P().telecharger({ dossier: z.dossier, base: SITE_Z, version: String(z.version_tuiles), zoom: idx.zoom, packs });
+      return await P().telecharger({ dossier: z.dossier, base: RELIEF_Z, version: String(z.version_tuiles), zoom: idx.zoom, packs });
     } finally { ecoute.remove(); await lire(); signaler(); }
   }
   const annuler = () => P().annuler();

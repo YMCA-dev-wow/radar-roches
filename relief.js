@@ -1,13 +1,16 @@
-// Relief des zones publié en paquets (outils/preparer_site.py) : <dossier>/relief.json (index) et relief_N.pack (PNG des
-// tuiles mis bout à bout). Une tuile = une requête « Range » sur son paquet (GitHub Pages les accepte, en-tête CORS ouvert).
+// Relief des zones publié en paquets (outils/preparer_site.py) sur un site à part, radar-roches-relief (il ne change qu'à
+// l'ajout d'une zone ; le site principal reste léger) : <dossier>/relief.json (index) et relief_N.pack (PNG des tuiles mis
+// bout à bout). Une tuile = une requête « Range » sur son paquet (GitHub Pages les accepte, en-tête CORS ouvert).
 // Sert au web (radar, rejeu, éditeur) et, dans l'appli, au relief d'une zone pas encore téléchargée (essais à terre, rejeu).
 // Sans index (essais locaux sur le dossier de travail), les tuiles séparées <dossier>/tuiles/z/x/y.png sont lues.
 // Web : chaque tuile lue est gardée dans le cache « radar-tuiles » sous son adresse de tuile (hors ligne).
 'use strict';
 const Relief = (() => {
-  const SITE_R = 'https://ymca-dev-wow.github.io/radar-roches/';
+  const RELIEF = 'https://ymca-dev-wow.github.io/radar-roches-relief/';
   const appli = !!(window.androidBridge || (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()));
-  const base = appli ? SITE_R : '';
+  // essais sur le PC (serveur local du dossier de travail) : tuiles séparées locales ; sinon le site du relief
+  const local = !appli && /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+  const base = local ? '' : RELIEF;
   const index = new Map();
   function lireIndex(dossier) {
     if (!index.has(dossier)) index.set(dossier, fetch(base + dossier + '/relief.json').then(r => r.ok ? r.json() : null).catch(() => null));

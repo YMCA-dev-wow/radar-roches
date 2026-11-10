@@ -733,8 +733,10 @@ $('offline').onclick = async () => {
   try { if (navigator.storage && navigator.storage.persist) await navigator.storage.persist(); } catch {} // évite que le navigateur efface la carte hors ligne
   try {
     const c = await caches.open(CACHE_TUILES);
-    const have = new Set((await c.keys()).map(r => new URL(r.url).pathname));
-    const todo = meta.tuiles.map(t => t[0] + '/' + t[1]).filter(k => !have.has(new URL(`${zone.dossier}/tuiles/${meta.zoom}/${k}.png`, location.href).pathname));
+    // tuiles déjà en cache (adresse du site du relief ou du site local) : repérées par « /<zone>/tuiles/<zoom>/x/y.png »
+    const fin = `/${zone.dossier}/tuiles/${meta.zoom}/`;
+    const have = new Set((await c.keys()).map(r => new URL(r.url).pathname).filter(p => p.includes(fin)).map(p => p.slice(p.indexOf(fin) + fin.length)));
+    const todo = meta.tuiles.map(t => t[0] + '/' + t[1]).filter(k => !have.has(k + '.png'));
     let done = meta.tuiles.length - todo.length;
     for (let i = 0; i < todo.length; i += 12) {   // Relief.blob garde chaque tuile dans le cache hors ligne
       await Promise.all(todo.slice(i, i + 12).map(k => Relief.blob(zone.dossier, meta.zoom, k).catch(() => {})));

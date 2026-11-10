@@ -2,6 +2,15 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 33,
+      "date": "2026-11-10",
+      "titre": "Relief des zones sur un site dédié",
+      "points": [
+        "Le relief des zones est maintenant publié à part, ce qui rend les mises à jour de l'appli plus fiables. Les zones déjà téléchargées restent valables.",
+        "Les versions précédentes de l'appli ne peuvent plus télécharger de nouvelle zone : garde l'appli à jour."
+      ]
+    },
+    {
       "id": 32,
       "date": "2026-11-10",
       "titre": "Sons en média",
