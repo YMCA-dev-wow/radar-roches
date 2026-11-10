@@ -1,0 +1,36 @@
+# Publie le site (dépôt tel quel) sur GitHub Pages à chaque mise à jour.
+# Remplace le déploiement automatique de GitHub, dont le délai de 10 min était dépassé avec le relief des zones
+# (paquets de plusieurs centaines de Mo) : ici, délai de 30 min.
+# Copié dans .github/workflows/ du dépôt par outils/preparer_site.py. Réglage du dépôt : Pages → Source = GitHub Actions.
+name: Site (GitHub Pages)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  site:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploiement.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deploiement
+        uses: actions/deploy-pages@v4
+        with:
+          timeout: 1800000
