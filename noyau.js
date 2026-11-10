@@ -15,7 +15,7 @@ const Natif = APPLI ? {
   notifs: window.Capacitor.registerPlugin('LocalNotifications'),
   voix: window.Capacitor.registerPlugin('TextToSpeech'),
   veille: window.Capacitor.registerPlugin('Veille'), // processeur gardé éveillé pendant la navigation (plugin de l'appli)
-  son: window.Capacitor.registerPlugin('Son'),         // sons et voix joués par Android, canal alarme (plugin de l'appli)
+  son: window.Capacitor.registerPlugin('Son'),         // sons et voix joués par Android, canal alarme ou média (plugin de l'appli)
   journal: window.Capacitor.registerPlugin('Journal'), // journal de session, état de l'appareil (plugin de l'appli)
   saut: window.Capacitor.registerPlugin('Saut'),
   tuiles: window.Capacitor.registerPlugin('Tuiles'),   // tuiles du relevé décodées par Android (plugin de l'appli)       // détection des sauts, version d'essai (plugin de l'appli)

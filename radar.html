@@ -125,6 +125,7 @@
   <div class="carte">
     <div class="ligne" id="volAlertesLigne"><span>Volume des alertes<small>dans l'appli, en plus du volume « alarme » du téléphone (les boutons de volume règlent un autre volume, celui des médias)</small></span><span style="display:flex;align-items:center;gap:8px"><input type="range" id="volAlertes" min="10" max="100" step="10" value="100" style="width:110px"><b id="volAlertesTxt">100 %</b></span></div>
     <label class="ligne" id="volMaxLigne"><span>Alertes au volume maximum<small>volume « alarme » du téléphone poussé au maximum pendant le radar, rétabli à l'arrêt</small></span><input type="checkbox" id="volMax" checked></label>
+    <label class="ligne" id="sonsMediaLigne"><span>Sons en média<small>bips et voix sur le volume « média » du téléphone au lieu du volume « alarme » ; désactivé à chaque démarrage de l'appli</small></span><input type="checkbox" id="sonsMedia"></label>
     <label class="ligne" id="sautsLigne"><span>Sauts (essai)<small>détection par l'accéléromètre du téléphone porté sur le tronc ; la voix annonce hauteur et temps de vol à la réception</small></span><input type="checkbox" id="sauts"></label>
     <button id="testSound">Écouter les sons</button>
     <div class="mu" style="margin-top:8px">Tintement doux descendant = pré-alerte · 1 bip = devant · 2 bips montants = tribord · 2 bips descendants = bâbord · les bips accélèrent en approchant · son continu = moins de 10 m · 3 bips très graves = GPS perdu.</div>
@@ -348,7 +349,11 @@ function feuilleSons() {
 }
 $('testSound').onclick = feuilleSons;
 $('demoSonsBtn').onclick = feuilleSons;
-if (!APPLI) { $('volMaxLigne').hidden = true; $('volAlertesLigne').hidden = true; $('sautsLigne').hidden = true; }
+if (!APPLI) { $('volMaxLigne').hidden = true; $('volAlertesLigne').hidden = true; $('sautsLigne').hidden = true; $('sonsMediaLigne').hidden = true; }
+// Sons en média : bips et voix sur le canal « média » d'Android (le seul que l'enregistreur d'écran capte) au lieu
+// d'« alarme ». Désactivé à chaque lancement de l'appli : sur l'eau, les alertes restent sur le canal alarme.
+const appliquerCanal = () => { if (APPLI) Natif.son.canal({ media: $('sonsMedia').checked }).catch(() => {}); };
+$('sonsMedia').addEventListener('change', appliquerCanal);
 const appliquerVolume = () => { $('volAlertesTxt').textContent = $('volAlertes').value + ' %'; if (APPLI) Natif.son.gain({ v: $('volAlertes').value / 100 }).catch(() => {}); };
 $('volAlertes').oninput = appliquerVolume; $('volAlertes').onchange = () => { appliquerVolume(); saveSettings(); };
 
@@ -674,7 +679,7 @@ async function demarrerJournal() {
 
 // ---------- Réglages persistants ----------
 const veilleEtat = {};
-const SETTINGS = ['veille', 'bips', 'voix', 'volMax', 'volAlertes', 'sauts', 'relais', 'notifDiscretes', 'styleMontre', 'seuil', 'vmin', 'antic', 'preAlerte', 'smooth', 'live', 'testMode', 'testH', 'testNoL3d', 'simMode', 'simStart'];
+const SETTINGS = ['veille', 'bips', 'voix', 'volMax', 'volAlertes', 'sonsMedia', 'sauts', 'relais', 'notifDiscretes', 'styleMontre', 'seuil', 'vmin', 'antic', 'preAlerte', 'smooth', 'live', 'testMode', 'testH', 'testNoL3d', 'simMode', 'simStart'];
 function saveSettings() { SETTINGS.forEach(k => store.set(k, $(k).type === 'checkbox' ? $(k).checked : $(k).value)); }
 // tout réglage modifié est enregistré aussitôt (sinon il revenait à sa valeur précédente au retour sur la page : « Sauts »)
 SETTINGS.forEach(k => $(k).addEventListener('change', () => saveSettings()));
@@ -1001,7 +1006,8 @@ function guideAccueil(apres) {
   // Seulement au lancement : pas en passant d'un onglet à l'autre (la page radar se recharge, les réglages doivent tenir).
   let premiereOuverture = true;
   try { premiereOuverture = !sessionStorage.getItem('radar.lance'); sessionStorage.setItem('radar.lance', '1'); } catch {}
-  if (premiereOuverture) { $('testMode').checked = false; $('simMode').checked = false; saveSettings(); }
+  if (premiereOuverture) { $('testMode').checked = false; $('simMode').checked = false; $('sonsMedia').checked = false; saveSettings(); }
+  appliquerCanal();
   styleMontre = $('styleMontre').value; $('testH').oninput(); $('simMode').onchange(); showGeoInfo();
   initProfils(); route(); demarrerGpsAccueil(); majVerifs();
   // premier lancement (ou nouvel accueil jamais vu) : quelques écrans d'accueil, puis les nouveautés

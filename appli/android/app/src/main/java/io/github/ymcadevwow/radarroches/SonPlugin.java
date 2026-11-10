@@ -28,14 +28,21 @@ import java.util.Locale;
  *  - continu(f, duree)       : son continu (moins de 10 m), f = 0 pour couper
  *  - parler(texte) / taire() : synthèse vocale sur le même canal
  *  - volumeMax(on)           : volume alarme au maximum pendant le radar, rétabli à l'arrêt
+ *  - canal(media)            : sons sur le canal « média » au lieu d'« alarme » (option « Sons en média » : seul le
+ *                              canal média est capté par l'enregistreur d'écran d'Android ; volume média du téléphone)
  * Note : { f: Hz, f1: Hz fin (glissando), t: décalage ms, d: durée ms, v: 0..1, onde: "carre" | "triangle" }
  */
 @CapacitorPlugin(name = "Son")
 public class SonPlugin extends Plugin {
     private static final int TAUX = 22050, BLOC = 441; // 20 ms par bloc
-    private static final AudioAttributes ATTR = new AudioAttributes.Builder()
+    private static final AudioAttributes ALARME = new AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_ALARM)
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build();
+    private static final AudioAttributes MEDIA = new AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_MEDIA)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build();
+    private volatile AudioAttributes attr = ALARME;   // canal des bips et de la voix (alarme par défaut)
+    private int flux() { return attr == MEDIA ? AudioManager.STREAM_MUSIC : AudioManager.STREAM_ALARM; }
 
     private static class Note { long debut, fin; double f0, f1, v; boolean triangle; double phase; }
 
@@ -58,7 +65,7 @@ public class SonPlugin extends Plugin {
             ttsPret = statut == TextToSpeech.SUCCESS;
             if (ttsPret) {
                 tts.setLanguage(Locale.FRANCE);
-                tts.setAudioAttributes(ATTR);
+                tts.setAudioAttributes(attr);
                 tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                     @Override public void onStart(String id) {}
                     @Override public void onDone(String id) { finParole(); }
@@ -81,7 +88,7 @@ public class SonPlugin extends Plugin {
         marche = true;
         Thread t = new Thread(() -> {
             int mini = AudioTrack.getMinBufferSize(TAUX, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
-            AudioTrack piste = new AudioTrack.Builder().setAudioAttributes(ATTR)
+            AudioTrack piste = new AudioTrack.Builder().setAudioAttributes(attr)
                     .setAudioFormat(new AudioFormat.Builder().setSampleRate(TAUX).setEncoding(AudioFormat.ENCODING_PCM_16BIT)
                             .setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
                     .setBufferSizeInBytes(Math.max(mini, BLOC * 2 * 4)).setTransferMode(AudioTrack.MODE_STREAM).build();
@@ -227,16 +234,28 @@ public class SonPlugin extends Plugin {
         call.resolve();
     }
 
+    // Canal des sons : { media: true } = média, false = alarme. Le fil de synthèse en cours s'arrête ; le prochain son
+    // repart sur le nouveau canal.
+    @PluginMethod
+    public void canal(PluginCall call) {
+        AudioAttributes a = call.getBoolean("media", false) ? MEDIA : ALARME;
+        if (a != attr) {
+            synchronized (verrou) { attr = a; marche = false; fil = null; }
+            if (ttsPret) tts.setAudioAttributes(a);
+        }
+        JSObject r = new JSObject(); r.put("media", attr == MEDIA); call.resolve(r);
+    }
+
     @PluginMethod
     public void volumeMax(PluginCall call) {
         AudioManager am = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
         boolean on = call.getBoolean("on", true);
         try {
             if (on) {
-                if (volumeAvant == null) volumeAvant = am.getStreamVolume(AudioManager.STREAM_ALARM);
-                am.setStreamVolume(AudioManager.STREAM_ALARM, am.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0);
+                if (volumeAvant == null) volumeAvant = am.getStreamVolume(flux());
+                am.setStreamVolume(flux(), am.getStreamMaxVolume(flux()), 0);
             } else if (volumeAvant != null) {
-                am.setStreamVolume(AudioManager.STREAM_ALARM, volumeAvant, 0);
+                am.setStreamVolume(flux(), volumeAvant, 0);
                 volumeAvant = null;
             }
         } catch (SecurityException e) { /* mode Ne pas déranger strict : volume inchangé */ }
@@ -255,7 +274,7 @@ public class SonPlugin extends Plugin {
         o.put("media", am.getStreamVolume(AudioManager.STREAM_MUSIC));
         o.put("mediaMax", am.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
         o.put("sonnerie", new String[] { "silencieux", "vibreur", "normal" }[Math.max(0, Math.min(2, am.getRingerMode()))]);
-        o.put("voix", ttsPret);
+        o.put("voix", ttsPret); o.put("canal", attr == MEDIA ? "media" : "alarme");
         o.put("sortie", sortie(am));
         o.put("notes", nNotes); o.put("motifs", nCadences); o.put("fil", marche); o.put("gain", gain);
         return o;
