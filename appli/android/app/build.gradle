@@ -31,6 +31,11 @@ android {
         }
     }
     buildTypes {
+        // version de test compilée sur le PC (adb) : installée à côté de l'appli publiée, sans toucher à ses données
+        debug {
+            applicationIdSuffix ".test"
+            versionNameSuffix "-test"
+        }
         release {
             if (System.getenv('ANDROID_KEYSTORE_FILE')) signingConfig signingConfigs.release
             minifyEnabled false
@@ -51,6 +56,8 @@ dependencies {
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
+    // version de test : fausse position (src/debug/.../FauxGps.java)
+    debugImplementation "com.google.android.gms:play-services-location:21.0.1"
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"

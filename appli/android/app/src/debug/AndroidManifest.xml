@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Version de test seulement (build debug) : fausse position pour les essais (FauxGps), pilotée par adb -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.ACCESS_MOCK_LOCATION" tools:ignore="MockLocation,ProtectedPermissions" />
+    <application>
+        <receiver android:name=".FauxGps" android:exported="true" />
+    </application>
+</manifest>
