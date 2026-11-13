@@ -242,8 +242,8 @@ const tuile2lat = (y, z) => Math.atan(Math.sinh(Math.PI * (1 - 2 * y / 2 ** z)))
 const lon2tx = (lon, z) => Math.floor((lon + 180) / 360 * 2 ** z);
 const lat2ty = (lat, z) => { const r = lat * Math.PI / 180; return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * 2 ** z); };
 const COULEUR_ZONE = { ok: '#30d158', web: '#30d158', maj: '#ff9f0a', encours: '#64d2ff', absente: '#c9d2d8', inconnu: '#c9d2d8' };
-// surbrillance de la zone couverte : vert = téléchargée (ou lue en ligne sur ordinateur), jaune = à télécharger
-const SURB_ZONE = { ok: '#30d158', web: '#30d158', maj: '#ff9f0a', encours: '#64d2ff', absente: '#ffd60a', inconnu: '#ffd60a' };
+// surbrillance de la zone couverte : vert = téléchargée (ou lue en ligne sur ordinateur), gris (ton du cadre) = à télécharger
+const SURB_ZONE = { ok: '#30d158', web: '#30d158', maj: '#ff9f0a', encours: '#64d2ff', absente: '#4a555d', inconnu: '#4a555d' };
 const ETAT_COURT = { ok: '✓', maj: 'mise à jour', encours: 'en cours…', absente: 'à télécharger', inconnu: '', web: '' };
 const centre = b => [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2];
 const aMontre = z => montres.some(a => a.id.split(':')[0] === z.id);
