@@ -2,6 +2,16 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 42,
+      "date": "2026-11-13",
+      "titre": "Rejeu : bilan des sauts",
+      "points": [
+        "Nouveau bouton « ⤴ Sauts » dans le rejeu quand la séance contient des sauts (téléphone, appli montre ou sauts Garmin) : nombre, plus haut, plus long vol, plus loin, temps en l'air, meilleure série.",
+        "Trajectoires de tous les sauts superposées (avec une silhouette de 1,80 m pour l'échelle), détail de chaque saut avec la vitesse au décollage, classement, répartition des hauteurs, et ▶ Revoir pour rejouer le saut. Les sauts sont aussi marqués sur la carte.",
+        "Les anciens journaux du téléphone sont refiltrés : le pompage n'y compte plus comme saut."
+      ]
+    },
+    {
       "id": 41,
       "date": "2026-11-13",
       "titre": "Zones : la partie couverte en surbrillance",

@@ -86,6 +86,35 @@
   .montre { flex: none; font: 15px/1.25 system-ui, sans-serif; padding: 22px; gap: 4px; overflow: hidden; background: #000; color: #e8edf3; border: 2px solid #444; border-radius: 50%; width: 150px; height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; margin: 8px auto; }
   .montre span { white-space: pre-line; }
   .montre b { font-size: 17px; color: #ffd60a; border-bottom: 1px dotted #888; padding-bottom: 3px; }
+  /* bilan des sauts : panneau latéral (plein écran sur téléphone) */
+  #sautsBtn { border-color: var(--accent); color: var(--accent); }
+  #sautsPan { position: fixed; top: 0; right: 0; bottom: 0; width: min(480px, 100vw); z-index: 3200; background: var(--bg); border-left: 1px solid var(--line);
+    overflow-y: auto; padding: 10px 14px 90px; box-shadow: -10px 0 30px #000a; }
+  #sautsPan .fTete { display: flex; align-items: baseline; gap: 8px; position: sticky; top: -10px; background: var(--bg); padding: 6px 0 8px; z-index: 1; }
+  #sautsPan h2 { font-size: 18px; margin: 0; } #sautsPan .fTete .x { margin-left: auto; padding: 2px 10px; }
+  #sautsPan h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 16px 0 6px; font-weight: 600; }
+  .tuiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .tuiles div { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 7px 8px; }
+  .tuiles b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; line-height: 1.15; }
+  .tuiles b small { font-size: 13px; font-weight: 500; color: var(--muted); margin-left: 2px; }
+  .tuiles span { font-size: 11px; color: var(--muted); }
+  #sautsPan canvas { width: 100%; display: block; border-radius: 8px; background: #0b1a1f; touch-action: manipulation; cursor: pointer; }
+  #cTraj { height: 230px; } #cFil { height: 120px; } #cAcc { height: 130px; margin-top: 8px; }
+  #sautDetail { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-top: 10px; }
+  #sautDetail .titre { display: flex; align-items: baseline; gap: 8px; } #sautDetail .titre b { font-size: 15px; }
+  #sautDetail .titre button { margin-left: auto; padding: 4px 10px; font-size: 13px; }
+  #sautDetail .vals { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 6px; }
+  #sautDetail .vals b { font-size: 20px; font-variant-numeric: tabular-nums; } #sautDetail .vals small { display: block; color: var(--muted); font-size: 11px; }
+  #sautsListe { list-style: none; margin: 0; padding: 0; }
+  #sautsListe li { display: grid; grid-template-columns: 30px 1fr auto; gap: 8px; align-items: center; padding: 6px 4px; border-bottom: 1px solid var(--line); cursor: pointer; font-variant-numeric: tabular-nums; }
+  #sautsListe li.sel { background: #12333a; } #sautsListe li .rang { text-align: center; color: var(--muted); }
+  #sautsListe li .barre { height: 6px; border-radius: 3px; background: var(--accent); margin-top: 3px; }
+  #sautsListe li small { color: var(--muted); }
+  #sautsPan .note { color: var(--muted); font-size: 12px; margin-top: 14px; }
+  #sautsPan .plus { width: 100%; margin-top: 6px; }
+  .repart { display: grid; grid-template-columns: 70px 1fr 26px; gap: 4px 8px; align-items: center; font-size: 12px; color: var(--muted); }
+  .repart i { display: block; height: 10px; border-radius: 0 4px 4px 0; background: var(--accent); min-width: 2px; }
+  .repart b { color: var(--text); text-align: right; font-weight: 500; }
   #busy { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 2000; font-size: 16px; }
   @media (max-width: 800px) {
     #app { display: block; height: auto; }
@@ -118,6 +147,7 @@
     <button class="primary" id="gpxBtn">Ouvrir une trace (FIT, GPX ou journal)…</button>
     <input type="file" id="gpxFile" accept=".gpx,.fit,.jsonl,application/gpx+xml" hidden>
     <div class="mesJ" id="mesJ"><button id="mesJBtn">Mes séances ▾</button><div class="mesJPan" id="mesJPan" hidden></div></div>
+    <button id="sautsBtn" hidden>⤴ Sauts</button>
     <span class="sub" id="info">Charge une ancienne session (FIT de préférence : heures et vitesse exactes) pour rejouer les alertes du radar.</span>
     <span style="flex:1"></span>
     <div id="bandeauEx" hidden></div>
@@ -183,6 +213,21 @@
   </footer>
 </div>
 <div id="busy" hidden></div>
+<div id="sautsPan" hidden>
+  <div class="fTete"><h2>Sauts</h2><span class="sub" id="sautsSous"></span><button class="x" id="sautsX" title="Fermer">✕</button></div>
+  <div class="tuiles" id="sautsTuiles"></div>
+  <h3>Trajectoires superposées</h3>
+  <canvas id="cTraj" title="Touche une trajectoire pour la choisir"></canvas>
+  <div id="sautDetail"></div>
+  <h3>Au fil de la séance</h3>
+  <canvas id="cFil" title="Touche un saut pour le choisir"></canvas>
+  <h3>Répartition des hauteurs</h3>
+  <div class="repart" id="sautsRepart"></div>
+  <h3>Classement</h3>
+  <ol id="sautsListe"></ol>
+  <button class="plus" id="sautsTous" hidden></button>
+  <p class="note">Hauteur estimée d'après le temps de vol (chute libre : g·t²/8) : elle est surestimée quand l'aile porte en l'air. Distance = vitesse au décollage × temps de vol ; la trajectoire dessinée est la parabole correspondante, pas une mesure point par point.</p>
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="relief.js"></script>
@@ -315,6 +360,13 @@ function lireFIT(buf) {
         if (f.size === 4) rec[f.num] = f.num === 0 || f.num === 1 ? dv.getInt32(pos, d.le) : dv.getUint32(pos, d.le);
         else if (f.size === 2) rec[f.num] = dv.getUint16(pos, d.le);
       }
+      if (d.glob === 285) { // jump (sauts natifs Garmin) : 0 distance, 1 hauteur, 3 temps de vol (flottants), 2 rotations, 5-6 position, 7/8 vitesse
+        if (f.size === 4 && (f.num <= 4)) rec[f.num] = dv.getFloat32(pos, d.le);
+        else if (f.num === 5 || f.num === 6) rec[f.num] = dv.getInt32(pos, d.le);
+        else if (f.size === 4) rec[f.num] = dv.getUint32(pos, d.le);
+        else if (f.size === 2) rec[f.num] = dv.getUint16(pos, d.le);
+        else if (f.size === 1) rec[f.num] = dv.getUint8(pos);
+      }
       pos += f.size;
     }
     const devVal = {};
@@ -326,6 +378,12 @@ function lireFIT(buf) {
     if (d.glob === 206 && rec[3]) champsDev[rec[0] + '/' + rec[1]] = rec[3];
     if (rec[253] != null) lastTs = rec[253];
     else if (compTs != null) lastTs = (compTs >= (lastTs & 0x1f) ? lastTs - (lastTs & 0x1f) + compTs : lastTs - (lastTs & 0x1f) + 32 + compTs);
+    if (d.glob === 285 && rec[3] > 0 && rec[3] < 10) {
+      const vN = rec[8] != null && rec[8] !== 0xffffffff ? rec[8] / 1000 : rec[7] != null && rec[7] !== 0xffff ? rec[7] / 1000 : null;
+      sautsJournal.push({ t: EPOCH + lastTs * 1000, vol: Math.round(rec[3] * 100) / 100, h: isFinite(rec[1]) && rec[1] > 0 ? Math.round(rec[1] * 10) / 10 : Math.round(9.81 * rec[3] * rec[3] / 8 * 10) / 10,
+        dNat: isFinite(rec[0]) && rec[0] > 0 ? rec[0] : null, vNat: vN, rot: rec[2] != null && rec[2] !== 0xff ? rec[2] : null, natif: true });
+      continue;
+    }
     if (d.glob !== 20 || rec[0] == null || rec[1] == null || rec[0] === 0x7fffffff || rec[1] === 0x7fffffff) continue;
     const v = rec[73] != null && rec[73] !== 0xffffffff ? rec[73] / 1000 : rec[6] != null && rec[6] !== 0xffff ? rec[6] / 1000 : null;
     out.push({ t: EPOCH + lastTs * 1000, lat: rec[0] * SEMI, lon: rec[1] * SEMI, vDev: v });
@@ -343,11 +401,20 @@ function lireJournal(txt) {
     if (!l.trim()) continue;
     let e; try { e = JSON.parse(l); } catch { continue; }
     if (e.type === 'debut') { reglagesJournal = reglagesJournal || e.reglages || null; exempleJournal = exempleJournal || e.exemple || null; } // plusieurs journaux : réglages de la première séance
-    else if (e.type === 'saut' && !e.ecarte) sautsJournal.push(e); // les candidats écartés (pompage, vitesse) restent dans le journal
+    else if (e.type === 'saut' && !e.ecarte && !pompage(e)) sautsJournal.push(e); // les candidats écartés (pompage, vitesse) restent dans le journal
     else if (e.type === 'pos' && isFinite(e.la) && isFinite(e.lo) && !e.sim) out.push({ t: e.t, lat: e.la, lon: e.lo, vDev: e.v != null ? e.v / 3.6 : null });
   }
   sansHeure = false;
   return completer(out);
+}
+// Journaux d'avant le filtre du 26/10 (pas de champ « ecarte ») : même critère que SautPlugin.enVol sur la courbe
+// (25 Hz, décollage à 2 s) — vrai vol si moyenne < 0,35 g et au moins 70 % des mesures sous 0,6 g
+function pompage(e) {
+  if (!Array.isArray(e.courbe) || e.courbe.length < 60) return false;
+  const vol = e.courbe.slice(50, 50 + Math.round(e.vol * 25));
+  if (vol.length < 10) return true;
+  const moy = vol.reduce((s, a) => s + a, 0) / vol.length, bas = vol.filter(a => a < 0.6).length;
+  return !(moy < 0.35 && bas >= 0.7 * vol.length);
 }
 function appliquerReglagesJournal() {
   const r = reglagesJournal; if (!r) return '';
@@ -678,6 +745,199 @@ $('zMoins').onclick = () => vueZoom(1.6); $('zPlus').onclick = () => vueZoom(0.6
 addEventListener('resize', () => { dessinerFrise(); resizeRadar(); });
 
 // =====================================================================
+// Bilan des sauts (appli montre : champs Connect IQ du FIT ; téléphone : journal ; Garmin : message « jump » natif)
+// Un saut = { t (réception), vol (s), h (m) } + selon la source : hBaro, courbe (accélération 25 Hz, de 2 s avant le
+// décollage à 1 s après la réception), dNat / vNat (distance, vitesse natives). On y ajoute la vitesse au décollage
+// prise sur la trace, la distance (vitesse × vol) et la position.
+// =====================================================================
+let sauts = [], sautSel = null, sautsTous = false;
+const sautsLayer = L.layerGroup().addTo(map);
+const fr = (v, n = 1) => v.toFixed(n).replace('.', ',');
+function ptA(t) { // position et vitesse interpolées à l'instant t (recherche dichotomique)
+  let lo = 0, hi = pts.length - 1;
+  if (t <= pts[0].t) return pts[0]; if (t >= pts[hi].t) return pts[hi];
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (pts[m].t <= t) lo = m; else hi = m; }
+  const a = pts[lo], b = pts[hi], f = (t - a.t) / (b.t - a.t);
+  return { lat: a.lat + f * (b.lat - a.lat), lon: a.lon + f * (b.lon - a.lon), v: a.v + f * (b.v - a.v), cap: a.cap };
+}
+function preparerSauts() {
+  sautsLayer.clearLayers(); sautSel = null; sautsTous = false;
+  sauts = sautsJournal.filter(s => s.vol > 0 && s.h > 0).sort((a, b) => a.t - b.t).map((s, i) => {
+    const t0 = s.t - s.vol * 1000, p = ptA(t0 - 500);
+    const v = s.vNat ?? Math.max(ptA(t0 - 1500).v, p.v); // vitesse d'approche (la trace ralentit souvent pendant le vol)
+    return { ...s, n: i + 1, t0, v, d: s.dNat ?? v * s.vol, lat: p.lat, lon: p.lon };
+  });
+  $('sautsBtn').hidden = !sauts.length;
+  $('sautsBtn').textContent = `⤴ ${sauts.length} saut${sauts.length > 1 ? 's' : ''}`;
+  if (!sauts.length) { $('sautsPan').hidden = true; return; }
+  const hmax = Math.max(...sauts.map(s => s.h));
+  for (const s of sauts) {
+    const m = L.circleMarker([s.lat, s.lon], { radius: 4 + 6 * s.h / hmax, color: '#04221f', weight: 1.5, fillColor: '#5ee6d6', fillOpacity: 0.9 })
+      .bindTooltip(`Saut ${s.n} · ${fr(s.h)} m · ${fr(s.vol, 2)} s`, { direction: 'top' });
+    m.on('click', () => ouvrirSauts(s)); m.addTo(sautsLayer);
+  }
+  sautSel = sauts.reduce((a, b) => b.h > a.h ? b : a);
+  if (!$('sautsPan').hidden) dessinerSauts();
+}
+function ouvrirSauts(s) { if (s) sautSel = s; $('sautsPan').hidden = false; dessinerSauts(); }
+$('sautsBtn').onclick = () => $('sautsPan').hidden ? ouvrirSauts() : ($('sautsPan').hidden = true);
+$('sautsX').onclick = () => { $('sautsPan').hidden = true; };
+$('sautsTous').onclick = () => { sautsTous = !sautsTous; dessinerSauts(); };
+addEventListener('resize', () => { if (!$('sautsPan').hidden) dessinerSauts(); });
+const toile = c => { const k = devicePixelRatio || 1, r = c.getBoundingClientRect(); c.width = r.width * k; c.height = r.height * k; const g = c.getContext('2d'); g.font = `${11 * k}px system-ui`; return { g, k, W: c.width, H: c.height }; };
+
+function dessinerSauts() {
+  if (!sauts.length) return;
+  const n = sauts.length, best = k => sauts.reduce((a, b) => b[k] > a[k] ? b : a);
+  const dur = (pts[pts.length - 1].t - pts[0].t) / 3600e3, tAir = sauts.reduce((s, x) => s + x.vol, 0);
+  // meilleure série : le plus de sauts en 10 minutes
+  let serie = 0, sT = 0; for (let i = 0, j = 0; i < n; i++) { while (sauts[i].t - sauts[j].t > 600e3) j++; if (i - j + 1 > serie) { serie = i - j + 1; sT = sauts[j].t; } }
+  $('sautsSous').textContent = `${new Date(pts[0].t).toLocaleDateString('fr-FR')} · ${sauts[0].natif ? 'sauts Garmin' : sauts[0].courbe ? 'téléphone' : 'appli montre'}`;
+  const tuile = (v, u, l) => `<div><b>${v}<small>${u}</small></b><span>${l}</span></div>`;
+  $('sautsTuiles').innerHTML = tuile(n, '', 'sauts' + (dur > 0.2 ? ` · ${fr(n / dur, 0)}/h` : ''))
+    + tuile(fr(best('h').h), 'm', 'plus haut') + tuile(fr(best('vol').vol, 2), 's', 'plus long vol')
+    + tuile(Math.round(best('d').d), 'm', 'plus loin') + tuile(fr(tAir, 0), 's', 'en l\'air au total')
+    + tuile(serie, '', serie > 1 ? `en 10 min dès ${new Date(sT).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : 'meilleure série');
+  dessinerTraj(); detailSaut(); dessinerFil(); repartition(); classement();
+}
+
+// Trajectoires superposées : chaque saut dessiné comme sa parabole depuis le même point de décollage ;
+// le saut choisi en blanc, les autres en turquoise d'autant plus opaque qu'ils sont hauts ; silhouette de 1,80 m pour l'échelle
+let geoTraj = null;
+function dessinerTraj() {
+  const c = $('cTraj'), { g, k, W, H } = toile(c);
+  const dmax = Math.max(4, ...sauts.map(s => s.d)) * 1.08, hmax = Math.max(2, ...sauts.map(s => s.h)) * 1.18;
+  const L0 = 34 * k, B0 = H - 24 * k, T0 = 10 * k, u = 1.8 / hmax * (B0 - T0) / 7.5; // u : module de la silhouette
+  const R0 = W - 3.4 * u - 10 * k;
+  const X = d => L0 + d / dmax * (R0 - L0), Y = h => B0 - h / hmax * (B0 - T0);
+  geoTraj = { X, Y };
+  // graduations
+  const pasH = hmax > 6 ? 2 : hmax > 3 ? 1 : 0.5;
+  g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = k; g.fillStyle = '#5d7a80'; g.textAlign = 'right';
+  for (let h = pasH; h < hmax; h += pasH) { g.beginPath(); g.moveTo(L0, Y(h)); g.lineTo(R0, Y(h)); g.stroke(); g.fillText(fr(h, pasH < 1 ? 1 : 0) + ' m', L0 - 4 * k, Y(h) + 4 * k); }
+  g.textAlign = 'center';
+  const pasD = dmax > 30 ? 10 : dmax > 12 ? 5 : 2;
+  for (let d = pasD; d < dmax; d += pasD) g.fillText(d + ' m', X(d), H - 6 * k);
+  // eau : vaguelettes
+  g.fillStyle = 'rgba(90,200,250,.16)'; g.beginPath(); g.moveTo(0, H);
+  for (let x = 0; x <= W; x += 4 * k) g.lineTo(x, B0 + 2 * k + Math.sin(x / (9 * k)) * 2 * k);
+  g.lineTo(W, H); g.closePath(); g.fill();
+  g.strokeStyle = '#5ac8fa'; g.lineWidth = 1.5 * k; g.beginPath();
+  for (let x = 0; x <= W; x += 4 * k) x ? g.lineTo(x, B0 + 2 * k + Math.sin(x / (9 * k)) * 2 * k) : g.moveTo(x, B0 + 2 * k);
+  g.stroke();
+  // silhouette de 1,80 m à droite (échelle)
+  const xs = R0 + 1.7 * u + 4 * k, yP = Y(0), yT = Y(1.8);
+  g.strokeStyle = '#7fb8b2'; g.fillStyle = '#7fb8b2'; g.lineWidth = 1.6 * k; g.lineCap = 'round';
+  g.beginPath(); g.arc(xs, yT + u, u, 0, 7); g.fill();
+  g.beginPath(); g.moveTo(xs, yT + 2 * u); g.lineTo(xs, yT + 4.6 * u); g.moveTo(xs, yT + 4.6 * u); g.lineTo(xs - 1.3 * u, yP); g.moveTo(xs, yT + 4.6 * u); g.lineTo(xs + 1.3 * u, yP);
+  g.moveTo(xs - 1.6 * u, yT + 3.6 * u); g.lineTo(xs, yT + 2.6 * u); g.lineTo(xs + 1.6 * u, yT + 3.6 * u); g.stroke();
+  g.textAlign = 'center'; g.fillText('1,80 m', xs, T0 + 2 * k); g.lineCap = 'butt';
+  // trajectoires : les autres d'abord, le choisi par-dessus
+  const arc = (s, couleur, ep) => {
+    g.strokeStyle = couleur; g.lineWidth = ep; g.beginPath();
+    for (let i = 0; i <= 40; i++) { const f = i / 40, x = X(f * s.d), y = Y(4 * s.h * f * (1 - f)); i ? g.lineTo(x, y) : g.moveTo(x, y); }
+    g.stroke();
+  };
+  const hm = Math.max(...sauts.map(s => s.h));
+  for (const s of sauts) if (s !== sautSel) arc(s, `rgba(94,230,214,${0.25 + 0.55 * s.h / hm})`, 1.5 * k);
+  if (sautSel) {
+    // ombre de 2 px couleur fond pour détacher la courbe choisie des autres
+    arc(sautSel, '#0b1a1f', 5 * k); arc(sautSel, '#ffffff', 2.5 * k);
+    const xa = X(sautSel.d / 2), ya = Y(sautSel.h);
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(xa, ya, 4 * k, 0, 7); g.fill();
+    g.font = `600 ${12 * k}px system-ui`; g.textAlign = xa > W * 0.6 ? 'right' : 'left';
+    g.fillText(`${fr(sautSel.h)} m · ${fr(sautSel.vol, 2)} s · ${Math.round(sautSel.d)} m`, xa + (xa > W * 0.6 ? -8 : 8) * k, Math.max(T0 + 10 * k, ya - 6 * k));
+  }
+  g.textAlign = 'left';
+}
+$('cTraj').onclick = e => { // choisit la trajectoire passant le plus près du point touché
+  if (!geoTraj) return;
+  const r = $('cTraj').getBoundingClientRect(), k = devicePixelRatio || 1, px = (e.clientX - r.left) * k, py = (e.clientY - r.top) * k;
+  let mieux = null, dm = Infinity;
+  for (const s of sauts) for (let i = 0; i <= 20; i++) { const f = i / 20, d = Math.hypot(geoTraj.X(f * s.d) - px, geoTraj.Y(4 * s.h * f * (1 - f)) - py); if (d < dm) { dm = d; mieux = s; } }
+  if (mieux && dm < 30 * k) { sautSel = mieux; dessinerSauts(); }
+};
+
+// Détail du saut choisi (+ courbe d'accélération pour le téléphone)
+function detailSaut() {
+  const s = sautSel, el = $('sautDetail'); if (!s) { el.hidden = true; return; }
+  el.hidden = false;
+  const rang = [...sauts].sort((a, b) => b.h - a.h).indexOf(s) + 1;
+  el.innerHTML = `<div class="titre"><b>Saut ${s.n}</b><span class="sub">${heure(s.t0)} · ${rang === 1 ? 'le plus haut' : rang + 'e plus haut'}</span><button id="sautVoir">▶ Revoir</button></div>
+    <div class="vals"><span><b>${fr(s.h)} m</b><small>hauteur</small></span><span><b>${fr(s.vol, 2)} s</b><small>en l'air</small></span><span><b>${Math.round(s.d)} m</b><small>distance</small></span>
+    <span><b>${fr(s.v * 1.944)} nd</b><small>${Math.round(s.v * 3.6)} km/h au décollage</small></span>${s.hBaro != null ? `<span><b>${fr(s.hBaro)} m</b><small>baromètre</small></span>` : ''}${s.rot ? `<span><b>${s.rot}</b><small>rotation(s)</small></span>` : ''}</div>
+    ${s.courbe ? '<canvas id="cAcc"></canvas><div class="sub">Accélération ressentie par le téléphone (g) : en l\'air, elle tombe vers 0 ; pic à la réception.</div>' : ''}`;
+  $('sautVoir').onclick = () => {
+    $('sautsPan').hidden = innerWidth < 800; // sur téléphone on referme pour voir la carte
+    seek(s.t0 - 5000); map.setView([s.lat, s.lon], Math.max(map.getZoom(), 17));
+    if (!playing) { $('speed').value = '1'; togglePlay(true); }
+  };
+  if (s.courbe) dessinerAcc(s);
+}
+function dessinerAcc(s) {
+  const { g, k, W, H } = toile($('cAcc')), c = s.courbe, dt = 0.04; // 25 Hz, depuis 2 s avant le décollage
+  const tmin = -2, tmax = c.length * dt - 2, amax = Math.max(2.5, ...c) * 1.05;
+  const L0 = 28 * k, R0 = W - 6 * k, B0 = H - 18 * k, T0 = 6 * k;
+  const X = t => L0 + (t - tmin) / (tmax - tmin) * (R0 - L0), Y = a => B0 - a / amax * (B0 - T0);
+  g.fillStyle = 'rgba(94,230,214,.12)'; g.fillRect(X(0), T0, X(s.vol) - X(0), B0 - T0); // fenêtre en l'air
+  g.fillStyle = '#5ee6d6'; g.textAlign = 'center'; g.fillText('en l\'air', (X(0) + X(s.vol)) / 2, T0 + 11 * k);
+  g.strokeStyle = 'rgba(255,255,255,.12)'; g.lineWidth = k; g.fillStyle = '#5d7a80'; g.textAlign = 'right';
+  for (const a of [0, 1, 2]) { g.beginPath(); g.moveTo(L0, Y(a)); g.lineTo(R0, Y(a)); g.stroke(); g.fillText(a + ' g', L0 - 4 * k, Y(a) + 4 * k); }
+  g.textAlign = 'center'; for (let t = -2; t <= tmax; t++) g.fillText((t > 0 ? '+' : '') + t + ' s', X(t), H - 4 * k);
+  g.strokeStyle = '#ffffff'; g.lineWidth = 2 * k; g.lineJoin = 'round'; g.beginPath();
+  c.forEach((a, i) => { const x = X(tmin + i * dt), y = Y(a); i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke();
+  g.textAlign = 'left';
+}
+
+// Au fil de la séance : une tige par saut, hauteur en ordonnée
+let geoFil = null;
+function dessinerFil() {
+  const { g, k, W, H } = toile($('cFil'));
+  const ta = pts[0].t, tb = pts[pts.length - 1].t, hmax = Math.max(1, ...sauts.map(s => s.h)) * 1.15;
+  const L0 = 30 * k, R0 = W - 8 * k, B0 = H - 18 * k, T0 = 8 * k;
+  const X = t => L0 + (t - ta) / (tb - ta) * (R0 - L0), Y = h => B0 - h / hmax * (B0 - T0);
+  geoFil = { X };
+  g.strokeStyle = 'rgba(255,255,255,.08)'; g.lineWidth = k; g.fillStyle = '#5d7a80'; g.textAlign = 'right';
+  const pasH = hmax > 4 ? 1 : 0.5;
+  for (let h = pasH; h < hmax; h += pasH) { g.beginPath(); g.moveTo(L0, Y(h)); g.lineTo(R0, Y(h)); g.stroke(); g.fillText(fr(h, pasH < 1 ? 1 : 0), L0 - 4 * k, Y(h) + 4 * k); }
+  g.strokeStyle = '#3a5a60'; g.beginPath(); g.moveTo(L0, B0); g.lineTo(R0, B0); g.stroke();
+  const hh = t => new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  g.textAlign = 'left'; g.fillText(hh(ta), L0, H - 4 * k); g.textAlign = 'right'; g.fillText(hh(tb), R0, H - 4 * k);
+  for (const s of sauts) {
+    const x = X(s.t), sel = s === sautSel;
+    g.strokeStyle = sel ? '#fff' : '#5ee6d6'; g.lineWidth = (sel ? 2.5 : 2) * k;
+    g.beginPath(); g.moveTo(x, B0); g.lineTo(x, Y(s.h)); g.stroke();
+    g.fillStyle = sel ? '#fff' : '#5ee6d6'; g.beginPath(); g.arc(x, Y(s.h), (sel ? 5 : 4) * k, 0, 7); g.fill();
+    g.strokeStyle = '#0b1a1f'; g.lineWidth = 2 * k; g.stroke(); // anneau couleur fond : points qui se chevauchent
+  }
+  g.textAlign = 'left';
+}
+$('cFil').onclick = e => {
+  if (!geoFil) return;
+  const r = $('cFil').getBoundingClientRect(), px = (e.clientX - r.left) * (devicePixelRatio || 1);
+  const s = sauts.reduce((a, b) => Math.abs(geoFil.X(b.t) - px) < Math.abs(geoFil.X(a.t) - px) ? b : a);
+  sautSel = s; dessinerSauts();
+};
+function repartition() {
+  const cl = [[0, 0.5], [0.5, 1], [1, 1.5], [1.5, 2], [2, 3], [3, Infinity]];
+  const nb = cl.map(([a, b]) => sauts.filter(s => s.h >= a && s.h < b).length);
+  const dern = nb.map(v => v > 0).lastIndexOf(true), m = Math.max(...nb);
+  $('sautsRepart').innerHTML = cl.slice(0, dern + 1).map(([a, b], i) => `<span>${b === Infinity ? 'plus de ' + a : fr(a, a % 1 ? 1 : 0) + ' – ' + fr(b, b % 1 ? 1 : 0)} m</span><i style="width:${nb[i] / m * 100}%"></i><b>${nb[i]}</b>`).join('');
+}
+function classement() {
+  const tri = [...sauts].sort((a, b) => b.h - a.h), hm = tri[0].h, vus = sautsTous ? tri : tri.slice(0, 10);
+  const ol = $('sautsListe'); ol.innerHTML = '';
+  vus.forEach((s, i) => {
+    const li = document.createElement('li'); if (s === sautSel) li.className = 'sel';
+    li.innerHTML = `<span class="rang">${['🥇', '🥈', '🥉'][i] || i + 1}</span><span><b>${fr(s.h)} m</b> · ${fr(s.vol, 2)} s · ${Math.round(s.d)} m<div class="barre" style="width:${s.h / hm * 100}%"></div></span><small>${heure(s.t0)}</small>`;
+    li.onclick = () => { sautSel = s; dessinerSauts(); $('cTraj').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+    ol.append(li);
+  });
+  $('sautsTous').hidden = sauts.length <= 10;
+  $('sautsTous').textContent = sautsTous ? 'Les 10 meilleurs seulement' : `Voir les ${sauts.length} sauts`;
+}
+
+// =====================================================================
 // Lecture
 // =====================================================================
 let cur = 0, playing = false, lastTick = null, idx = 0;
@@ -791,6 +1051,7 @@ async function ouvrirTrace(txt, nom) {
   map.fitBounds(L.latLngBounds(pts.map(p => [p.lat, p.lon])), { padding: [30, 30] });
   cur = pts[0].t; idx = 0; Wmap = null; vue.t0 = vue.t1 = 0;
   $('play').disabled = false;
+  preparerSauts();
   await calculer();
 }
 
