@@ -2,6 +2,14 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 35,
+      "date": "2026-11-13",
+      "titre": "Page Sécurité et confidentialité",
+      "points": [
+        "Nouvelle page Plus → Sécurité et confidentialité : code source public, signature, autorisations demandées et pourquoi, aucune collecte de données, empreinte et analyse antivirus de chaque version."
+      ]
+    },
+    {
       "id": 34,
       "date": "2026-11-13",
       "titre": "Version bêta : conditions et contact",

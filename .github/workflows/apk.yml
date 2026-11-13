@@ -88,5 +88,19 @@ jobs:
           body: |
             Appli Android du radar (construction n° ${{ github.run_number }}).
             Télécharger depuis le téléphone : https://github.com/${{ github.repository }}/releases/latest/download/radar-roches.apk
+            Sécurité (empreintes, analyse antivirus) : https://ymca-dev-wow.github.io/radar-roches/securite.html
           files: ${{ runner.temp }}/radar-roches.apk
           make_latest: true
+
+      # Analyse antivirus : l'APK est envoyée à VirusTotal (plus de 70 antivirus) si la clé d'API est fournie dans les
+      # secrets du dépôt (VIRUSTOTAL_API_KEY, compte VirusTotal gratuit). Le rapport est public, retrouvé par l'empreinte
+      # SHA-256 de l'APK (page securite.html). Sans clé : étape ignorée ; un échec n'empêche pas la publication.
+      - name: Analyse VirusTotal
+        continue-on-error: true
+        env:
+          VT: ${{ secrets.VIRUSTOTAL_API_KEY }}
+        run: |
+          sha256sum "$RUNNER_TEMP/radar-roches.apk"
+          if [ -z "$VT" ]; then echo "Pas de clé VIRUSTOTAL_API_KEY : analyse non envoyée"; exit 0; fi
+          curl -sS --fail --request POST --url https://www.virustotal.com/api/v3/files \
+            --header "x-apikey: $VT" --form "file=@$RUNNER_TEMP/radar-roches.apk" | head -c 400
