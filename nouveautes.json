@@ -2,6 +2,14 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 38,
+      "date": "2026-11-13",
+      "titre": "Nouvelle zone : Locquirec – Aber Wrac'h",
+      "points": [
+        "Tout le nord Finistère, de Locquirec à l'Aber Wrac'h : baie de Morlaix, Roscoff, île de Batz, côte des Légendes. Marée d'après le marégraphe de Roscoff. Relief à télécharger depuis Plus → Carte et téléchargements."
+      ]
+    },
+    {
       "id": 37,
       "date": "2026-11-13",
       "titre": "Nouvelle zone : baie de Saint-Brieuc",

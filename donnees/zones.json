@@ -333,6 +333,102 @@
   "taille_tuiles": 90645605
  },
  {
+  "id": "locquirec_aber_wrach",
+  "nom": "Locquirec – Aber Wrac'h",
+  "dossier": "donnees_29n",
+  "zh_ref": -4.764,
+  "bornes": [
+   48.54816517565458,
+   -4.6933954799634545,
+   48.796031434632184,
+   -3.5192820880309927
+  ],
+  "retard": 0,
+  "jauges": [
+   {
+    "fichier": "roscoff",
+    "refmar": 54,
+    "nom": "Roscoff",
+    "lon": -3.9657,
+    "nm": 5.3,
+    "pmve": 8.9,
+    "bmve": 1.3
+   }
+  ],
+  "ports": [
+   {
+    "id": "wrach",
+    "nom": "L'Aber Wrac'h",
+    "lat": 48.5983,
+    "lon": -4.5617,
+    "nm": 4.46,
+    "pmve": 7.835,
+    "bmve": 1.085,
+    "zh": -4.066,
+    "w": 0.0
+   },
+   {
+    "id": "brignogan",
+    "nom": "Brignogan-Plage",
+    "lat": 48.6785,
+    "lon": -4.3175,
+    "nm": 4.92,
+    "pmve": 8.545,
+    "bmve": 1.295,
+    "zh": -4.352,
+    "w": 0.0
+   },
+   {
+    "id": "batz",
+    "nom": "Île de Batz",
+    "lat": 48.7417,
+    "lon": -4.0133,
+    "nm": 5.25,
+    "pmve": 9.05,
+    "bmve": 1.45,
+    "zh": -4.764,
+    "w": 0.0
+   },
+   {
+    "id": "roscoff",
+    "nom": "Roscoff",
+    "lat": 48.7187,
+    "lon": -3.9657,
+    "nm": 5.3,
+    "pmve": 9.1,
+    "bmve": 1.5,
+    "zh": -4.764,
+    "w": 0.0
+   },
+   {
+    "id": "primel",
+    "nom": "Anse de Primel",
+    "lat": 48.7167,
+    "lon": -3.8333,
+    "nm": 5.46,
+    "pmve": 9.335,
+    "bmve": 1.585,
+    "zh": -4.978,
+    "w": 0.0
+   },
+   {
+    "id": "locquirec",
+    "nom": "Locquirec",
+    "lat": 48.7,
+    "lon": -3.6333,
+    "nm": 5.49,
+    "pmve": 9.34,
+    "bmve": 1.64,
+    "zh": -4.98,
+    "w": 0.0
+   }
+  ],
+  "interp": "distance",
+  "port_central": "roscoff",
+  "version_tuiles": "bc3aa18c286a",
+  "taille_tuiles": 139756614
+ },
+ {
   "id": "baie_saint_brieuc",
   "nom": "Baie de Saint-Brieuc",
   "dossier": "donnees_22b",
