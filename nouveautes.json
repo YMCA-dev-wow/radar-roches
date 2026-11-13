@@ -2,6 +2,14 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 37,
+      "date": "2026-11-13",
+      "titre": "Nouvelle zone : baie de Saint-Brieuc",
+      "points": [
+        "Du cap Fréhel à Ploubazlanec : Erquy, Dahouët, Le Légué, Binic, Saint-Quay. Marée d'après le marégraphe de Saint-Quay. Relief à télécharger depuis Plus → Carte et téléchargements (environ 65 Mo)."
+      ]
+    },
+    {
       "id": 36,
       "date": "2026-11-13",
       "titre": "Nouveau numéro de version : v0.8",

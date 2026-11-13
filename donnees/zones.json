@@ -333,6 +333,113 @@
   "taille_tuiles": 90645605
  },
  {
+  "id": "baie_saint_brieuc",
+  "nom": "Baie de Saint-Brieuc",
+  "dossier": "donnees_22b",
+  "zh_ref": -5.908,
+  "bornes": [
+   48.4658050751752,
+   -2.988460212279502,
+   48.767035254642636,
+   -2.282846744866973
+  ],
+  "retard": 0,
+  "jauges": [
+   {
+    "fichier": "saint_quay",
+    "refmar": 506,
+    "nom": "Saint-Quay-Portrieux",
+    "lon": -2.8181,
+    "nm": 6.46,
+    "pmve": 11.45,
+    "bmve": 1.55
+   }
+  ],
+  "ports": [
+   {
+    "id": "paimpol",
+    "nom": "Paimpol",
+    "lat": 48.7903,
+    "lon": -2.9553,
+    "nm": 6.21,
+    "pmve": 10.935,
+    "bmve": 1.485,
+    "zh": -5.649,
+    "w": 0.0
+   },
+   {
+    "id": "brehec",
+    "nom": "Bréhec",
+    "lat": 48.7265,
+    "lon": -2.9458,
+    "nm": 6.37,
+    "pmve": 11.195,
+    "bmve": 1.545,
+    "zh": -5.885,
+    "w": 0.0
+   },
+   {
+    "id": "quay",
+    "nom": "Saint-Quay-Portrieux",
+    "lat": 48.6475,
+    "lon": -2.8181,
+    "nm": 6.46,
+    "pmve": 11.41,
+    "bmve": 1.51,
+    "zh": -5.908,
+    "w": 0.0
+   },
+   {
+    "id": "binic",
+    "nom": "Binic",
+    "lat": 48.6,
+    "lon": -2.8167,
+    "nm": 6.36,
+    "pmve": 11.335,
+    "bmve": 1.385,
+    "zh": -5.898,
+    "w": 0.0
+   },
+   {
+    "id": "legue",
+    "nom": "Le Légué",
+    "lat": 48.5667,
+    "lon": -2.6833,
+    "nm": 6.46,
+    "pmve": 11.485,
+    "bmve": 1.435,
+    "zh": -5.946,
+    "w": 0.0
+   },
+   {
+    "id": "dahouet",
+    "nom": "Dahouët",
+    "lat": 48.5792,
+    "lon": -2.5693,
+    "nm": 6.39,
+    "pmve": 11.39,
+    "bmve": 1.39,
+    "zh": -5.866,
+    "w": 0.0
+   },
+   {
+    "id": "erquy",
+    "nom": "Erquy",
+    "lat": 48.6392,
+    "lon": -2.4902,
+    "nm": 6.33,
+    "pmve": 11.38,
+    "bmve": 1.28,
+    "zh": -5.829,
+    "w": 0.0
+   }
+  ],
+  "interp": "distance",
+  "port_central": "quay",
+  "version_tuiles": "22b1be54c3b1",
+  "taille_tuiles": 68179451
+ },
+ {
   "id": "torche_concarneau",
   "nom": "La Torche – Concarneau",
   "dossier": "donnees_29s",
