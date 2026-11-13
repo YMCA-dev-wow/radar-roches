@@ -249,6 +249,58 @@ function texteZone(z) {
   const st = ZonesLocales.statut(z);
   return [z.nom, ETAT_COURT[st], z.taille_tuiles && st !== 'ok' ? moZone(z.taille_tuiles) : ''].filter(Boolean).join(' · ') + (aMontre(z) ? '  ⌚' : '');
 }
+// Contour d'une zone : tuiles de relief regroupées en cellules du niveau ZOOM_CONTOUR, dont on suit les bords extérieurs
+// (arêtes non partagées entre deux cellules, chaînées en anneaux). Renvoie les anneaux (lat, lon), un point central
+// pris dans la zone (cellule la plus proche du centre de gravité) et le point le plus au nord (étiquette).
+const ZOOM_CONTOUR = 14;
+function contourZone(z) {
+  const m = z.meta, f = 2 ** (m.zoom - ZOOM_CONTOUR), C = new Set();
+  for (const [x, y] of m.tuiles) C.add(Math.floor(x / f) + '/' + Math.floor(y / f));
+  // lissage : fermeture morphologique (dilatation puis érosion d'une cellule) qui comble les échancrures et trous isolés
+  const V8 = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
+  const dil = new Set(C);
+  for (const k of C) { const [x, y] = k.split('/').map(Number); for (const [dx, dy] of V8) dil.add((x + dx) + '/' + (y + dy)); }
+  for (const k of dil) {
+    const [x, y] = k.split('/').map(Number);
+    if (V8.every(([dx, dy]) => dil.has((x + dx) + '/' + (y + dy)))) C.add(k);
+  }
+  z._cellules = C;
+  const suiv = new Map(), aretes = [];   // arêtes orientées (sens horaire autour de chaque cellule), sommets « x,y »
+  const ajoute = (a, b) => { aretes.push(a); if (!suiv.has(a)) suiv.set(a, []); suiv.get(a).push(b); };
+  let sx = 0, sy = 0;
+  for (const k of C) {
+    const [x, y] = k.split('/').map(Number); sx += x + .5; sy += y + .5;
+    if (!C.has(x + '/' + (y - 1))) ajoute(x + ',' + y, (x + 1) + ',' + y);                  // bord nord
+    if (!C.has((x + 1) + '/' + y)) ajoute((x + 1) + ',' + y, (x + 1) + ',' + (y + 1));      // bord est
+    if (!C.has(x + '/' + (y + 1))) ajoute((x + 1) + ',' + (y + 1), x + ',' + (y + 1));      // bord sud
+    if (!C.has((x - 1) + '/' + y)) ajoute(x + ',' + (y + 1), x + ',' + y);                  // bord ouest
+  }
+  const vers = (x, y) => [tuile2lat(y, ZOOM_CONTOUR), x / 2 ** ZOOM_CONTOUR * 360 - 180];
+  const anneaux = [];
+  for (const depart of aretes) {
+    if (!suiv.get(depart) || !suiv.get(depart).length) continue;
+    const pts = [depart]; let p = depart;
+    for (;;) {
+      const l = suiv.get(p); if (!l || !l.length) break;
+      p = l.pop(); if (p === depart) break; pts.push(p);
+    }
+    // sommets alignés retirés (le contour ne garde que ses coins)
+    const xy = pts.map(s => s.split(',').map(Number)), coins = [];
+    for (let i = 0; i < xy.length; i++) {
+      const a = xy[(i - 1 + xy.length) % xy.length], b = xy[i], c = xy[(i + 1) % xy.length];
+      if ((b[0] - a[0]) * (c[1] - b[1]) !== (b[1] - a[1]) * (c[0] - b[0])) coins.push(vers(b[0], b[1]));
+    }
+    if (coins.length > 2) anneaux.push(coins);
+  }
+  const gx = sx / C.size, gy = sy / C.size;
+  let bc = null, bd = Infinity, haut = null;
+  for (const k of C) {
+    const [x, y] = k.split('/').map(Number), d = (x + .5 - gx) ** 2 + (y + .5 - gy) ** 2;
+    if (d < bd) { bd = d; bc = [x, y]; }
+    if (!haut || y < haut[1] || (y === haut[1] && Math.abs(x - gx) < Math.abs(haut[0] - gx))) haut = [x, y];
+  }
+  return { anneaux, centre: vers(bc[0] + .5, bc[1] + .5), haut: vers(haut[0] + .5, haut[1]) };
+}
 async function chargerZones() {
   zones = await (await fetch('donnees/zones.json')).json();
   for (const z of zones) {
@@ -267,17 +319,20 @@ async function chargerZones() {
         i = j + 1;
       }
     }
-    // cadre de la zone : liseré sombre (lisible sur la photo aérienne) + pointillé coloré selon l'état
-    const b = [[z.bornes[0], z.bornes[1]], [z.bornes[2], z.bornes[3]]];
-    L.rectangle(b, { color: '#000', opacity: .55, weight: 6, fill: false, interactive: false }).addTo(couches.couv);
-    z._cadre = L.rectangle(b, { weight: 3, dashArray: '9 7', fill: false, interactive: false }).addTo(couches.couv);
-    const ouvrir = () => ouvrirIci(L.latLng(centre(z.bornes)), z);
-    z._lbl = etiquette([z.bornes[2], (z.bornes[1] + z.bornes[3]) / 2], s => { s.textContent = texteZone(z); s.style.borderColor = COULEUR_ZONE[ZonesLocales.statut(z)]; }, 'tel', ouvrir).addTo(couches.couv);
-    z._pin = etiquette(centre(z.bornes), s => { s.innerHTML = '<i></i><b></b>'; s.firstChild.style.background = COULEUR_ZONE[ZonesLocales.statut(z)]; s.lastChild.textContent = z.nom + (aMontre(z) ? ' ⌚' : ''); }, 'pin', ouvrir).addTo(couches.couv);
+    // cadre de la zone : contour réel de son relief (cellules de ~1,5 km), pas son rectangle englobant (les rectangles se
+    // chevauchent et laissaient croire, par exemple, que la rade de Brest contient Le Conquet) ;
+    // liseré sombre (lisible sur la photo aérienne) + pointillé coloré selon l'état
+    const c = contourZone(z);
+    L.polygon(c.anneaux, { color: '#000', opacity: .55, weight: 6, fill: false, interactive: false }).addTo(couches.couv);
+    z._cadre = L.polygon(c.anneaux, { weight: 3, dashArray: '9 7', fill: false, interactive: false }).addTo(couches.couv);
+    const ouvrir = () => ouvrirIci(L.latLng(c.centre), z);
+    z._lbl = etiquette(c.haut, s => { s.textContent = texteZone(z); s.style.borderColor = COULEUR_ZONE[ZonesLocales.statut(z)]; }, 'tel', ouvrir).addTo(couches.couv);
+    z._pin = etiquette(c.centre, s => { s.innerHTML = '<i></i><b></b>'; s.firstChild.style.background = COULEUR_ZONE[ZonesLocales.statut(z)]; s.lastChild.textContent = z.nom + (aMontre(z) ? ' ⌚' : ''); }, 'pin', ouvrir).addTo(couches.couv);
   }
   await ZonesLocales.lire(zones);
 }
-const couvre = (z, ll) => contient(z.bornes, ll);
+// le point est-il dans la zone ? cellule de contour (≈ 1,5 km) contenant au moins une tuile de relief
+const couvre = (z, ll) => contient(z.bornes, ll) && !!z._cellules && z._cellules.has(lon2tx(ll.lng, ZOOM_CONTOUR) + '/' + lat2ty(ll.lat, ZOOM_CONTOUR));
 // couleurs de la carte, liste de la section Téléphone et résumé, après chaque changement d'état
 function majTel() {
   for (const z of zones) {

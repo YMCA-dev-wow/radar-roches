@@ -148,8 +148,29 @@ async function chargerDonnees() {
   activerZone(z0 || ZONES[0]);
 }
 // Zone contenant la position (bornes des données, marge de 3 km), sinon la plus proche
+// Zone de la position : celle dont le relief (tuiles de meta.tuiles) est le plus proche, à 6 tuiles près (≈ 2,5 km) ;
+// à défaut, la plus proche par son rectangle. Les rectangles se chevauchent (Le Conquet, Camaret, l'Aber Wrac'h…) :
+// seul le relief dit quelle zone couvre vraiment le point.
+function tuilesZone(z) {
+  if (!z._t16 && z.meta && z.meta.tuiles) z._t16 = new Set(z.meta.tuiles.map(t => t[0] + '/' + t[1]));
+  return z._t16;
+}
 function zonePour(lat, lon) {
+  const n = 2 ** 16, r = lat * Math.PI / 180;
+  const tx = Math.floor((lon + 180) / 360 * n), ty = Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n);
   let best = null, bd = Infinity;
+  for (const z of ZONES) {
+    const T = tuilesZone(z);
+    if (!T) continue;
+    for (let k = 0; k <= 6 && k < bd; k++) {   // anneaux de tuiles de plus en plus grands autour de la position
+      let trouve = false;
+      for (let dx = -k; dx <= k && !trouve; dx++) for (let dy = -k; dy <= k; dy++)
+        if ((Math.abs(dx) === k || Math.abs(dy) === k) && T.has((tx + dx) + '/' + (ty + dy))) { trouve = true; break; }
+      if (trouve) { bd = k; best = z; break; }
+    }
+  }
+  if (best) return best;
+  bd = Infinity;
   for (const z of ZONES) {
     const [la0, lo0, la1, lo1] = z.bornes;
     const dla = Math.max(0, la0 - lat, lat - la1) * 111, dlo = Math.max(0, lo0 - lon, lon - lo1) * 111 * Math.cos(lat * Math.PI / 180);
