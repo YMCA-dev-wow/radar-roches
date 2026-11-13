@@ -242,6 +242,8 @@ const tuile2lat = (y, z) => Math.atan(Math.sinh(Math.PI * (1 - 2 * y / 2 ** z)))
 const lon2tx = (lon, z) => Math.floor((lon + 180) / 360 * 2 ** z);
 const lat2ty = (lat, z) => { const r = lat * Math.PI / 180; return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * 2 ** z); };
 const COULEUR_ZONE = { ok: '#30d158', web: '#30d158', maj: '#ff9f0a', encours: '#64d2ff', absente: '#c9d2d8', inconnu: '#c9d2d8' };
+// surbrillance de la zone couverte : vert = téléchargée (ou lue en ligne sur ordinateur), jaune = à télécharger
+const SURB_ZONE = { ok: '#30d158', web: '#30d158', maj: '#ff9f0a', encours: '#64d2ff', absente: '#ffd60a', inconnu: '#ffd60a' };
 const ETAT_COURT = { ok: '✓', maj: 'mise à jour', encours: 'en cours…', absente: 'à télécharger', inconnu: '', web: '' };
 const centre = b => [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2];
 const aMontre = z => montres.some(a => a.id.split(':')[0] === z.id);
@@ -319,14 +321,16 @@ async function chargerZones() {
         i = j + 1;
       }
     }
-    // cadre de la zone : contour réel de son relief (cellules de ~1,5 km), pas son rectangle englobant (les rectangles se
-    // chevauchent et laissaient croire, par exemple, que la rade de Brest contient Le Conquet) ;
-    // liseré sombre (lisible sur la photo aérienne) + pointillé coloré selon l'état
+    // zone réellement couverte (contour du relief, cellules de ~1,5 km) en surbrillance colorée selon l'état : les
+    // rectangles se chevauchent (la rade de Brest semblait contenir Le Conquet) ; règle pair-impair : îlots et trous corrects
     const c = contourZone(z);
-    L.polygon(c.anneaux, { color: '#000', opacity: .55, weight: 6, fill: false, interactive: false }).addTo(couches.couv);
-    z._cadre = L.polygon(c.anneaux, { weight: 3, dashArray: '9 7', fill: false, interactive: false }).addTo(couches.couv);
+    z._surb = L.polygon(c.anneaux, { stroke: false, fillOpacity: .45, fillRule: 'evenodd', interactive: false }).addTo(couches.couv);
+    // cadre de la zone (rectangle, plus lisible) : liseré sombre (lisible sur la photo aérienne) + pointillé coloré selon l'état
+    const b = [[z.bornes[0], z.bornes[1]], [z.bornes[2], z.bornes[3]]];
+    L.rectangle(b, { color: '#000', opacity: .55, weight: 6, fill: false, interactive: false }).addTo(couches.couv);
+    z._cadre = L.rectangle(b, { weight: 3, dashArray: '9 7', fill: false, interactive: false }).addTo(couches.couv);
     const ouvrir = () => ouvrirIci(L.latLng(c.centre), z);
-    z._lbl = etiquette(c.haut, s => { s.textContent = texteZone(z); s.style.borderColor = COULEUR_ZONE[ZonesLocales.statut(z)]; }, 'tel', ouvrir).addTo(couches.couv);
+    z._lbl = etiquette([z.bornes[2], (z.bornes[1] + z.bornes[3]) / 2], s => { s.textContent = texteZone(z); s.style.borderColor = COULEUR_ZONE[ZonesLocales.statut(z)]; }, 'tel', ouvrir).addTo(couches.couv);
     z._pin = etiquette(c.centre, s => { s.innerHTML = '<i></i><b></b>'; s.firstChild.style.background = COULEUR_ZONE[ZonesLocales.statut(z)]; s.lastChild.textContent = z.nom + (aMontre(z) ? ' ⌚' : ''); }, 'pin', ouvrir).addTo(couches.couv);
   }
   await ZonesLocales.lire(zones);
@@ -337,7 +341,8 @@ const couvre = (z, ll) => contient(z.bornes, ll) && !!z._cellules && z._cellules
 function majTel() {
   for (const z of zones) {
     const st = ZonesLocales.statut(z);
-    z._rects.forEach(r => r.setStyle({ fillColor: st === 'absente' || st === 'inconnu' ? '#6f7c85' : COULEUR_ZONE[st] }));
+    z._rects.forEach(r => r.setStyle({ fillColor: SURB_ZONE[st] }));
+    z._surb.setStyle({ fillColor: SURB_ZONE[st] });
     z._cadre.setStyle({ color: COULEUR_ZONE[st] });
     z._lbl.maj(); z._pin.maj();
   }
@@ -347,8 +352,8 @@ function majTel() {
     const n = zones.filter(z => ZonesLocales.statut(z) === 'ok').length;
     $('resTel').textContent = `${n} / ${zones.length} téléchargée${n > 1 ? 's' : ''}`;
     $('legendeTel').innerHTML = '';
-    for (const [c, t] of [['#30d158', 'téléchargée'], ['#c9d2d8', 'à télécharger'], ['#ff9f0a', 'mise à jour disponible']])
-      $('legendeTel').append(Object.assign(document.createElement('span'), { innerHTML: `<i class="pastille" style="border:2px dashed ${c}"></i>${t}` }));
+    for (const st of ['ok', 'absente', 'maj'])
+      $('legendeTel').append(Object.assign(document.createElement('span'), { innerHTML: `<i class="pastille" style="border:2px dashed ${COULEUR_ZONE[st]};background:${SURB_ZONE[st]}99"></i>${{ ok: 'téléchargée', absente: 'à télécharger', maj: 'mise à jour disponible' }[st]}` }));
   } else {
     $('resTel').textContent = zones.length + ' zones';
     $('telInfo').textContent = 'Zones couvertes par le radar du téléphone (relevé Litto3D). Sur ordinateur, le relief est lu en ligne ; dans l\'appli Android, il se télécharge ici, zone par zone.';
