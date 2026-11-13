@@ -71,7 +71,7 @@ for (const e of ENTREES) {
 <script>
 // e-mail de contact : objet prérempli avec la version de l'appli (aide à reproduire un bug)
 fetch('version.json').then(r => r.ok ? r.json() : null).catch(() => null).then(v => {
-  const t = v && v.version ? ` v${v.version} (${v.construction})` : '';
+  const t = v && v.version ? ` v${v.version}.${v.construction}${v.canal === 'dev' ? ' dev' : ''}` : '';
   document.getElementById('mailContact').href = 'mailto:ymcafoiling@gmail.com?subject=' + encodeURIComponent('Radar roches' + t + ' : ');
 });
 </script>

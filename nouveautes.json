@@ -6,7 +6,7 @@
       "date": "2026-11-13",
       "titre": "Nouveau numéro de version : v0.8",
       "points": [
-        "L'appli affiche désormais sa version sous la forme v0.8 (construction) en bas de Plus : 0 = version bêta, 8 = vague de nouveautés. Indique-la quand tu signales un bug (elle est déjà dans l'objet de l'e-mail de contact)."
+        "L'appli affiche désormais sa version en bas de Plus, par exemple v0.8.73 : 0 = version bêta, 8 = vague de nouveautés, 73 = construction. Indique-la quand tu signales un bug (elle est déjà dans l'objet de l'e-mail de contact)."
       ]
     },
     {

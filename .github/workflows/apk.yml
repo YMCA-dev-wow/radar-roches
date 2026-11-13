@@ -1,5 +1,8 @@
-# Fabrique l'appli Android (APK) à chaque mise à jour et la publie à une adresse fixe :
-# https://github.com/YMCA-dev-wow/radar-roches/releases/latest/download/radar-roches.apk
+# Fabrique l'appli Android (APK) à chaque mise à jour. Deux canaux :
+#  - développement (chaque mise à jour) : https://github.com/YMCA-dev-wow/radar-roches/releases/download/appli-dev/radar-roches.apk
+#  - testeurs (seulement si le message du commit contient « [publier] », ou lancement manuel avec « publier ») :
+#    https://github.com/YMCA-dev-wow/radar-roches/releases/latest/download/radar-roches.apk
+# Une publication testeurs met aussi à jour le canal de développement (il a toujours la version la plus récente).
 # Copié dans .github/workflows/ du dépôt par outils/preparer_site.py.
 name: APK Android
 
@@ -7,6 +10,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      publier:
+        description: Publier pour les testeurs
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -16,6 +24,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+
+      - name: Canal (développement ou testeurs)
+        env:
+          MSG: ${{ github.event.head_commit.message }}
+          PUBLIER: ${{ github.event.inputs.publier }}
+        run: |
+          if [ "$PUBLIER" = "true" ] || printf '%s' "$MSG" | grep -qiF '[publier]'; then C=testeurs; else C=dev; fi
+          echo "CANAL=$C" >> "$GITHUB_ENV"; echo "Canal : $C"
 
       - uses: actions/setup-node@v5
         with:
@@ -83,7 +99,20 @@ jobs:
       - name: Version affichée
         run: echo "VERSION_APPLI=$(node -e "const v=require('./appli/version.json');console.log(v.generation+'.'+v.jalon)")" >> "$GITHUB_ENV"
 
-      - name: Publication (adresse fixe)
+      - name: Publication (canal de développement)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: appli-dev
+          name: Radar roches – version de développement
+          prerelease: true
+          make_latest: false
+          body: |
+            Version de développement, mise à jour à chaque modification : version ${{ env.VERSION_APPLI }} (construction n° ${{ github.run_number }}).
+            Télécharger : https://github.com/${{ github.repository }}/releases/download/appli-dev/radar-roches.apk
+          files: ${{ runner.temp }}/radar-roches.apk
+
+      - name: Publication (canal testeurs)
+        if: env.CANAL == 'testeurs'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: appli
@@ -99,6 +128,7 @@ jobs:
       # secrets du dépôt (VIRUSTOTAL_API_KEY, compte VirusTotal gratuit). Le rapport est public, retrouvé par l'empreinte
       # SHA-256 de l'APK (page securite.html). Sans clé : étape ignorée ; un échec n'empêche pas la publication.
       - name: Analyse VirusTotal
+        if: env.CANAL == 'testeurs'
         continue-on-error: true
         env:
           VT: ${{ secrets.VIRUSTOTAL_API_KEY }}

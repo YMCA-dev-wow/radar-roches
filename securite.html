@@ -102,7 +102,7 @@
     const sha = a.digest.replace(/^sha256:/, ''), n = (rel.body || '').match(/construction n° (\d+)/), v = (rel.body || '').match(/version (\d+\.\d+)/);
     el.innerHTML = '';
     const ligne = (t, html) => { const d = document.createElement('div'); d.innerHTML = t; el.append(d); if (html) el.append(html); };
-    ligne(`<b>Radar roches${v ? ' v' + v[1] : ''}${n ? ' · construction ' + n[1] : ''}</b> · publiée le ${new Date(a.updated_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}`
+    ligne(`<b>Radar roches${v && n ? ' v' + v[1] + '.' + n[1] : n ? ' · construction ' + n[1] : ''}</b> · publiée le ${new Date(a.updated_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}`
       + ` · ${(a.size / 1e6).toFixed(1).replace('.', ',')} Mo`);
     const e = document.createElement('div'); e.className = 'empreinte'; e.textContent = sha;
     ligne('Empreinte SHA-256 de l\'APK :', e);
