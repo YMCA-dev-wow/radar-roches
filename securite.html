@@ -99,10 +99,10 @@
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const rel = await r.json(), a = (rel.assets || []).find(x => x.name === 'radar-roches.apk');
     if (!a || !a.digest) throw new Error('empreinte indisponible');
-    const sha = a.digest.replace(/^sha256:/, ''), n = (rel.body || '').match(/construction n° (\d+)/);
+    const sha = a.digest.replace(/^sha256:/, ''), n = (rel.body || '').match(/construction n° (\d+)/), v = (rel.body || '').match(/version (\d+\.\d+)/);
     el.innerHTML = '';
     const ligne = (t, html) => { const d = document.createElement('div'); d.innerHTML = t; el.append(d); if (html) el.append(html); };
-    ligne(`<b>Radar roches${n ? ' · construction ' + n[1] : ''}</b> · publiée le ${new Date(a.updated_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}`
+    ligne(`<b>Radar roches${v ? ' v' + v[1] : ''}${n ? ' · construction ' + n[1] : ''}</b> · publiée le ${new Date(a.updated_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}`
       + ` · ${(a.size / 1e6).toFixed(1).replace('.', ',')} Mo`);
     const e = document.createElement('div'); e.className = 'empreinte'; e.textContent = sha;
     ligne('Empreinte SHA-256 de l\'APK :', e);

@@ -9,7 +9,9 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         // numéro de version = numéro de la construction GitHub (doit augmenter pour installer une mise à jour)
         versionCode((System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger())
-        versionName("1." + (System.getenv('GITHUB_RUN_NUMBER') ?: '0'))
+        // version affichée : génération.jalon.construction (appli/version.json), ex. 0.8.71
+        def v = new groovy.json.JsonSlurper().parse(rootProject.file('../version.json'))
+        versionName("${v.generation}.${v.jalon}." + (System.getenv('GITHUB_RUN_NUMBER') ?: '0'))
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

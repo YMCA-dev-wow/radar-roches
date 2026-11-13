@@ -70,8 +70,9 @@ for (const e of ENTREES) {
 </script>
 <script>
 // e-mail de contact : objet prérempli avec la version de l'appli (aide à reproduire un bug)
-fetch('version.txt').then(r => r.ok ? r.text() : '').catch(() => '').then(v => {
-  document.getElementById('mailContact').href = 'mailto:ymcafoiling@gmail.com?subject=' + encodeURIComponent('Radar roches' + (v.trim() ? ' (version ' + v.trim() + ')' : '') + ' : ');
+fetch('version.json').then(r => r.ok ? r.json() : null).catch(() => null).then(v => {
+  const t = v && v.version ? ` v${v.version} (${v.construction})` : '';
+  document.getElementById('mailContact').href = 'mailto:ymcafoiling@gmail.com?subject=' + encodeURIComponent('Radar roches' + t + ' : ');
 });
 </script>
 <script src="maj.js"></script>

@@ -672,8 +672,9 @@ async function demarrerJournal() {
   const ok = p => p.then(r => r, e => ({ erreur: e.message }));
   const son = await ok($('volMax').checked ? Natif.son.volumeMax({ on: true }) : Natif.son.etat());
   let version = null; try { version = (await (await fetch('version.txt', { cache: 'no-store' })).text()).trim(); } catch {}
+  let versionNom = null; try { versionNom = (await (await fetch('version.json', { cache: 'no-store' })).json()).version; } catch {}
   await JournalSession.ouvrir({
-    version, appareil: await ok(Natif.journal.appareil()), son, zone: zone && zone.id,
+    version, versionNom, appareil: await ok(Natif.journal.appareil()), son, zone: zone && zone.id,
     profil: profils[profilActif] && profils[profilActif].nom,
     reglages: Object.fromEntries(SETTINGS.map(k => [k, $(k).type === 'checkbox' ? $(k).checked : $(k).value])),
     maree: { recalage: etatRecal, info: $('liveInfo').textContent }, ecran: !document.hidden,

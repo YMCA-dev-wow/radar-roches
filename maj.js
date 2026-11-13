@@ -12,14 +12,20 @@
   async function versionLocale() {
     try { const r = await fetch('version.txt', { cache: 'no-store' }); return parseInt(await r.text(), 10) || 0; } catch { return 0; }
   }
+  // version affichée (génération.jalon) de l'appli installée : version.json, écrit à la fabrication de l'APK
+  async function nomLocal() {
+    try { return (await (await fetch('version.json', { cache: 'no-store' })).json()).version || ''; } catch { return ''; }
+  }
+  const affiche = (nom, n) => (nom ? `v${nom} (${n})` : `Construction ${n}`);
   async function versionPubliee(force) {
     const c = lire('maj.publiee');
     if (!force && c && Date.now() - c.t < 6 * 3600e3) return c.n;
     const r = await fetch(API, { signal: AbortSignal.timeout(10000), headers: { Accept: 'application/vnd.github+json' } });
     if (!r.ok) throw new Error('GitHub : HTTP ' + r.status);
-    const m = /construction n° (\d+)/.exec((await r.json()).body || '');
+    const corps = (await r.json()).body || '';
+    const m = /construction n° (\d+)/.exec(corps), v = /version (\d+\.\d+)/.exec(corps);
     const n = m ? +m[1] : 0;
-    ecrire('maj.publiee', { t: Date.now(), n });
+    ecrire('maj.publiee', { t: Date.now(), n, nom: v ? v[1] : '' });
     return n;
   }
   // zone : pied de page, une ligne discrète « Construction N · Vérifier les mises à jour », qui devient
@@ -32,26 +38,27 @@
   };
   window.verifierMaj = async function (zone, force = false) {
     if (!appli || !zone) return;
-    const ici = await versionLocale();
+    const ici = await versionLocale(), nom = await nomLocal(), moi = affiche(nom, ici);
     const ligne = (...morceaux) => { zone.innerHTML = ''; morceaux.forEach((m, i) => { if (i) zone.append(' · '); zone.append(m); }); };
     let n;
     try { n = await versionPubliee(force); }
-    catch (err) { ligne(`Construction ${ici}`, 'vérification impossible'); return; }
+    catch (err) { ligne(moi, 'vérification impossible'); return; }
     if (n > ici) {
-      const a = lien(`Mise à jour disponible (${n})`, APK, true); a.target = '_blank'; a.rel = 'noopener';
-      ligne(`Construction ${ici}`, a);
+      const pub = affiche((lire('maj.publiee') || {}).nom, n);
+      const a = lien(`Mise à jour disponible : ${pub}`, APK, true); a.target = '_blank'; a.rel = 'noopener';
+      ligne(moi, a);
       if ((lire('maj.notifiee') || 0) < n) { // notification Android, une fois par version
         ecrire('maj.notifiee', n);
         try {
           const N = C.registerPlugin('LocalNotifications');
           const p = await N.requestPermissions();
-          if (p.display === 'granted') await N.schedule({ notifications: [{ id: 900, title: 'Radar roches : mise à jour', body: `Construction ${n} disponible (tu as la ${ici}). Lien en bas de l'accueil.` }] });
+          if (p.display === 'granted') await N.schedule({ notifications: [{ id: 900, title: 'Radar roches : mise à jour', body: `${pub} disponible (tu as la ${moi}). Lien en bas de Plus.` }] });
         } catch {}
       }
     } else {
       const a = lien('Vérifier les mises à jour', '#');
       a.onclick = e => { e.preventDefault(); zone.textContent = 'Vérification…'; window.verifierMaj(zone, true); };
-      ligne(`Construction ${ici}`, a);
+      ligne(moi, a);
     }
   };
 })();

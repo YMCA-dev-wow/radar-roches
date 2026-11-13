@@ -1,0 +1,5 @@
+{
+  "_lisezmoi": "Version affichée de l'appli : génération.jalon (+ construction GitHub, ajoutée automatiquement). Génération 0 = bêta, 1 = première version publique. Augmenter « jalon » à chaque nouvelle vague de nouveautés envoyée aux testeurs.",
+  "generation": 0,
+  "jalon": 8
+}

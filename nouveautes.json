@@ -2,6 +2,14 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 36,
+      "date": "2026-11-13",
+      "titre": "Nouveau numéro de version : v0.8",
+      "points": [
+        "L'appli affiche désormais sa version sous la forme v0.8 (construction) en bas de Plus : 0 = version bêta, 8 = vague de nouveautés. Indique-la quand tu signales un bug (elle est déjà dans l'objet de l'e-mail de contact)."
+      ]
+    },
+    {
       "id": 35,
       "date": "2026-11-13",
       "titre": "Page Sécurité et confidentialité",

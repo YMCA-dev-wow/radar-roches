@@ -80,13 +80,16 @@ jobs:
           name: radar-roches-apk
           path: ${{ runner.temp }}/radar-roches.apk
 
+      - name: Version affichée
+        run: echo "VERSION_APPLI=$(node -e "const v=require('./appli/version.json');console.log(v.generation+'.'+v.jalon)")" >> "$GITHUB_ENV"
+
       - name: Publication (adresse fixe)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: appli
           name: Radar roches – appli Android
           body: |
-            Appli Android du radar (construction n° ${{ github.run_number }}).
+            Appli Android du radar, version ${{ env.VERSION_APPLI }} (construction n° ${{ github.run_number }}).
             Télécharger depuis le téléphone : https://github.com/${{ github.repository }}/releases/latest/download/radar-roches.apk
             Sécurité (empreintes, analyse antivirus) : https://ymca-dev-wow.github.io/radar-roches/securite.html
           files: ${{ runner.temp }}/radar-roches.apk

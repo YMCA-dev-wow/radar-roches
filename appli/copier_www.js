@@ -25,4 +25,7 @@ for (const [page, script] of [['radar.html', 'noyau.js'], ['rejeu.html', 'noyau.
 // l'appli s'ouvre directement sur le radar (l'accueil web, orienté ordinateur, n'y sert pas)
 fs.writeFileSync(path.join(dst, 'index.html'), '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=radar.html"><script>location.replace("radar.html")</script>');
 fs.writeFileSync(path.join(dst, 'version.txt'), process.env.GITHUB_RUN_NUMBER || 'locale');
+// version affichée : génération.jalon (appli/version.json) + construction, ex. 0.8.71 (affichée « v0.8 (71) »)
+const V = JSON.parse(fs.readFileSync(path.join(__dirname, 'version.json'), 'utf8'));
+fs.writeFileSync(path.join(dst, 'version.json'), JSON.stringify({ version: `${V.generation}.${V.jalon}`, construction: +(process.env.GITHUB_RUN_NUMBER || 0) }));
 console.log('www prêt');
