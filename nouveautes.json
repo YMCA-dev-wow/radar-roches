@@ -2,6 +2,15 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 34,
+      "date": "2026-11-13",
+      "titre": "Version bêta : conditions et contact",
+      "points": [
+        "Au premier lancement, une fenêtre rappelle les limites de l'appli (aide à la vigilance, pas un instrument de navigation) et son statut de version bêta, à accepter une fois. Elle reste consultable dans Plus → Conditions d'utilisation.",
+        "Un bug, une idée ? Le contact est dans Plus : ymcafoiling@gmail.com, avec le journal de la séance concernée."
+      ]
+    },
+    {
       "id": 33,
       "date": "2026-11-10",
       "titre": "Relief des zones sur un site dédié",

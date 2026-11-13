@@ -37,6 +37,10 @@
   .guideAccueil .corps ul { padding-left: 20px; margin: 8px 0; } .guideAccueil .corps li { margin: 6px 0; }
   .guideAccueil .encadre { background: var(--p1); border: 1px solid var(--ln); border-radius: 14px; padding: 12px 14px; margin: 12px 0; font-size: 14px; }
   .guideAccueil .bas { display: flex; gap: 10px; margin-top: 16px; } .guideAccueil .bas button { flex: 1; justify-content: center; padding: 13px; }
+  .guideAccueil .bas button:disabled { opacity: .4; }
+  .guideAccueil > h2 { margin-top: 10px; }
+  .guideAccueil .accepter { display: flex; gap: 12px; align-items: flex-start; margin: 18px 0 4px; padding: 12px 14px; border: 1px solid var(--ac); border-radius: 14px; cursor: pointer; }
+  .guideAccueil .accepter input { width: 24px; height: 24px; flex: none; margin-top: 1px; accent-color: var(--ac); }
   #courbe { width: 100%; height: 54px; margin-top: 8px; display: block; }
   .verifs { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 6px; }
   .demarrer { display: flex; align-items: center; justify-content: center; width: 168px; height: 168px; margin: 14px auto 10px; border-radius: 50%;
@@ -945,9 +949,39 @@ function route() {
   $('setup').hidden = av; $('avance').hidden = !av;
   if (h === '#profils') ouvrirProfils();
   if (h === '#accueil') { history.replaceState(null, '', location.pathname); guideAccueil(); }
+  if (h === '#conditions') { history.replaceState(null, '', location.pathname); afficherConditions(null, true); }
   scrollTo(0, 0);
 }
 addEventListener('hashchange', route);
+
+// ---------- Conditions d'utilisation (version bêta) : à accepter au premier lancement ----------
+// Version des conditions : l'augmenter les fait accepter de nouveau par tous (texte modifié).
+const VERSION_CONDITIONS = 1;
+function afficherConditions(apres, consultation) {
+  const g = document.createElement('div'); g.className = 'guideAccueil';
+  g.innerHTML = `<h2>Avant de commencer</h2><div class="corps">
+    <div class="encadre"><b>Une aide à la vigilance, pas un instrument de navigation.</b> Radar roches ne remplace ni la carte marine,
+      ni l'observation du plan d'eau, ni le bon sens marin. Garde les yeux ouverts : tu restes seul responsable de ta navigation et de ta sécurité.</div>
+    <ul>
+      <li><b>Ses données ont des limites</b> : seules les zones couvertes sont connues ; le fond est celui mesuré entre 2014 et 2021 selon les secteurs
+        (sable et vase bougent) ; la marée est une prévision ; bouées, bateaux et autres usagers ne sont pas détectés.</li>
+      <li><b>Ton téléphone aussi</b> : batterie, GPS, son étouffé par la pochette ou le vent… une alerte peut ne pas être entendue.</li>
+      <li><b>Version bêta</b> : l'appli est en cours de développement, gratuite et réalisée par un passionné. Des bugs sont possibles.
+        <b>Mets-la à jour avant chaque sortie</b> (Plus affiche « Mise à jour disponible »).</li>
+      <li><b>Un bug, une idée ?</b> Écris à <b>${'ymcafoiling@gmail.com'}</b>, avec le journal de la séance concernée (Plus → Avancé → Journaux de session → Envoyer).</li>
+    </ul>
+    <label class="accepter"><input type="checkbox" id="caAccepte"> <span>J'ai lu et j'accepte : Radar roches est une aide en version bêta, je reste responsable de ma navigation.</span></label>
+  </div><div class="bas"><button class="btn prim" id="caOk">Continuer</button></div>`;
+  document.body.append(g);
+  const c = g.querySelector('#caAccepte'), ok = g.querySelector('#caOk');
+  if (consultation) { c.checked = c.disabled = true; ok.textContent = 'Fermer'; }
+  const maj = () => { ok.disabled = !c.checked; }; c.onchange = maj; maj();
+  ok.onclick = () => {
+    if (!c.checked) return;
+    store.set('conditions', { version: VERSION_CONDITIONS, le: new Date().toISOString() });
+    g.remove(); if (apres) apres();
+  };
+}
 
 // ---------- Accueil du premier lancement : 4 écrans ----------
 function guideAccueil(apres) {
@@ -1014,7 +1048,10 @@ function guideAccueil(apres) {
   initProfils(); route(); demarrerGpsAccueil(); majVerifs();
   // premier lancement (ou nouvel accueil jamais vu) : quelques écrans d'accueil, puis les nouveautés
   const accueilAFaire = !store.get('accueilVu', false) && (window.androidBridge || /[?&]accueil/.test(location.search));
-  if (!accueilAFaire && premiereOuverture && window.androidBridge) nouveautes.ouvrir(); // après une mise à jour : quoi de neuf
+  // conditions (bêta) d'abord, tant qu'elles n'ont pas été acceptées dans leur version actuelle
+  const conditionsAFaire = ((store.get('conditions', null) || {}).version || 0) < VERSION_CONDITIONS && (window.androidBridge || /[?&]accueil/.test(location.search));
+  const conditionsOk = conditionsAFaire ? new Promise(r => afficherConditions(r)) : Promise.resolve();
+  if (!accueilAFaire && premiereOuverture && window.androidBridge) conditionsOk.then(() => nouveautes.ouvrir()); // après une mise à jour : quoi de neuf
   addEventListener('load', () => diagEtat().then(t => $('diagInfo').textContent = t));
   setTimeout(() => { // chargement anormalement long : dire ce qui manque
     if (chargementEnAttente.size) $('dataInfo').textContent = 'Chargement bloqué sur : ' + [...chargementEnAttente].join(', ');
@@ -1026,7 +1063,7 @@ function guideAccueil(apres) {
     const r = store.get('recal', null);
     if (r && r.jour === new Date().toDateString() && PORTS.some(p => p.id === r.port)) { $('offPort').value = r.port; r.rows.forEach(offRow); }
     applyRecal(); $('start').disabled = false; $('dataInfo').textContent = '';
-    if (accueilAFaire) guideAccueil(() => { if (window.androidBridge) nouveautes.ouvrir(); });
+    if (accueilAFaire) conditionsOk.then(() => guideAccueil(() => { if (window.androidBridge) nouveautes.ouvrir(); }));
     await recalageDirect(); updHNow(); setInterval(updHNow, 60000);
   } catch (err) {
     $('dataInfo').innerHTML = '<span class="err">' + (location.protocol === 'file:'

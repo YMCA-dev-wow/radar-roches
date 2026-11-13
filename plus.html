@@ -14,6 +14,8 @@
   footer { text-align: center; color: #4f7a76; font-size: 13px; margin-top: 26px; }
   .journal { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--ln); }
   .journal > div { flex: 1; cursor: pointer; }
+  .contact { margin: 22px 0 0; padding: 14px 16px; background: var(--p1); border: 1px solid var(--ln); border-radius: 14px; line-height: 1.5; }
+  .contact p { margin: 6px 0 0; } .contact a { color: var(--ac); }
   .groupeMenu { margin: 18px 0 0; }
   .groupeMenu > summary { list-style: none; cursor: pointer; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--mu); padding: 10px 4px; display: flex; align-items: center; gap: 8px; }
   .groupeMenu > summary::-webkit-details-marker { display: none; }
@@ -29,6 +31,12 @@
 <div class="page">
   <div class="entete"><img src="logo.svg" width="30" height="30" alt=""><h1>Plus</h1></div>
   <nav class="menu" id="menu"></nav>
+  <div class="contact">
+    <b>Un bug, une idée d'amélioration ?</b>
+    <p>Écris-moi : <a id="mailContact" href="mailto:ymcafoiling@gmail.com">ymcafoiling@gmail.com</a>. Pour un bug, joins le journal de la séance
+      concernée (Avancé → Journaux de session → Envoyer).</p>
+    <p class="mu">Radar roches est en version bêta : mets l'appli à jour avant chaque sortie. <a href="radar.html#conditions">Conditions d'utilisation</a></p>
+  </div>
   <footer id="maj"></footer>
 </div>
 <script>
@@ -59,6 +67,12 @@ for (const e of ENTREES) {
   if (href === '#journaux') a.onclick = e => { e.preventDefault(); ouvrirJournaux(); };
   cible.append(a);
 }
+</script>
+<script>
+// e-mail de contact : objet prérempli avec la version de l'appli (aide à reproduire un bug)
+fetch('version.txt').then(r => r.ok ? r.text() : '').catch(() => '').then(v => {
+  document.getElementById('mailContact').href = 'mailto:ymcafoiling@gmail.com?subject=' + encodeURIComponent('Radar roches' + (v.trim() ? ' (version ' + v.trim() + ')' : '') + ' : ');
+});
 </script>
 <script src="maj.js"></script>
 <script>verifierMaj(document.getElementById('maj'));</script>
