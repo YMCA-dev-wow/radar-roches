@@ -6,7 +6,8 @@
       "date": "2026-11-13",
       "titre": "Zones : la partie couverte en surbrillance",
       "points": [
-        "Sur la carte, la partie de chaque zone vraiment couverte par le relief est colorée dans son cadre : en vert si elle est téléchargée, en gris si elle est à télécharger. On voit ainsi que Le Conquet est dans Brest Iroise et pas dans la rade de Brest.",
+        "Sur la carte, la partie de chaque zone vraiment couverte par le relief est colorée dans son cadre : en vert si elle est téléchargée, en gris si elle est à télécharger. On voit ainsi que Le Conquet est dans la zone de l'Iroise et pas dans la rade de Brest.",
+        "La zone « Brest Iroise » s'appelle maintenant « Aber Wrac'h – Goulet de Brest » : elle couvre Ouessant, Molène et la côte de l'Aber Wrac'h au goulet, pas la rade. Si tu l'as déjà téléchargée, rien à refaire.",
         "Le radar choisit sa zone de la même façon : là où deux zones se touchent (Camaret, Le Conquet, l'Aber Wrac'h…), il prend celle dont le relief couvre vraiment ta position."
       ]
     },
