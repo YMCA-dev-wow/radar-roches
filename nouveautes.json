@@ -2,6 +2,14 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 40,
+      "date": "2026-11-13",
+      "titre": "Nouvelle zone : Rade de Brest – Baie d'Audierne",
+      "points": [
+        "Rade de Brest, presqu'île de Crozon, baie de Douarnenez, pointe du Raz, île de Sein et baie d'Audierne. Marée d'après le marégraphe de Brest, calée port par port sur les horaires du Shom. Relief à télécharger depuis Plus → Carte et téléchargements."
+      ]
+    },
+    {
       "id": 39,
       "date": "2026-11-13",
       "titre": "Marée plus juste en Iroise et en nord Finistère",

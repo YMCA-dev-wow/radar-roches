@@ -443,6 +443,192 @@
   "taille_tuiles": 139756614
  },
  {
+  "id": "rade_audierne",
+  "nom": "Rade de Brest – Baie d'Audierne",
+  "dossier": "donnees_29c",
+  "zh_ref": -3.635,
+  "bornes": [
+   47.84356227705857,
+   -5.14892352730128,
+   48.466144744942504,
+   -4.170103760156922
+  ],
+  "retard": 0,
+  "jauges": [
+   {
+    "fichier": "brest",
+    "refmar": 3,
+    "nom": "Brest",
+    "lon": -4.4947,
+    "nm": 4.14,
+    "pmve": 7.05,
+    "bmve": 1.15
+   }
+  ],
+  "ports": [
+   {
+    "id": "sein",
+    "nom": "Île de Sein",
+    "lat": 48.0402,
+    "lon": -4.8475,
+    "nm": 3.59,
+    "pmve": 6.215,
+    "bmve": 0.965,
+    "zh": -3.001,
+    "dt": -1920,
+    "w": 0.0
+   },
+   {
+    "id": "vorlen",
+    "nom": "Port du Vorlen",
+    "lat": 48.053,
+    "lon": -4.7125,
+    "nm": 3.65,
+    "pmve": 6.225,
+    "bmve": 1.075,
+    "zh": -3.245,
+    "dt": -1920,
+    "w": 0.0
+   },
+   {
+    "id": "plogoff",
+    "nom": "Plogoff",
+    "lat": 48.024,
+    "lon": -4.6987,
+    "nm": 3.202,
+    "pmve": 5.476,
+    "bmve": 0.927,
+    "zh": -2.62,
+    "dt": -1920,
+    "w": 0.0
+   },
+   {
+    "id": "camaret",
+    "nom": "Camaret-sur-Mer",
+    "lat": 48.2783,
+    "lon": -4.59,
+    "nm": 3.813,
+    "pmve": 6.552,
+    "bmve": 1.075,
+    "zh": -3.314,
+    "dt": -780,
+    "w": 0.0
+   },
+   {
+    "id": "dellec",
+    "nom": "Le Dellec",
+    "lat": 48.3537,
+    "lon": -4.562,
+    "nm": 3.99,
+    "pmve": 6.84,
+    "bmve": 1.14,
+    "zh": -3.591,
+    "dt": -300,
+    "w": 0.0
+   },
+   {
+    "id": "audierne",
+    "nom": "Audierne",
+    "lat": 48.0215,
+    "lon": -4.5376,
+    "nm": 2.975,
+    "pmve": 5.151,
+    "bmve": 0.799,
+    "zh": -2.531,
+    "dt": -1260,
+    "w": 0.0
+   },
+   {
+    "id": "morgat",
+    "nom": "Morgat",
+    "lat": 48.2245,
+    "lon": -4.4973,
+    "nm": 3.774,
+    "pmve": 6.556,
+    "bmve": 0.993,
+    "zh": -3.372,
+    "dt": -600,
+    "w": 0.0
+   },
+   {
+    "id": "brest",
+    "nom": "Brest",
+    "lat": 48.3825,
+    "lon": -4.4947,
+    "nm": 4.022,
+    "pmve": 6.97,
+    "bmve": 1.075,
+    "zh": -3.635,
+    "dt": 120,
+    "w": 0.0
+   },
+   {
+    "id": "moulinblanc",
+    "nom": "Moulin Blanc",
+    "lat": 48.395,
+    "lon": -4.43,
+    "nm": 4.21,
+    "pmve": 7.185,
+    "bmve": 1.235,
+    "zh": -3.726,
+    "dt": 300,
+    "w": 0.0
+   },
+   {
+    "id": "guenole",
+    "nom": "Saint-Guénolé",
+    "lat": 47.814,
+    "lon": -4.3825,
+    "nm": 2.912,
+    "pmve": 4.998,
+    "bmve": 0.826,
+    "zh": -2.511,
+    "dt": -1380,
+    "w": 0.0
+   },
+   {
+    "id": "tinduff",
+    "nom": "Tinduff",
+    "lat": 48.3358,
+    "lon": -4.3675,
+    "nm": 4.27,
+    "pmve": 7.32,
+    "bmve": 1.22,
+    "zh": -3.741,
+    "dt": 300,
+    "w": 0.0
+   },
+   {
+    "id": "douarnenez",
+    "nom": "Douarnenez",
+    "lat": 48.1,
+    "lon": -4.3167,
+    "nm": 3.728,
+    "pmve": 6.524,
+    "bmve": 0.932,
+    "zh": -3.332,
+    "dt": -660,
+    "w": 0.0
+   },
+   {
+    "id": "terenez",
+    "nom": "Pont de Térénez",
+    "lat": 48.28,
+    "lon": -4.2689,
+    "nm": 4.43,
+    "pmve": 7.505,
+    "bmve": 1.355,
+    "zh": -3.743,
+    "dt": 300,
+    "w": 0.0
+   }
+  ],
+  "interp": "distance",
+  "port_central": "brest",
+  "version_tuiles": "6483e5bd9e3a",
+  "taille_tuiles": 161460757
+ },
+ {
   "id": "baie_saint_brieuc",
   "nom": "Baie de Saint-Brieuc",
   "dossier": "donnees_22b",
