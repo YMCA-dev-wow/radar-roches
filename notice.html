@@ -125,7 +125,8 @@ Après une séance de plus de 3 minutes, l'appli propose de la revoir dans le re
     Hauteur calculée d'après le temps de vol, surestimée quand l'aile porte ; précision d'environ ±30 %. Les sauts apparaissent dans le rejeu du journal
     (triangles blancs sur la frise, lignes « saut » dans la liste). Réglage « Sauts (essai) » dans Plus → Réglages avancés → Sons, <b>coupé par défaut</b>.
     Ne comptent que les vols vraiment allégés, au-dessus de 12 km/h (le pompage dans les molles n'est plus pris pour un saut) ; aucune annonce de saut
-    pendant une alerte.</li>
+    pendant une alerte. L'annonce vient 1 s après la réception. Pour affiner le calcul, le journal garde la courbe d'accélération (100 mesures par seconde,
+    norme et verticale), l'altitude du baromètre et les chocs forts sans phase allégée (réceptions de sauts de kite, où l'aile porte).</li>
   <li><b>La voix distingue</b> « Roche » (relief marqué, roche saisie) et « Haut-fond » (sable, vase). Après un haut-fond, une roche sur ta route
     est annoncée à nouveau, même dans la même série d'alertes.</li>
   <li>Le bandeau sous les chiffres décrit le danger le plus proche : <b>rouge</b> pour une alerte, <b>jaune</b> pour une pré-alerte, <b>bleu</b> pour la veille latérale.</li>
@@ -226,6 +227,9 @@ Après <b>START → Enregistrer</b>, un <b>résumé</b> s'affiche : durée, dist
 plus haut saut et plus long temps de vol (Garmin Connect n'affiche pas les données d'une appli installée hors du Store). N'importe quel bouton revient à l'accueil.</p>
 <p><b>Sauts (essai)</b> : la montre détecte les sauts avec son accéléromètre (temps de vol, hauteur estimée ; au poignet, précision limitée), au-dessus de 12 km/h.
 Après chaque saut, un bandeau « SAUT 1,2 m » reste 10 s à l'écran.
+Depuis le 13/11, l'appli enregistre aussi les <b>accélérations brutes</b> (25 mesures par seconde sur 3 axes) pour affiner le calcul de la hauteur et mettre au point
+la détection des sauts de kite : règle la montre sur <b>Système → Enregistrement des données → Chaque seconde</b> (sinon l'enregistrement « intelligent » saute
+des secondes et leurs mesures sont perdues). Le fichier de la séance est plus gros (environ 1 Mo de plus pour 2 h).
 La page de données (UP / DOWN) affiche leur nombre, le plus haut et le dernier. Ils sont enregistrés dans l'activité : dans Garmin Connect,
 courbes « Saut », « Temps de vol » et « Sauts » (nombre cumulé) ; le rejeu les montre aussi (triangles blancs, lignes « saut »).
 La montre ne peut pas parler : Garmin ne permet pas la voix aux applis Connect IQ.</p>
@@ -339,8 +343,11 @@ Le bilan montre :</p>
     la courbe d'accélération (en l'air, elle tombe vers 0 g ; pic à la réception). <b>▶ Revoir</b> lance le rejeu quelques secondes avant le saut ;</li>
   <li>les sauts <b>au fil de la séance</b>, la <b>répartition des hauteurs</b> et le <b>classement</b> (10 meilleurs, ou tous).</li>
 </ul>
-<p>La hauteur vient du temps de vol (chute libre) : elle est surestimée quand l'aile porte. La distance est la vitesse au décollage multipliée par le temps de vol, et la courbe
-dessinée est la parabole correspondante, pas une mesure point par point. Les anciens journaux (avant le 26/10) sont refiltrés : le pompage n'y compte plus comme saut.</p>
+<p><b>Hauteur corrigée</b> : en l'air, l'accéléromètre ne mesure pas la gravité mais les forces qui te portent (aile, kite). Quand la courbe d'accélération du vol est connue
+(téléphone ; montre depuis le 13/11), le rejeu l'intègre deux fois entre le décollage et la réception : on obtient la vraie trajectoire verticale et une hauteur tenant compte
+de la portance (trait blanc), comparée à la chute libre g·t²/8 (pointillé). Avec l'appli montre du 28/10 au 13/11, seule l'accélération moyenne en vol est connue :
+h = (1 − a_moy)·g·t²/8. Sans ces données, chute libre (surestimée quand l'aile porte). Le calcul est en cours de calage avec des vidéos.
+La distance est la vitesse au décollage multipliée par le temps de vol. Les anciens journaux (avant le 26/10) sont refiltrés : le pompage n'y compte plus comme saut.</p>
 
 <h2 id="web">11. Version web (ordinateur)</h2>
 <p>Sur ordinateur, l'<b>atelier</b> sert à préparer et analyser, sans radar (sur l'eau : l'appli ou la montre) :</p>

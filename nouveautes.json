@@ -2,6 +2,18 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 43,
+      "date": "2026-11-13",
+      "titre": "Sauts : hauteur corrigée de la portance",
+      "montre": true,
+      "points": [
+        "Rejeu : la hauteur des sauts tient compte de la portance de l'aile quand l'accélération en vol est connue (double intégration). Le saut choisi montre sa vraie trajectoire, avec la chute libre en pointillé pour comparer.",
+        "Téléphone (Sauts (essai)) : accéléromètre à 100 mesures par seconde, composante verticale, altitude du baromètre et chocs forts notés au journal, pour affiner le calcul et préparer la détection des sauts de kite. L'annonce vient 1 s après la réception.",
+        "Applis montre (toutes zones, Forerunner 255 et Fenix 8) : correction d'une détection qui pouvait rater des sauts après un passage dans le clapot, et enregistrement des accélérations brutes. Règle la montre sur Système → Enregistrement des données → Chaque seconde. Retélécharge l'appli (Plus → Carte et téléchargements) et remplace l'ancienne dans GARMIN → Apps.",
+        "Les applis montre des Côtes-d'Armor reçoivent aussi le vibreur, les sauts, le résumé de séance et les nœuds."
+      ]
+    },
+    {
       "id": 42,
       "date": "2026-11-13",
       "titre": "Rejeu : bilan des sauts",

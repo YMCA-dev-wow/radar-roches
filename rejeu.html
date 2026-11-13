@@ -226,7 +226,7 @@
   <h3>Classement</h3>
   <ol id="sautsListe"></ol>
   <button class="plus" id="sautsTous" hidden></button>
-  <p class="note">Hauteur estimée d'après le temps de vol (chute libre : g·t²/8) : elle est surestimée quand l'aile porte en l'air. Distance = vitesse au décollage × temps de vol ; la trajectoire dessinée est la parabole correspondante, pas une mesure point par point.</p>
+  <p class="note">Hauteur corrigée de la portance de l'aile quand l'accélération en vol est connue : double intégration de l'accélération mesurée (téléphone, montre avec données brutes), sinon accélération moyenne en vol (montre). Sans ces données : chute libre g·t²/8, surestimée quand l'aile porte (pointillé sur le saut choisi). Distance = vitesse au décollage × temps de vol. Calcul en cours de calage, à comparer avec des vidéos.</p>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -332,6 +332,7 @@ function lireFIT(buf) {
   if (String.fromCharCode(dv.getUint8(8), dv.getUint8(9), dv.getUint8(10), dv.getUint8(11)) !== '.FIT') throw new Error('fichier FIT invalide');
   const defs = {}, out = [], EPOCH = 631065600000, SEMI = 180 / 2 ** 31;
   const champsDev = {}; // « indexDev/numéro » -> nom, d'après les messages field_description (206) : champs Connect IQ
+  brutFIT = [];
   let pos = hs, lastTs = 0;
   while (pos < fin) {
     const h = dv.getUint8(pos++);
@@ -373,11 +374,13 @@ function lireFIT(buf) {
     for (const f of d.dev) { // champs Connect IQ : flottants sur 4 octets (sauts de l'appli montre)
       const nom = champsDev[f.idx + '/' + f.num];
       if (nom && f.size === 4) devVal[nom] = dv.getFloat32(pos, d.le);
+      else if (nom && /^acc_[xyz]$/.test(nom) && f.size >= 4) { const a = []; for (let i = 0; i + 1 < f.size; i += 2) a.push(dv.getInt16(pos + i, d.le)); devVal[nom] = a; }
       pos += f.size;
     }
     if (d.glob === 206 && rec[3]) champsDev[rec[0] + '/' + rec[1]] = rec[3];
     if (rec[253] != null) lastTs = rec[253];
     else if (compTs != null) lastTs = (compTs >= (lastTs & 0x1f) ? lastTs - (lastTs & 0x1f) + compTs : lastTs - (lastTs & 0x1f) + 32 + compTs);
+    if (d.glob === 20 && devVal.acc_x && devVal.acc_y && devVal.acc_z && devVal.acc_x[0] !== 32767) brutFIT.push({ t: EPOCH + lastTs * 1000, x: devVal.acc_x, y: devVal.acc_y, z: devVal.acc_z }); // 32767 : seconde sans mesure
     if (d.glob === 285 && rec[3] > 0 && rec[3] < 10) {
       const vN = rec[8] != null && rec[8] !== 0xffffffff ? rec[8] / 1000 : rec[7] != null && rec[7] !== 0xffff ? rec[7] / 1000 : null;
       sautsJournal.push({ t: EPOCH + lastTs * 1000, vol: Math.round(rec[3] * 100) / 100, h: isFinite(rec[1]) && rec[1] > 0 ? Math.round(rec[1] * 10) / 10 : Math.round(9.81 * rec[3] * rec[3] / 8 * 10) / 10,
@@ -387,21 +390,22 @@ function lireFIT(buf) {
     if (d.glob !== 20 || rec[0] == null || rec[1] == null || rec[0] === 0x7fffffff || rec[1] === 0x7fffffff) continue;
     const v = rec[73] != null && rec[73] !== 0xffffffff ? rec[73] / 1000 : rec[6] != null && rec[6] !== 0xffff ? rec[6] / 1000 : null;
     out.push({ t: EPOCH + lastTs * 1000, lat: rec[0] * SEMI, lon: rec[1] * SEMI, vDev: v });
-    if (devVal.saut > 0) sautsJournal.push({ t: EPOCH + lastTs * 1000, h: Math.round(devVal.saut * 10) / 10, vol: Math.round((devVal.saut_vol || 0) * 100) / 100 }); // sauts de l'appli montre
+    if (devVal.saut > 0) sautsJournal.push({ t: EPOCH + lastTs * 1000, h: Math.round(devVal.saut * 10) / 10, vol: Math.round((devVal.saut_vol || 0) * 100) / 100, moy: devVal.saut_moy > 0 ? devVal.saut_moy : null, montre: true }); // sauts de l'appli montre
   }
   sansHeure = false;
   return completer(out);
 }
 // Journal de session de l'appli (.jsonl) : une position par ligne « pos » (la, lo, v en km/h) ; l'en-tête « debut »
 // donne les réglages du radar pendant la séance, repris dans le rejeu pour retrouver les mêmes alertes
-let reglagesJournal = null, sautsJournal = [], exempleJournal = null;
+let reglagesJournal = null, sautsJournal = [], exempleJournal = null, chocsJournal = [], brutFIT = [];
 function lireJournal(txt) {
-  const out = []; reglagesJournal = null; sautsJournal = []; exempleJournal = null;
+  const out = []; reglagesJournal = null; sautsJournal = []; exempleJournal = null; chocsJournal = []; brutFIT = [];
   for (const l of txt.split('\n')) {
     if (!l.trim()) continue;
     let e; try { e = JSON.parse(l); } catch { continue; }
     if (e.type === 'debut') { reglagesJournal = reglagesJournal || e.reglages || null; exempleJournal = exempleJournal || e.exemple || null; } // plusieurs journaux : réglages de la première séance
     else if (e.type === 'saut' && !e.ecarte && !pompage(e)) sautsJournal.push(e); // les candidats écartés (pompage, vitesse) restent dans le journal
+    else if (e.type === 'choc') chocsJournal.push(e); // chocs sans phase allégée (candidats sauts de kite, depuis le 13/11)
     else if (e.type === 'pos' && isFinite(e.la) && isFinite(e.lo) && !e.sim) out.push({ t: e.t, lat: e.la, lon: e.lo, vDev: e.v != null ? e.v / 3.6 : null });
   }
   sansHeure = false;
@@ -411,7 +415,7 @@ function lireJournal(txt) {
 // (25 Hz, décollage à 2 s) — vrai vol si moyenne < 0,35 g et au moins 70 % des mesures sous 0,6 g
 function pompage(e) {
   if (!Array.isArray(e.courbe) || e.courbe.length < 60) return false;
-  const vol = e.courbe.slice(50, 50 + Math.round(e.vol * 25));
+  const hz = e.hz || 25, i0 = Math.round((e.avant ?? 2) * hz), vol = e.courbe.slice(i0, i0 + Math.round(e.vol * hz));
   if (vol.length < 10) return true;
   const moy = vol.reduce((s, a) => s + a, 0) / vol.length, bas = vol.filter(a => a < 0.6).length;
   return !(moy < 0.35 && bas >= 0.7 * vol.length);
@@ -554,7 +558,7 @@ function listerEvenements() {
   for (const { t, ev, n, s } of lignes) {
     const li = document.createElement('li');
     if (s) {
-      li.innerHTML = `<i class="dot" style="background:#fff"></i><span>${heure(t)} · <b>saut</b> ${String(s.h).replace('.', ',')} m · ${String(s.vol).replace('.', ',')} s de vol${s.hBaro != null ? ` · baromètre ${String(s.hBaro).replace('.', ',')} m` : ''}</span>`;
+      li.innerHTML = `<i class="dot" style="background:#fff"></i><span>${heure(t)} · <b>saut</b> ${String(s.hc ?? s.h).replace('.', ',')} m · ${String(s.vol).replace('.', ',')} s de vol${s.hBaro != null ? ` · baromètre ${String(s.hBaro).replace('.', ',')} m` : ''}</span>`;
       li.onclick = () => seek(t - 3000);
     } else if (ev) {
       const p = pts[ev.debut];
@@ -765,19 +769,61 @@ function preparerSauts() {
   sauts = sautsJournal.filter(s => s.vol > 0 && s.h > 0).sort((a, b) => a.t - b.t).map((s, i) => {
     const t0 = s.t - s.vol * 1000, p = ptA(t0 - 500);
     const v = s.vNat ?? Math.max(ptA(t0 - 1500).v, p.v); // vitesse d'approche (la trace ralentit souvent pendant le vol)
-    return { ...s, n: i + 1, t0, v, d: s.dNat ?? v * s.vol, lat: p.lat, lon: p.lon };
+    const r = { ...s, n: i + 1, t0, v, d: s.dNat ?? v * s.vol, lat: p.lat, lon: p.lon };
+    if (s.montre && !s.courbe && brutFIT.length) courbesMontre(r);
+    hauteurCorrigee(r);
+    return r;
   });
   $('sautsBtn').hidden = !sauts.length;
   $('sautsBtn').textContent = `⤴ ${sauts.length} saut${sauts.length > 1 ? 's' : ''}`;
   if (!sauts.length) { $('sautsPan').hidden = true; return; }
-  const hmax = Math.max(...sauts.map(s => s.h));
+  const hmax = Math.max(...sauts.map(s => s.hc), 0.1);
   for (const s of sauts) {
-    const m = L.circleMarker([s.lat, s.lon], { radius: 4 + 6 * s.h / hmax, color: '#04221f', weight: 1.5, fillColor: '#5ee6d6', fillOpacity: 0.9 })
-      .bindTooltip(`Saut ${s.n} · ${fr(s.h)} m · ${fr(s.vol, 2)} s`, { direction: 'top' });
+    const m = L.circleMarker([s.lat, s.lon], { radius: 4 + 6 * s.hc / hmax, color: '#04221f', weight: 1.5, fillColor: '#5ee6d6', fillOpacity: 0.9 })
+      .bindTooltip(`Saut ${s.n} · ${fr(s.hc)} m · ${fr(s.vol, 2)} s`, { direction: 'top' });
     m.on('click', () => ouvrirSauts(s)); m.addTo(sautsLayer);
   }
-  sautSel = sauts.reduce((a, b) => b.h > a.h ? b : a);
+  sautSel = sauts.reduce((a, b) => b.hc > a.hc ? b : a);
   if (!$('sautsPan').hidden) dessinerSauts();
+}
+// Courbes de la montre reconstituées depuis les accélérations brutes du FIT (25 mesures par enregistrement d'une seconde) :
+// la réception est le pic le plus fort de la seconde du saut ; la verticale est estimée par l'accélération moyenne
+// de 1,5 à 0,3 s avant le décollage (au poignet, l'estimation est grossière)
+function courbesMontre(s) {
+  const ech = [];
+  for (const b of brutFIT) { if (b.t < s.t - s.vol * 1000 - 4000 || b.t > s.t + 3000) continue; const n = b.x.length; for (let i = 0; i < n; i++) ech.push({ t: b.t - 1000 + (i + 1) * 1000 / n, x: b.x[i] / 1000, y: b.y[i] / 1000, z: b.z[i] / 1000 }); }
+  if (ech.length < 50) return;
+  ech.forEach(e => { e.g = Math.hypot(e.x, e.y, e.z); });
+  let rec = null; for (const e of ech) if (e.t >= s.t - 1300 && e.t <= s.t + 300 && (!rec || e.g > rec.g)) rec = e;
+  if (!rec) return;
+  const t0 = rec.t - s.vol * 1000, avant = ech.filter(e => e.t >= t0 - 1500 && e.t <= t0 - 300);
+  let gv = null;
+  if (avant.length > 5) { const m = ['x', 'y', 'z'].map(k => avant.reduce((a, e) => a + e[k], 0) / avant.length), n = Math.hypot(...m); if (n > 0.5) gv = m.map(c => c / n); }
+  const sel = ech.filter(e => e.t >= t0 - 2000 && e.t <= rec.t + 1000);
+  s.courbe = sel.map(e => Math.round(e.g * 100) / 100);
+  if (gv) s.courbeV = sel.map(e => Math.round((e.x * gv[0] + e.y * gv[1] + e.z * gv[2]) * 100) / 100);
+  s.hz = 25; s.avant = (sel[0] ? (t0 - sel[0].t) / 1000 : 2); s.vertical = gv ? 'estimée' : false; s.t = rec.t; s.t0 = t0;
+}
+// Hauteur corrigée de la portance de l'aile :
+//  - avec une courbe (téléphone, montre avec données brutes) : double intégration de g·(a − 1) sur le vol, z = 0 au décollage
+//    et à la réception ; a = composante verticale si connue, sinon norme (qui compte toute force comme portante : hauteur basse) ;
+//  - sinon, avec l'accélération moyenne en vol (montre) : h = (1 − a_moy)·g·t²/8 ;
+//  - sinon : chute libre g·t²/8.
+function hauteurCorrigee(s) {
+  s.hLibre = s.h; s.hc = s.h; s.calc = 'chute libre';
+  const c = s.courbeV || s.courbe;
+  if (c && c.length > 10) {
+    const hz = s.hz || 25, i0 = Math.round((s.avant ?? 2) * hz), i1 = Math.min(c.length - 1, i0 + Math.round(s.vol * hz)), dt = 1 / hz;
+    if (i1 - i0 >= 5) {
+      const z = [0]; let vz = 0, zz = 0;
+      for (let i = i0 + 1; i <= i1; i++) { vz += 9.81 * (c[i] - 1) * dt; zz += vz * dt; z.push(zz); }
+      const T = (i1 - i0) * dt, v0 = -z[z.length - 1] / T, prof = z.map((v, k) => v + v0 * k * dt);
+      s.profil = prof; s.hc = Math.round(Math.max(...prof) * 10) / 10;
+      s.calc = s.courbeV ? (s.vertical === 'estimée' ? 'intégrée (verticale estimée)' : 'intégrée (verticale)') : 'intégrée (norme)';
+      return;
+    }
+  }
+  if (s.moy != null && s.moy >= 0 && s.moy < 1) { s.hc = Math.round((1 - s.moy) * 9.81 * s.vol * s.vol / 8 * 10) / 10; s.calc = 'portance moyenne'; }
 }
 function ouvrirSauts(s) { if (s) sautSel = s; $('sautsPan').hidden = false; dessinerSauts(); }
 $('sautsBtn').onclick = () => $('sautsPan').hidden ? ouvrirSauts() : ($('sautsPan').hidden = true);
@@ -795,7 +841,7 @@ function dessinerSauts() {
   $('sautsSous').textContent = `${new Date(pts[0].t).toLocaleDateString('fr-FR')} · ${sauts[0].natif ? 'sauts Garmin' : sauts[0].courbe ? 'téléphone' : 'appli montre'}`;
   const tuile = (v, u, l) => `<div><b>${v}<small>${u}</small></b><span>${l}</span></div>`;
   $('sautsTuiles').innerHTML = tuile(n, '', 'sauts' + (dur > 0.2 ? ` · ${fr(n / dur, 0)}/h` : ''))
-    + tuile(fr(best('h').h), 'm', 'plus haut') + tuile(fr(best('vol').vol, 2), 's', 'plus long vol')
+    + tuile(fr(best('hc').hc), 'm', 'plus haut') + tuile(fr(best('vol').vol, 2), 's', 'plus long vol')
     + tuile(Math.round(best('d').d), 'm', 'plus loin') + tuile(fr(tAir, 0), 's', 'en l\'air au total')
     + tuile(serie, '', serie > 1 ? `en 10 min dès ${new Date(sT).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : 'meilleure série');
   dessinerTraj(); detailSaut(); dessinerFil(); repartition(); classement();
@@ -806,7 +852,7 @@ function dessinerSauts() {
 let geoTraj = null;
 function dessinerTraj() {
   const c = $('cTraj'), { g, k, W, H } = toile(c);
-  const dmax = Math.max(4, ...sauts.map(s => s.d)) * 1.08, hmax = Math.max(2, ...sauts.map(s => s.h)) * 1.18;
+  const dmax = Math.max(4, ...sauts.map(s => s.d)) * 1.08, hmax = Math.max(2, ...sauts.map(s => s.hc), sautSel ? sautSel.hLibre : 0) * 1.18;
   const L0 = 34 * k, B0 = H - 24 * k, T0 = 10 * k, u = 1.8 / hmax * (B0 - T0) / 7.5; // u : module de la silhouette
   const R0 = W - 3.4 * u - 10 * k;
   const X = d => L0 + d / dmax * (R0 - L0), Y = h => B0 - h / hmax * (B0 - T0);
@@ -833,20 +879,23 @@ function dessinerTraj() {
   g.moveTo(xs - 1.6 * u, yT + 3.6 * u); g.lineTo(xs, yT + 2.6 * u); g.lineTo(xs + 1.6 * u, yT + 3.6 * u); g.stroke();
   g.textAlign = 'center'; g.fillText('1,80 m', xs, T0 + 2 * k); g.lineCap = 'butt';
   // trajectoires : les autres d'abord, le choisi par-dessus
-  const arc = (s, couleur, ep) => {
+  const arc = (s, couleur, ep, libre) => { // profil intégré si connu, sinon parabole de la hauteur retenue (ou de chute libre)
     g.strokeStyle = couleur; g.lineWidth = ep; g.beginPath();
-    for (let i = 0; i <= 40; i++) { const f = i / 40, x = X(f * s.d), y = Y(4 * s.h * f * (1 - f)); i ? g.lineTo(x, y) : g.moveTo(x, y); }
+    const pr = !libre && s.profil, n = pr ? pr.length - 1 : 40, h = libre ? s.hLibre : s.hc;
+    for (let i = 0; i <= n; i++) { const f = i / n, x = X(f * s.d), y = Y(pr ? Math.max(0, pr[i]) : 4 * h * f * (1 - f)); i ? g.lineTo(x, y) : g.moveTo(x, y); }
     g.stroke();
   };
-  const hm = Math.max(...sauts.map(s => s.h));
-  for (const s of sauts) if (s !== sautSel) arc(s, `rgba(94,230,214,${0.25 + 0.55 * s.h / hm})`, 1.5 * k);
+  const hm = Math.max(...sauts.map(s => s.hc), 0.1);
+  for (const s of sauts) if (s !== sautSel) arc(s, `rgba(94,230,214,${0.25 + 0.55 * s.hc / hm})`, 1.5 * k);
   if (sautSel) {
+    if (sautSel.hLibre - sautSel.hc > 0.05) { g.setLineDash([4 * k, 4 * k]); arc(sautSel, 'rgba(255,255,255,.55)', 1.3 * k, true); g.setLineDash([]); } // chute libre, pour comparer
     // ombre de 2 px couleur fond pour détacher la courbe choisie des autres
     arc(sautSel, '#0b1a1f', 5 * k); arc(sautSel, '#ffffff', 2.5 * k);
-    const xa = X(sautSel.d / 2), ya = Y(sautSel.h);
+    const pr = sautSel.profil, im = pr ? pr.indexOf(Math.max(...pr)) / (pr.length - 1) : 0.5;
+    const xa = X(sautSel.d * im), ya = Y(sautSel.hc);
     g.fillStyle = '#fff'; g.beginPath(); g.arc(xa, ya, 4 * k, 0, 7); g.fill();
     g.font = `600 ${12 * k}px system-ui`; g.textAlign = xa > W * 0.6 ? 'right' : 'left';
-    g.fillText(`${fr(sautSel.h)} m · ${fr(sautSel.vol, 2)} s · ${Math.round(sautSel.d)} m`, xa + (xa > W * 0.6 ? -8 : 8) * k, Math.max(T0 + 10 * k, ya - 6 * k));
+    g.fillText(`${fr(sautSel.hc)} m · ${fr(sautSel.vol, 2)} s · ${Math.round(sautSel.d)} m`, xa + (xa > W * 0.6 ? -8 : 8) * k, Math.max(T0 + 10 * k, ya - 6 * k));
   }
   g.textAlign = 'left';
 }
@@ -854,7 +903,7 @@ $('cTraj').onclick = e => { // choisit la trajectoire passant le plus près du p
   if (!geoTraj) return;
   const r = $('cTraj').getBoundingClientRect(), k = devicePixelRatio || 1, px = (e.clientX - r.left) * k, py = (e.clientY - r.top) * k;
   let mieux = null, dm = Infinity;
-  for (const s of sauts) for (let i = 0; i <= 20; i++) { const f = i / 20, d = Math.hypot(geoTraj.X(f * s.d) - px, geoTraj.Y(4 * s.h * f * (1 - f)) - py); if (d < dm) { dm = d; mieux = s; } }
+  for (const s of sauts) for (let i = 0; i <= 20; i++) { const f = i / 20, d = Math.hypot(geoTraj.X(f * s.d) - px, geoTraj.Y(4 * s.hc * f * (1 - f)) - py); if (d < dm) { dm = d; mieux = s; } }
   if (mieux && dm < 30 * k) { sautSel = mieux; dessinerSauts(); }
 };
 
@@ -862,11 +911,12 @@ $('cTraj').onclick = e => { // choisit la trajectoire passant le plus près du p
 function detailSaut() {
   const s = sautSel, el = $('sautDetail'); if (!s) { el.hidden = true; return; }
   el.hidden = false;
-  const rang = [...sauts].sort((a, b) => b.h - a.h).indexOf(s) + 1;
+  const rang = [...sauts].sort((a, b) => b.hc - a.hc).indexOf(s) + 1;
   el.innerHTML = `<div class="titre"><b>Saut ${s.n}</b><span class="sub">${heure(s.t0)} · ${rang === 1 ? 'le plus haut' : rang + 'e plus haut'}</span><button id="sautVoir">▶ Revoir</button></div>
-    <div class="vals"><span><b>${fr(s.h)} m</b><small>hauteur</small></span><span><b>${fr(s.vol, 2)} s</b><small>en l'air</small></span><span><b>${Math.round(s.d)} m</b><small>distance</small></span>
+    <div class="vals"><span><b>${fr(s.hc)} m</b><small>hauteur ${s.calc === 'chute libre' ? '(chute libre)' : 'corrigée'}</small></span>${s.calc !== 'chute libre' ? `<span><b>${fr(s.hLibre)} m</b><small>en chute libre</small></span>` : ''}<span><b>${fr(s.vol, 2)} s</b><small>en l'air</small></span><span><b>${Math.round(s.d)} m</b><small>distance</small></span>
     <span><b>${fr(s.v * 1.944)} nd</b><small>${Math.round(s.v * 3.6)} km/h au décollage</small></span>${s.hBaro != null ? `<span><b>${fr(s.hBaro)} m</b><small>baromètre</small></span>` : ''}${s.rot ? `<span><b>${s.rot}</b><small>rotation(s)</small></span>` : ''}</div>
-    ${s.courbe ? '<canvas id="cAcc"></canvas><div class="sub">Accélération ressentie par le téléphone (g) : en l\'air, elle tombe vers 0 ; pic à la réception.</div>' : ''}`;
+    <div class="sub">Calcul : ${s.calc}${s.hInt != null ? ` · téléphone : ${fr(s.hInt)} m` : ''}</div>
+    ${s.courbe ? `<canvas id="cAcc"></canvas><div class="sub">Accélération ressentie par ${s.montre ? 'la montre' : 'le téléphone'} (g) : blanc = norme${s.courbeV ? ', turquoise = verticale' + (s.vertical === 'estimée' ? ' (estimée)' : '') : ''}. En l'air, elle tombe vers 0 si rien ne porte ; ce qui reste au-dessus de 0 est la portance de l'aile. Pic à la réception.</div>` : ''}`;
   $('sautVoir').onclick = () => {
     $('sautsPan').hidden = innerWidth < 800; // sur téléphone on referme pour voir la carte
     seek(s.t0 - 5000); map.setView([s.lat, s.lon], Math.max(map.getZoom(), 17));
@@ -875,17 +925,19 @@ function detailSaut() {
   if (s.courbe) dessinerAcc(s);
 }
 function dessinerAcc(s) {
-  const { g, k, W, H } = toile($('cAcc')), c = s.courbe, dt = 0.04; // 25 Hz, depuis 2 s avant le décollage
-  const tmin = -2, tmax = c.length * dt - 2, amax = Math.max(2.5, ...c) * 1.05;
+  const { g, k, W, H } = toile($('cAcc')), c = s.courbe, dt = 1 / (s.hz || 25), av = s.avant ?? 2; // depuis « avant » s avant le décollage
+  const tmin = -av, tmax = c.length * dt - av, amax = Math.min(6, Math.max(2.5, ...c) * 1.05);
   const L0 = 28 * k, R0 = W - 6 * k, B0 = H - 18 * k, T0 = 6 * k;
   const X = t => L0 + (t - tmin) / (tmax - tmin) * (R0 - L0), Y = a => B0 - a / amax * (B0 - T0);
   g.fillStyle = 'rgba(94,230,214,.12)'; g.fillRect(X(0), T0, X(s.vol) - X(0), B0 - T0); // fenêtre en l'air
   g.fillStyle = '#5ee6d6'; g.textAlign = 'center'; g.fillText('en l\'air', (X(0) + X(s.vol)) / 2, T0 + 11 * k);
   g.strokeStyle = 'rgba(255,255,255,.12)'; g.lineWidth = k; g.fillStyle = '#5d7a80'; g.textAlign = 'right';
   for (const a of [0, 1, 2]) { g.beginPath(); g.moveTo(L0, Y(a)); g.lineTo(R0, Y(a)); g.stroke(); g.fillText(a + ' g', L0 - 4 * k, Y(a) + 4 * k); }
-  g.textAlign = 'center'; for (let t = -2; t <= tmax; t++) g.fillText((t > 0 ? '+' : '') + t + ' s', X(t), H - 4 * k);
-  g.strokeStyle = '#ffffff'; g.lineWidth = 2 * k; g.lineJoin = 'round'; g.beginPath();
-  c.forEach((a, i) => { const x = X(tmin + i * dt), y = Y(a); i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke();
+  g.textAlign = 'center'; for (let t = Math.ceil(tmin); t <= tmax; t++) g.fillText((t > 0 ? '+' : '') + t + ' s', X(t), H - 4 * k);
+  g.lineJoin = 'round';
+  const trace = (cc, coul, ep) => { g.strokeStyle = coul; g.lineWidth = ep; g.beginPath(); cc.forEach((a, i) => { const x = X(tmin + i * dt), y = Y(Math.max(-0.2, Math.min(amax, a))); i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke(); };
+  trace(c, '#ffffff', 1.6 * k);
+  if (s.courbeV) trace(s.courbeV, '#5ee6d6', 2 * k);
   g.textAlign = 'left';
 }
 
@@ -893,7 +945,7 @@ function dessinerAcc(s) {
 let geoFil = null;
 function dessinerFil() {
   const { g, k, W, H } = toile($('cFil'));
-  const ta = pts[0].t, tb = pts[pts.length - 1].t, hmax = Math.max(1, ...sauts.map(s => s.h)) * 1.15;
+  const ta = pts[0].t, tb = pts[pts.length - 1].t, hmax = Math.max(1, ...sauts.map(s => s.hc)) * 1.15;
   const L0 = 30 * k, R0 = W - 8 * k, B0 = H - 18 * k, T0 = 8 * k;
   const X = t => L0 + (t - ta) / (tb - ta) * (R0 - L0), Y = h => B0 - h / hmax * (B0 - T0);
   geoFil = { X };
@@ -906,8 +958,8 @@ function dessinerFil() {
   for (const s of sauts) {
     const x = X(s.t), sel = s === sautSel;
     g.strokeStyle = sel ? '#fff' : '#5ee6d6'; g.lineWidth = (sel ? 2.5 : 2) * k;
-    g.beginPath(); g.moveTo(x, B0); g.lineTo(x, Y(s.h)); g.stroke();
-    g.fillStyle = sel ? '#fff' : '#5ee6d6'; g.beginPath(); g.arc(x, Y(s.h), (sel ? 5 : 4) * k, 0, 7); g.fill();
+    g.beginPath(); g.moveTo(x, B0); g.lineTo(x, Y(s.hc)); g.stroke();
+    g.fillStyle = sel ? '#fff' : '#5ee6d6'; g.beginPath(); g.arc(x, Y(s.hc), (sel ? 5 : 4) * k, 0, 7); g.fill();
     g.strokeStyle = '#0b1a1f'; g.lineWidth = 2 * k; g.stroke(); // anneau couleur fond : points qui se chevauchent
   }
   g.textAlign = 'left';
@@ -920,16 +972,16 @@ $('cFil').onclick = e => {
 };
 function repartition() {
   const cl = [[0, 0.5], [0.5, 1], [1, 1.5], [1.5, 2], [2, 3], [3, Infinity]];
-  const nb = cl.map(([a, b]) => sauts.filter(s => s.h >= a && s.h < b).length);
+  const nb = cl.map(([a, b]) => sauts.filter(s => s.hc >= a && s.hc < b).length);
   const dern = nb.map(v => v > 0).lastIndexOf(true), m = Math.max(...nb);
   $('sautsRepart').innerHTML = cl.slice(0, dern + 1).map(([a, b], i) => `<span>${b === Infinity ? 'plus de ' + a : fr(a, a % 1 ? 1 : 0) + ' – ' + fr(b, b % 1 ? 1 : 0)} m</span><i style="width:${nb[i] / m * 100}%"></i><b>${nb[i]}</b>`).join('');
 }
 function classement() {
-  const tri = [...sauts].sort((a, b) => b.h - a.h), hm = tri[0].h, vus = sautsTous ? tri : tri.slice(0, 10);
+  const tri = [...sauts].sort((a, b) => b.hc - a.hc), hm = Math.max(tri[0].hc, 0.1), vus = sautsTous ? tri : tri.slice(0, 10);
   const ol = $('sautsListe'); ol.innerHTML = '';
   vus.forEach((s, i) => {
     const li = document.createElement('li'); if (s === sautSel) li.className = 'sel';
-    li.innerHTML = `<span class="rang">${['🥇', '🥈', '🥉'][i] || i + 1}</span><span><b>${fr(s.h)} m</b> · ${fr(s.vol, 2)} s · ${Math.round(s.d)} m<div class="barre" style="width:${s.h / hm * 100}%"></div></span><small>${heure(s.t0)}</small>`;
+    li.innerHTML = `<span class="rang">${['🥇', '🥈', '🥉'][i] || i + 1}</span><span><b>${fr(s.hc)} m</b> · ${fr(s.vol, 2)} s · ${Math.round(s.d)} m<div class="barre" style="width:${s.hc / hm * 100}%"></div></span><small>${heure(s.t0)}</small>`;
     li.onclick = () => { sautSel = s; dessinerSauts(); $('cTraj').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
     ol.append(li);
   });

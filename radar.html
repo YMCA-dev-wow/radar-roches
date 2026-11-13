@@ -587,6 +587,7 @@ function arreter() {
   if (APPLI) {
     Natif.veille.liberer().catch(() => {});
     cadenceNatif(null); Natif.son.arreter().catch(() => {}); Natif.son.volumeMax({ on: false }).catch(() => {});
+    if (ecouteChocs) { ecouteChocs.remove(); ecouteChocs = null; }
     if (ecouteSauts) { ecouteSauts.remove(); ecouteSauts = null; Natif.saut.arreter().catch(() => {}); }
     JournalSession.fermer({ arret: 'bouton' }); journalSon = null;
   }
@@ -647,7 +648,7 @@ document.addEventListener('visibilitychange', async () => {
 window.journalTuile = (k, msg) => JournalSession.ev('tuile', { k, erreur: msg });
 // Sauts (version d'essai) : détectés par Android (SautPlugin), notés dans le journal avec la courbe d'accélération,
 // annoncés à la voix : « Saut, 1,2 mètre, 1 seconde ». La hauteur balistique g·t²/8 est surestimée quand l'aile porte.
-let ecouteSauts = null;
+let ecouteSauts = null, ecouteChocs = null;
 const fr1v = v => String(v).replace('.', ',');
 async function demarrerSauts() {
   if (!$('sauts').checked || ecouteSauts) return;
@@ -663,7 +664,9 @@ async function demarrerSauts() {
       const danger = analysis && (analysis.best || analysis.pre || analysis.lat);
       if (voixActive && !muted && !danger && !voixEnCours()) parler(`Saut, ${fr1v(s.h)} mètre${s.h >= 2 ? 's' : ''}, ${fr1v(Math.round(s.vol * 10) / 10)} seconde${s.vol >= 2 ? 's' : ''}`);
     });
-    JournalSession.ev('sauts', { actif: true, barometre: r.barometre });
+    // chocs sans phase allégée (candidats sauts de kite) : seulement notés au journal, au-dessus de 12 km/h, pour l'analyse
+    ecouteChocs = await Natif.saut.addListener('choc', c => { const v = fix ? fix.speed * 3.6 : 0; if (v >= 12) JournalSession.ev('choc', { ...c, v: Math.round(v) }); });
+    JournalSession.ev('sauts', { actif: true, barometre: r.barometre, gravite: r.gravite, hz: r.hz });
   } catch (e) { JournalSession.ev('sauts', { actif: false, erreur: e.message }); }
 }
 
