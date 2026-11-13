@@ -54,8 +54,9 @@ function normale(w, t, hFn = hJauge) {
   if (J.length < 2 || w <= 0) return n0;
   return (1 - w) * n0 + w * (hFn(1, t - (1 - w) * zone.retard * 1000) - J[1].nm) / marnage(J[1]);
 }
-// Hauteur au port P (zéro hydro local)
-function hauteurPort(P, t, hFn) { return P.nm + normale(P.w, t, hFn) * marnage(P); }
+// Hauteur au port P (zéro hydro local) ; P.dt (s, facultatif) : retard de la marée du port sur le marégraphe de la zone
+// (négatif = en avance), étalonné sur les horaires du Shom (outils/etalonner_ports.py)
+function hauteurPort(P, t, hFn) { return P.nm + normale(P.w, t - (P.dt || 0) * 1000, hFn) * marnage(P); }
 function corrAt(t) { // décalage horaire et correction de hauteur interpolés entre les extrêmes saisis
   const p = recal.pts;
   if (t <= p[0].te) return p[0];

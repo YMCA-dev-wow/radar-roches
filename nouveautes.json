@@ -2,6 +2,15 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 39,
+      "date": "2026-11-13",
+      "titre": "Marée plus juste en Iroise et en nord Finistère",
+      "points": [
+        "La marée de chaque port tient maintenant compte de son avance ou de son retard sur le marégraphe de la zone, calée sur les horaires du Shom. Avant, l'écart pouvait dépasser 50 cm vers Portsall, les Abers et Camaret (jusqu'à 1 m à l'Aber Wrac'h) ; il est maintenant d'environ 15 cm.",
+        "Zone Brest Iroise : mets l'appli à jour avant ta prochaine sortie vers les Abers ou Camaret."
+      ]
+    },
+    {
       "id": 38,
       "date": "2026-11-13",
       "titre": "Nouvelle zone : Locquirec – Aber Wrac'h",
