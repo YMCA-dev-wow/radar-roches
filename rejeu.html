@@ -62,9 +62,9 @@
   #medChoix button.sel { color: var(--accent); border-color: var(--accent); }
   #medAfficher { position: absolute; top: 10px; right: 10px; z-index: 900; padding: 6px 10px; font-size: 12px; background: rgba(7,19,24,.9); }
   /* légende de la couleur de trace */
-  #legendeC { position: absolute; left: 10px; bottom: 10px; z-index: 800; background: rgba(7,19,24,.9); border: 1px solid var(--line); border-radius: 10px; padding: 5px 8px; font-size: 11px; color: var(--muted); width: 178px; }
-  #legendeC .modes { display: flex; gap: 4px; }
-  #legendeC .modes button { padding: 2px 7px; font-size: 11px; border-radius: 10px; }
+  #legendeC { position: absolute; left: 10px; bottom: 10px; z-index: 800; background: rgba(7,19,24,.9); border: 1px solid var(--line); border-radius: 10px; padding: 5px 8px; font-size: 11px; color: var(--muted); width: max-content; min-width: 170px; max-width: calc(100% - 20px); }
+  #legendeC .modes { display: flex; gap: 4px; flex-wrap: nowrap; }
+  #legendeC .modes button { padding: 2px 7px; font-size: 11px; line-height: 1.4; border-radius: 10px; white-space: nowrap; flex: none; }
   #legendeC .modes button.sel { background: var(--accent); color: #04221f; border-color: var(--accent); font-weight: 600; }
   #legendeC .grad { height: 7px; border-radius: 4px; margin: 5px 0 2px; }
   #legendeC .ech { display: flex; justify-content: space-between; }
