@@ -307,7 +307,7 @@ ou en grand (touche la barrette ou le titre « Mes roches »). Sur ordinateur, l
 <b>fiche</b>, qui refait le calcul des alertes sur la trace : utile pour comprendre une alerte ou régler l'anticipation.</p>
 <h3>Les quatre vues</h3>
 <ul>
-  <li><b>Liste</b> : une carte par séance (vignette de la trace, sport, date, commentaire, lieu, durée, distance, vitesse max sur 2 s, sauts). Les lancements du radar
+  <li><b>Liste</b> : une carte par séance (vignette de la trace sur le trait de côte, sport, date, commentaire, lieu, durée, distance, vitesse max sur 2 s, sauts). Les lancements du radar
     sans navigation (moins de 2 min ou de 200 m) sont masqués. <b>＋ Ouvrir un fichier</b> ajoute un FIT, un GPX ou un journal aux séances. En bas, deux <b>exemples</b>
     commentés (séances réelles au Sillon : roche évitée après une alerte, collision sans radar).</li>
   <li><b>Calendrier</b> : semaine, mois ou année, une pastille par séance à la couleur de son sport ; touche un jour pour voir ses séances.</li>
@@ -316,7 +316,7 @@ ou en grand (touche la barrette ou le titre « Mes roches »). Sur ordinateur, l
   <li><b>Récap</b> : filtres (sports, dates, distance, durée) et regroupement par séance, semaine, mois ou année : heures en barres, puis tableau (séances, durée,
     distance, vitesse max, sauts). Touche une ligne pour voir ses séances.</li>
 </ul>
-<p><b>Regrouper ou supprimer</b> : bouton ☑ en haut de la liste, coche les séances puis <b>Regrouper</b> (plusieurs journaux d'une même sortie, par exemple après un
+<p><b>Regrouper ou supprimer</b> : appui long sur une séance (ou bouton ☑ en haut), puis touche les autres séances concernées, puis <b>Regrouper</b> (plusieurs journaux d'une même sortie, par exemple après un
 redémarrage du radar) ou <b>Supprimer</b> (définitif : le journal est effacé du téléphone, le fichier importé de l'appli). Une séance regroupée se sépare depuis sa fiche
 (menu ⋮ → Séparer).</p>
 <h3>Récupérer un fichier de montre</h3>
@@ -339,14 +339,15 @@ redémarrage du radar) ou <b>Supprimer</b> (définitif : le journal est effacé 
     le pointillé rouge marque l'eau minimale sous la surface (fond au-dessus = danger). Coche <b>Vitesse</b> pour ajouter la courbe de vitesse.</li>
   <li><b>Zoom</b> sur une portion : pince la frise à deux doigts (molette sur ordinateur), ou boutons − / + ; double toucher ou <b>Tout</b> pour toute la séance ;
     <b>↕</b> double la hauteur de la frise. Session entière : glisser déplace le curseur. Portion zoomée : glisser fait défiler, toucher place le curseur.</li>
-  <li>Sous la frise, le <b>résumé</b> (durée, distance, vitesse max, alertes) : touche-le pour tous les chiffres, dont les vitesses max instantanée, sur 2 s, 100 m,
-    250 m, 500 m et 1 mille, et le plus haut saut.</li>
-  <li>Menu <b>⋮</b> : <b>Modifier</b> (sport, commentaire, lieu), <b>Exporter</b> la trace en GPX, le journal (.jsonl) ou le fichier d'origine, <b>Bilan des sauts</b>,
+  <li>Sous la frise, le <b>résumé</b> (durée, distance, vitesse max, alertes) : balaie-le vers le haut (ou touche-le) pour tous les chiffres, dont les vitesses max
+    instantanée, sur 2 s, 100 m, 250 m, 500 m et 1 mille, et le plus haut saut ; balaie la feuille vers le bas pour la fermer. Quand la frise est <b>zoomée</b>, les chiffres
+    portent sur la portion affichée (en turquoise, « portion ») et la trace hors de cette portion est grisée sur la carte.</li>
+  <li>Menu <b>⋮</b> : <b>Modifier</b> (sport, commentaire, lieu), <b>Exporter</b> la trace en GPX, les <b>logs pour débug</b> (.jsonl, à joindre à un retour sur l'appli) ou le fichier d'origine, <b>Bilan des sauts</b>,
     <b>Réglages du rejeu</b> (marée mesurée, prédite ou forcée, eau minimale, anticipation, angles, sons, montre : tout est recalculé ; les réglages de la séance
     sont repris d'un journal), <b>Ouvrir un fichier</b>, <b>Séparer</b>, <b>Supprimer</b>.</li>
 </ol>
 <p>Le <b>sport</b> d'une nouvelle séance vient du profil du radar (Foil → Wingfoil, Planche → Windsurf, Kite → Kitesurf) ou du fichier FIT ; la liste des sports, leurs
-couleurs et les unités (nœuds, km/h ou m/s ; km ou milles) se règlent dans <b>Plus → Réglages généraux</b>. Après une séance de plus de 3 minutes, le radar propose
+couleurs (triés par ordre alphabétique, Parawing compris) et les unités (nœuds, km/h ou m/s ; km ou milles nautiques) se règlent dans <b>Plus → Réglages généraux</b>. Après une séance de plus de 3 minutes, le radar propose
 de la revoir ; <b>Plus → Journaux de session</b> garde l'envoi des journaux pour analyser un problème.</p>
 <h3>Bilan des sauts</h3>
 <p>Si la séance contient des sauts (journal du téléphone avec « Sauts (essai) », appli montre Radar roches, ou sauts enregistrés nativement par une montre Garmin),

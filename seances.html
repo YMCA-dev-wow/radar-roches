@@ -21,6 +21,7 @@
   .groupe { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--mu); margin: 12px 2px 6px; }
   .carteS { display: flex; gap: 10px; background: var(--p1); border: 1px solid var(--ln); border-radius: 14px; padding: 9px; margin-bottom: 8px; cursor: pointer; align-items: center; }
   .carteS:active { background: var(--p2); }
+  .carteS { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
   .vign { width: 76px; height: 76px; border-radius: 10px; background: #0f2b33; flex: none; }
   .carteS .info { flex: 1; min-width: 0; }
   .carteS .t { display: flex; align-items: baseline; gap: 6px; font-weight: 600; font-size: 14px; }
@@ -89,7 +90,7 @@
 <div class="page">
   <div class="entete">
     <h1>Séances</h1>
-    <button class="ico" id="bSel" title="Sélectionner pour regrouper ou supprimer">☑</button>
+    <button class="ico" id="bSel" title="Sélectionner pour regrouper ou supprimer (ou appui long sur une séance)">☑</button>
     <a class="btn ico" href="plus.html#reglages" title="Réglages généraux (unités, sports)">⚙</a>
   </div>
   <div class="onglets" id="onglets"><button data-v="liste">Liste</button><button data-v="cal">Calendrier</button><button data-v="carte">Carte</button><button data-v="recap">Récap</button></div>
@@ -158,15 +159,22 @@ const MOISC = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août
 const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 const debutSemaine = d => { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - (x.getDay() + 6) % 7); return x; };
 
-// ---------- vignette : trace dans un carré, proportions gardées ----------
+// ---------- vignette : trait de côte et trace dans un carré, proportions gardées ----------
+let COTE = []; // [{ l: [[lat, lon]…], b: [lat0, lon0, lat1, lon1] }]
 function vignette(s, taille = 76) {
   const pts = s.trace || [];
   if (pts.length < 2) return `<svg class="vign" viewBox="0 0 76 76"></svg>`;
   const k = Math.cos(pts[0][0] * Math.PI / 180), xs = pts.map(p => p[1] * k), ys = pts.map(p => -p[0]);
-  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys), e = Math.max(x1 - x0, y1 - y0) || 1e-6, m = 8, r = (76 - 2 * m) / e;
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys), e = Math.max(x1 - x0, y1 - y0, 0.004) || 1e-6, m = 8, r = (76 - 2 * m) / e;
   const ox = m + (76 - 2 * m - (x1 - x0) * r) / 2, oy = m + (76 - 2 * m - (y1 - y0) * r) / 2;
-  const d = (s.traces || [pts]).map(tr => tr.map((p, i) => (i ? 'L' : 'M') + (ox + (p[1] * k - x0) * r).toFixed(1) + ' ' + (oy + (-p[0] - y0) * r).toFixed(1)).join('')).join('');
-  return `<svg class="vign" style="width:${taille}px;height:${taille}px" viewBox="0 0 76 76"><path d="${d}" fill="none" stroke="var(--ac)" stroke-width="2" stroke-linejoin="round"/></svg>`;
+  const X = p => (ox + (p[1] * k - x0) * r).toFixed(1), Y = p => (oy + (-p[0] - y0) * r).toFixed(1);
+  // côte : polylignes qui touchent le carré affiché (le SVG coupe ce qui dépasse)
+  const vx0 = x0 - ox / r, vx1 = vx0 + 76 / r, vy0 = y0 - oy / r, vy1 = vy0 + 76 / r; // carré en (lon·k, −lat)
+  const la0 = -vy1, la1 = -vy0, lo0 = vx0 / k, lo1 = vx1 / k;
+  let dc = '';
+  for (const c of COTE) if (c.b[0] <= la1 && c.b[2] >= la0 && c.b[1] <= lo1 && c.b[3] >= lo0) dc += c.l.map((p, i) => (i ? 'L' : 'M') + X(p) + ' ' + Y(p)).join('');
+  const d = (s.traces || [pts]).map(tr => tr.map((p, i) => (i ? 'L' : 'M') + X(p) + ' ' + Y(p)).join('')).join('');
+  return `<svg class="vign" style="width:${taille}px;height:${taille}px" viewBox="0 0 76 76">${dc ? `<path d="${dc}" fill="none" stroke="#7fa6b0" stroke-width="1" stroke-linejoin="round"/>` : ''}<path d="${d}" fill="none" stroke="var(--ac)" stroke-width="2" stroke-linejoin="round"/></svg>`;
 }
 function carteSeance(s, petite = false) {
   const el = document.createElement('div'); el.className = 'carteS';
@@ -177,7 +185,15 @@ function carteSeance(s, petite = false) {
     `<div class="info"><div class="t"><span class="nomS"></span><small>${quand}</small></div><div class="c"></div>
      <div class="chiffres"><span><b>${S.duree(s.duree)}</b><small>durée</small></span><span><b>${di.n}</b><small>${di.u}</small></span><span><b>${v.n}</b><small>${v.u} max</small></span>${s.nSauts ? `<span><b>${s.nSauts}</b><small>saut${s.nSauts > 1 ? 's' : ''}</small></span>` : ''}</div></div>`;
   el.querySelector('.nomS').textContent = S.titre(s); el.querySelector('.c').textContent = c || ' ';
+  // appui long (0,5 s) : passe en sélection avec cette séance ; ensuite, un appui coche ou décoche
+  let minuteur = null, long = false, x0 = 0, y0 = 0;
+  el.addEventListener('pointerdown', e => { long = false; x0 = e.clientX; y0 = e.clientY; clearTimeout(minuteur);
+    minuteur = setTimeout(() => { long = true; if (navigator.vibrate) navigator.vibrate(30); if (!selMode) modeSel(true, s.id); else { choisies.add(s.id); rendreListe(); majBarreSel(); } }, 500); });
+  el.addEventListener('pointermove', e => { if (Math.hypot(e.clientX - x0, e.clientY - y0) > 10) clearTimeout(minuteur); });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => el.addEventListener(t, () => clearTimeout(minuteur)));
+  el.addEventListener('contextmenu', e => e.preventDefault());
   el.onclick = e => {
+    if (long) { long = false; return; }
     if (!selMode) return ouvrirSeance(s.id);
     choisies.has(s.id) ? choisies.delete(s.id) : choisies.add(s.id);
     const cb = el.querySelector('input'); if (cb && e.target !== cb) cb.checked = choisies.has(s.id);
@@ -221,7 +237,7 @@ function majBarreSel() {
   $('bRegr').disabled = choisies.size < 2; $('bRegr').textContent = 'Regrouper' + (choisies.size > 1 ? ` (${choisies.size})` : '');
   $('bSupp').disabled = !choisies.size; $('bSupp').textContent = 'Supprimer' + (choisies.size ? ` (${choisies.size})` : '');
 }
-function modeSel(on) { selMode = on; choisies.clear(); $('bSel').classList.toggle('on', on); if (on && vue !== 'liste') changerVue('liste'); rendreListe(); majBarreSel(); }
+function modeSel(on, premier) { selMode = on; choisies.clear(); if (on && premier) choisies.add(premier); $('bSel').classList.toggle('on', on); if (on && vue !== 'liste') changerVue('liste'); rendreListe(); majBarreSel(); }
 $('bSel').onclick = () => modeSel(!selMode);
 $('bAnnul').onclick = () => modeSel(false);
 $('bRegr').onclick = async () => { const l = toutes.filter(s => choisies.has(s.id)); S.regrouper(l); modeSel(false); await charger(); };
@@ -349,7 +365,7 @@ function cleGroupe(s, g) {
 }
 function rendreRecap() {
   S.setPref('recap', rf);
-  document.querySelectorAll('.uD').forEach(e => e.textContent = S.unites().d === 'mi' ? 'milles' : 'km');
+  document.querySelectorAll('.uD').forEach(e => e.textContent = S.unites().d === 'mi' ? 'milles nautiques' : 'km');
   $('rSports').innerHTML = '';
   for (const sp of S.sports()) {
     const b = document.createElement('button'); b.className = rf.sports.includes(sp.id) ? 'on' : '';
@@ -396,6 +412,7 @@ document.querySelectorAll('#onglets button').forEach(b => b.onclick = () => { if
 
 async function charger() {
   $('chargement').hidden = false;
+  if (!COTE.length) COTE = (await S.cote()).map(l => { const la = l.map(p => p[0]), lo = l.map(p => p[1]); return { l, b: [Math.min(...la), Math.min(...lo), Math.max(...la), Math.max(...lo)] }; });
   try { toutes = await S.liste((f, n) => { $('chargement').textContent = `Lecture des séances… ${f} / ${n}`; }); }
   catch (e) { $('chargement').textContent = 'Lecture impossible : ' + e.message; return; }
   $('chargement').hidden = true;

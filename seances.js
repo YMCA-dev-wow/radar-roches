@@ -21,19 +21,31 @@ const Seances = (() => {
   const setUnites = u => ecrireLS('unites', Object.assign(unites(), u));
   const fr = (x, n = 1) => x.toFixed(n).replace('.', ',');
   function vit(ms, n = 1) { const u = unites().v; return u === 'kmh' ? { n: fr(ms * 3.6, n), u: 'km/h' } : u === 'ms' ? { n: fr(ms, n), u: 'm/s' } : { n: fr(ms * 1.94384, n), u: 'nd' }; }
-  function dist(m, n = 1) { return unites().d === 'mi' ? { n: fr(m / 1852, n), u: 'mi' } : { n: fr(m / 1000, n), u: 'km' }; }
+  // distance : km ou milles nautiques (NM), jamais de « mi » ambigu (mile terrestre)
+  function dist(m, n = 1) { return unites().d === 'mi' ? { n: fr(m / 1852, n), u: 'NM' } : { n: fr(m / 1000, n), u: 'km' }; }
   const duree = ms => { const mn = Math.round(ms / 60000); return Math.floor(mn / 60) + ':' + String(mn % 60).padStart(2, '0'); };
 
   // ---------- sports ----------
+  // une entrée par sport ; couleurs vives, vérifiées deux à deux dans l'ordre de la liste (fond sombre et clair) ;
+  // rouge, orange et jaune restent réservés aux alertes ; « Autre » en gris neutre
   const SPORTS_DEFAUT = [
-    { id: 'wing', nom: 'Wingfoil', c: '#5ee6d6' }, { id: 'windsurf', nom: 'Windsurf', c: '#6c8cff' }, { id: 'windfoil', nom: 'Windfoil', c: '#a9b8ff' },
-    { id: 'kite', nom: 'Kitesurf', c: '#f2a3d3' }, { id: 'kitefoil', nom: 'Kitefoil', c: '#d9b8f0' }, { id: 'surf', nom: 'Surf', c: '#b8c97a' },
-    { id: 'foil', nom: 'Surf foil, downwind', c: '#7fd1a8' }, { id: 'sup', nom: 'Paddle', c: '#d9c58f' }, { id: 'voile', nom: 'Voile', c: '#9fb7c4' },
-    { id: 'autre', nom: 'Autre', c: '#8a9aa0' },
+    { id: 'autre', nom: 'Autre', c: '#8a8a8a' }, { id: 'kitefoil', nom: 'Kitefoil', c: '#a855f7' }, { id: 'kite', nom: 'Kitesurf', c: '#e8389a' },
+    { id: 'sup', nom: 'Paddle', c: '#c08a0c' }, { id: 'parawing', nom: 'Parawing', c: '#0fa596' }, { id: 'surf', nom: 'Surf', c: '#9a9a10' },
+    { id: 'foil', nom: 'Surf foil, downwind', c: '#1e88e5' }, { id: 'voile', nom: 'Voile', c: '#b9702a' }, { id: 'windfoil', nom: 'Windfoil', c: '#0aa3bd' },
+    { id: 'windsurf', nom: 'Windsurf', c: '#5b6cff' }, { id: 'wing', nom: 'Wingfoil', c: '#1aad54' },
   ];
-  const PALETTE = ['#5ee6d6', '#6c8cff', '#f2a3d3', '#b8c97a', '#d9c58f', '#7fd1a8', '#a9b8ff', '#d9b8f0', '#9fb7c4', '#e7b38a'];
-  const sports = () => lireLS('sports', null) || SPORTS_DEFAUT.map(s => ({ ...s }));
-  const setSports = l => ecrireLS('sports', l);
+  const PALETTE = ['#1aad54', '#5b6cff', '#e8389a', '#0aa3bd', '#a855f7', '#c08a0c', '#0fa596', '#1e88e5', '#b9702a', '#9a9a10', '#8a8a8a'];
+  // anciennes couleurs pastel (avant le 16/11) : remplacées par les nouvelles dans une liste déjà enregistrée
+  const PASTEL = ['#5ee6d6', '#6c8cff', '#a9b8ff', '#f2a3d3', '#d9b8f0', '#b8c97a', '#7fd1a8', '#d9c58f', '#9fb7c4', '#8a9aa0', '#e7b38a'];
+  // liste triée par ordre alphabétique, « Autre » à la fin
+  const trier = l => l.slice().sort((a, b) => (a.id === 'autre') - (b.id === 'autre') || a.nom.localeCompare(b.nom, 'fr'));
+  function sports() {
+    const l = lireLS('sports', null);
+    if (!l) return trier(SPORTS_DEFAUT.map(s => ({ ...s })));
+    for (const s of l) if (PASTEL.includes(s.c)) { const d = SPORTS_DEFAUT.find(x => x.id === s.id); s.c = d ? d.c : PALETTE[l.indexOf(s) % PALETTE.length]; }
+    return trier(l);
+  }
+  const setSports = l => ecrireLS('sports', trier(l));
   const sport = id => sports().find(s => s.id === id) || null;
   // sport proposé d'après le profil du radar ou le sport du fichier FIT (43 planche à voile, 44 kitesurf, 37 paddle, 38 surf)
   const PROFIL_SPORT = { Foil: 'wing', Planche: 'windsurf', Kite: 'kite' };
@@ -119,6 +131,10 @@ const Seances = (() => {
   // une séance trop courte (radar ouvert sans naviguer) n'apparaît pas dans la liste
   const vide = r => !r || !r.t0 || r.nPos < 30 || r.duree < 120000 || r.dist < 200;
 
+  // ---------- trait de côte (donnees/cote.json, tiré du relief : outils/trait_cote.py) ----------
+  let coteP = null;
+  const cote = () => coteP || (coteP = fetch('donnees/cote.json').then(r => r.json()).then(j => Object.values(j.zones).flat()).catch(() => []));
+
   // ---------- séances ----------
   // liste(progres) : séances triées de la plus récente à la plus ancienne ; progres(fait, total) pendant le calcul des résumés
   async function liste(progres) {
@@ -194,5 +210,5 @@ const Seances = (() => {
   const couleur = s => (sport(s.sport) || {}).c || '#8a9aa0';
 
   return { APPLI: APPLI_S, pref, setPref, unites, setUnites, vit, dist, duree, fr, sports, setSports, sport, SPORTS_DEFAUT, PALETTE,
-    liste, seance, contenu, nomSource, ajouterFichier, modifier, regrouper, separer, supprimer, exporter, titre, couleur, sources };
+    liste, seance, contenu, nomSource, cote, ajouterFichier, modifier, regrouper, separer, supprimer, exporter, titre, couleur, sources };
 })();

@@ -94,6 +94,8 @@
   #tl.haute { height: 200px; }
   #resume { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; text-align: center; font-variant-numeric: tabular-nums; cursor: pointer; padding-top: 4px; }
   #resume b { display: block; font-size: 16px; line-height: 1.15; } #resume small { font-size: 10px; color: var(--muted); }
+  #resume.zoom b { color: var(--accent); }
+  #resume, .poignee { touch-action: none; }
   .poignee { width: 40px; height: 4px; border-radius: 2px; background: var(--ln2); margin: 4px auto 2px; cursor: pointer; }
   /* feuilles (panneaux qui montent du bas) */
   .feuilleR { position: fixed; inset: 0; z-index: 3100; background: rgba(0,0,0,.5); display: flex; align-items: flex-end; justify-content: center; }
@@ -428,19 +430,39 @@ function busy(txt) { $('busy').hidden = !txt; if (txt) $('busy').textContent = t
 function dessinerTrace() {
   trackLayer.clearLayers();
   // trace de base : couleur selon le réglage (vitesse, profondeur) par petits tronçons de même teinte, ou bleu uni
-  const e = echelleTrace(), base = e ? RAMPE[modeTrace] : null, cle = p => { const x = e && e.f(p); return x == null ? -1 : Math.round(Math.max(0, Math.min(1, x)) * 16); };
-  let run = [pts[0]], k = e ? cle(pts[0]) : 0;
-  const flushB = () => run.length > 1 && L.polyline(run.map(p => [p.lat, p.lon]), { color: !e || k < 0 ? '#5ac8fa' : couleurRampe(base, k / 16), weight: 3.5, opacity: 0.95 }).addTo(trackLayer);
-  for (let i = 1; i < pts.length; i++) { run.push(pts[i]); const kk = e ? cle(pts[i]) : 0; if (kk !== k) { flushB(); run = [pts[i]]; k = kk; } }
+  // hors de la portion de frise affichée (zoom) : trace grisée
+  const [f0, f1] = fenetre(), dedans = p => p.t >= f0 && p.t <= f1;
+  const e = echelleTrace(), base = e ? RAMPE[modeTrace] : null, cle = p => { if (!dedans(p)) return -2; const x = e && e.f(p); return x == null ? -1 : Math.round(Math.max(0, Math.min(1, x)) * 16); };
+  let run = [pts[0]], k = cle(pts[0]);
+  const flushB = () => {
+    if (run.length < 2) return;
+    const ll = run.map(p => [p.lat, p.lon]);
+    if (k === -2) { // hors portion : gris avec un liseré sombre, lisible sur tous les fonds
+      L.polyline(ll, { color: '#10181c', weight: 5, opacity: 0.45, interactive: false }).addTo(trackLayer);
+      L.polyline(ll, { color: '#b4bec4', weight: 2.5, opacity: 0.9, interactive: false }).addTo(trackLayer);
+    } else L.polyline(ll, { color: !e || k < 0 ? '#5ac8fa' : couleurRampe(base, k / 16), weight: 3.5, opacity: 0.95 }).addTo(trackLayer);
+  };
+  for (let i = 1; i < pts.length; i++) { run.push(pts[i]); const kk = cle(pts[i]); if (kk !== k) { flushB(); run = [pts[i]]; k = kk; } }
   flushB();
   // alertes et pré-alertes par-dessus, plus épaisses
-  const cls = p => p.lvl || (p.pre ? 'pre' : 0);
+  const cls = p => dedans(p) ? p.lvl || (p.pre ? 'pre' : 0) : 0;
   run = []; let lvl = 0;
   const flushA = () => run.length > 1 && lvl && L.polyline(run.map(p => [p.lat, p.lon]), { color: lvl === 'pre' ? '#ffd60a' : COLS[lvl], weight: 6, opacity: 0.95 }).addTo(trackLayer);
   for (let i = 0; i < pts.length; i++) { const c = cls(pts[i]); if (c !== lvl) { if (c && lvl) run.push(pts[i]); flushA(); run = []; lvl = c; } if (c) run.push(pts[i]); }
   flushA();
   boat.addTo(trackLayer);
   majLegendeC();
+  sautsLayer.eachLayer(m => m.setOpacity(m._saut && (m._saut.t < f0 || m._saut.t0 > f1) ? 0.3 : 1));
+}
+// portion de la frise affichée : toute la séance, ou la portion zoomée
+function fenetre() { if (!pts.length) return [0, 0]; const a = pts[0].t, b = pts[pts.length - 1].t; return vue.t1 > vue.t0 ? [Math.max(a, vue.t0), Math.min(b, vue.t1)] : [a, b]; }
+const estZoome = () => { if (!pts.length) return false; const [a, b] = fenetre(); return a > pts[0].t + 1 || b < pts[pts.length - 1].t - 1; };
+// quand la portion change : chiffres et trace mis à jour (après la fin du geste)
+let fenDessinee = '', fenMinuteur = null;
+function surFenetre() {
+  const k = fenetre().join('/'); if (k === fenDessinee) return;
+  clearTimeout(fenMinuteur);
+  fenMinuteur = setTimeout(() => { fenDessinee = fenetre().join('/'); if (pts.length && pts[0].W != null) dessinerTrace(); majResume(); }, 300);
 }
 
 let events = [];
@@ -573,6 +595,7 @@ function dessinerFrise() {
   $('lEau').textContent = pi ? fr1(pi.W) + ' m' : '–';
   const [a0, b0] = bornes(), zoom = t0 > a0 + 1 || t1 < b0 - 1;
   $('lFen').textContent = (zoom ? 'Zoom ' : 'Session ') + heure(t0) + ' – ' + heure(t1) + ' · ' + fmtDuree(t1 - t0);
+  surFenetre();
 }
 const fr1 = v => v.toFixed(1).replace('.', ',');
 const FOND = { roche: '#6e6a66', lisse: '#c2a46b', terre: '#4f7a3a' }; // nature du fond (relief Litto3D)
@@ -667,7 +690,7 @@ function preparerSauts() {
   for (const s of sauts) {
     const ic = L.divIcon({ className: 'pastilleSaut', html: `<span style="background:${couleurRampe(RS, s.hc / hmax)}">${fr(s.hc)}</span>`, iconSize: [0, 0] });
     const m = L.marker([s.lat, s.lon], { icon: ic, zIndexOffset: 500 + Math.round(s.hc * 100), title: `Saut ${s.n} · ${fr(s.hc)} m · ${fr(s.vol, 2)} s` });
-    m.on('click', () => choisirSaut(s)); m.addTo(sautsLayer);
+    m._saut = s; m.on('click', () => choisirSaut(s)); m.addTo(sautsLayer);
   }
   sautSel = sauts.reduce((a, b) => b.hc > a.hc ? b : a);
   placerVues();
@@ -1121,16 +1144,24 @@ document.querySelectorAll('#legendeC .modes button').forEach(b => b.onclick = ()
 // Résumé (bas de l'écran) et tous les chiffres (feuille)
 // =====================================================================
 let chiffresSeance = null;
+// chiffres de la portion de frise affichée (toute la séance sans zoom)
+function chiffresFenetre() {
+  if (!estZoome()) return { c: chiffresSeance, ev: events, sa: sauts, zoom: false };
+  const [a, b] = fenetre(), sel = pts.filter(p => p.t >= a && p.t <= b);
+  return { c: sel.length > 1 ? Traces.chiffres(sel) : null, ev: events.filter(e => pts[e.debut].t >= a && pts[e.debut].t <= b), sa: sauts.filter(s => s.t >= a && s.t0 <= b), zoom: true, a, b };
+}
 function majResume() {
-  const c = chiffresSeance; if (!c) return;
+  const { c, ev, zoom } = chiffresFenetre(); if (!c) return;
   const v = Seances.vit(c.v2s), d = Seances.dist(c.dist);
-  $('resume').innerHTML = `<span><b>${Seances.duree(c.duree)}</b><small>durée</small></span><span><b>${d.n}</b><small>${d.u}</small></span><span><b>${v.n}</b><small>${v.u} max</small></span><span><b id="resAl">${events.length}</b><small>alerte${events.length > 1 ? 's' : ''}</small></span>`;
+  $('resume').innerHTML = `<span><b>${Seances.duree(c.duree)}</b><small>${zoom ? 'portion' : 'durée'}</small></span><span><b>${d.n}</b><small>${d.u}</small></span><span><b>${v.n}</b><small>${v.u} max</small></span><span><b id="resAl">${ev.length}</b><small>alerte${ev.length > 1 ? 's' : ''}</small></span>`;
+  $('resume').classList.toggle('zoom', zoom);
 }
 function ouvrirResume() {
-  const c = chiffresSeance; if (!c) return;
+  const F = chiffresFenetre(), c = F.c; if (!c) return;
+  const events = F.ev, sauts = F.sa;
   const s = seanceCourante, sp = s && Seances.sport(s.sport);
   $('rSport').textContent = s ? Seances.titre(s) : $('titre').textContent; $('rSportDot').style.background = sp ? sp.c : '#8a9aa0';
-  $('rComm').textContent = s && s.commentaire ? '« ' + s.commentaire + ' »' : '';
+  $('rComm').textContent = [F.zoom ? `Portion ${heure(F.a).slice(0, 5)} – ${heure(F.b).slice(0, 5)} (zoom de la frise)` : '', s && s.commentaire ? '« ' + s.commentaire + ' »' : ''].filter(Boolean).join(' · ');
   const V = x => { const v = Seances.vit(x); return `${v.n}<u>${v.u}</u>`; }, D = Seances.dist(c.dist);
   const hm = sauts.length ? Math.max(...sauts.map(x => x.hc)) : 0;
   const cases = [[Seances.duree(c.duree), 'durée'], [`${D.n}<u>${D.u}</u>`, 'distance'], [V(c.vmoy), 'moyenne'], [V(c.vInst), 'vitesse instantanée'], [V(c.v2s), 'max sur 2 s'],
@@ -1140,7 +1171,23 @@ function ouvrirResume() {
   $('fResume').hidden = false;
 }
 $('resume').onclick = ouvrirResume; $('poignee').onclick = ouvrirResume;
-document.querySelectorAll('.feuilleR').forEach(f => f.addEventListener('click', e => { if (e.target === f) f.hidden = true; }));
+// balayage vers le haut sur le résumé (ou sa poignée) : tous les chiffres
+for (const el of [$('resume'), $('poignee')]) {
+  let y0 = null;
+  el.addEventListener('pointerdown', e => { y0 = e.clientY; });
+  el.addEventListener('pointermove', e => { if (y0 != null && y0 - e.clientY > 25) { y0 = null; ouvrirResume(); } });
+  ['pointerup', 'pointercancel'].forEach(t => el.addEventListener(t, () => { y0 = null; }));
+}
+document.querySelectorAll('.feuilleR').forEach(f => {
+  f.addEventListener('click', e => { if (e.target === f) f.hidden = true; });
+  // glisser vers le bas (depuis le haut de la feuille) : la feuille suit le doigt et se ferme au-delà de 80 px
+  const inn = f.querySelector('.in'); let y0 = null, dy = 0;
+  inn.addEventListener('pointerdown', e => { if (inn.scrollTop <= 0 && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) { y0 = e.clientY; dy = 0; } });
+  inn.addEventListener('pointermove', e => { if (y0 == null) return; dy = e.clientY - y0; if (dy > 0) inn.style.transform = `translateY(${dy}px)`; });
+  const fin = () => { if (y0 == null) return; y0 = null; inn.style.transform = ''; if (dy > 80) f.hidden = true; };
+  inn.addEventListener('pointerup', fin); inn.addEventListener('pointercancel', fin);
+  inn.style.touchAction = 'pan-y';
+});
 
 // =====================================================================
 // Menu ⋮ : modifier, exporter, bilan des sauts, réglages, séparer, supprimer, ouvrir un fichier
@@ -1162,7 +1209,7 @@ $('bMenu').onclick = () => {
   if (s) l.append(menuAction('✎', 'Modifier', 'sport, commentaire, lieu', ouvrirModif));
   if (pts.length) l.append(menuAction('⇩', 'Exporter la trace (GPX)', 'pour Strava, Garmin Connect, Suunto…', () => Seances.exporter(nomFichier('gpx'), Traces.gpx(pts, $('titre').textContent), 'application/gpx+xml').catch(e => alert(e.message))));
   const journaux = contenusCourants.filter(c => typeof c.contenu === 'string' && c.src && !c.src.startsWith('ex:') && /^\s*\{/.test(c.contenu));
-  if (journaux.length) l.append(menuAction('⇩', 'Exporter le journal (.jsonl)', 'détails de la séance : positions, sons, sauts, état du téléphone', () => Seances.exporter(nomFichier('jsonl'), journaux.map(c => c.contenu).join('\n'), 'application/octet-stream').catch(e => alert(e.message))));
+  if (journaux.length) l.append(menuAction('⇩', 'Logs pour débug (.jsonl)', 'à envoyer avec tes retours sur l’appli : positions, sons, sauts, état du téléphone', () => Seances.exporter(nomFichier('jsonl'), journaux.map(c => c.contenu).join('\n'), 'application/octet-stream').catch(e => alert(e.message))));
   const fichiers = contenusCourants.filter(c => c.src && c.src.startsWith('f:') && !/^\s*\{/.test(typeof c.contenu === 'string' ? c.contenu : ''));
   for (const c of fichiers) l.append(menuAction('⇩', "Exporter le fichier d'origine", c.nom, () => Seances.exporter(c.nom, c.contenu).catch(e => alert(e.message))));
   if (sauts.length) l.append(menuAction('⤴', 'Bilan des sauts', `${sauts.length} saut${sauts.length > 1 ? 's' : ''}`, () => ouvrirSauts()));

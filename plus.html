@@ -108,7 +108,7 @@ function ouvrirReglagesGeneraux() {
   document.body.append(f);
   const fermer = () => { f.remove(); if (location.hash === '#reglages') history.replaceState(null, '', 'plus.html'); };
   f.querySelector('#fermerReg').onclick = fermer; f.onclick = e => { if (e.target === f) fermer(); };
-  const CHOIX = { v: [['kmh', 'km/h'], ['nd', 'nœuds'], ['ms', 'm/s']], d: [['km', 'km'], ['mi', 'milles']] };
+  const CHOIX = { v: [['kmh', 'km/h'], ['nd', 'nœuds'], ['ms', 'm/s']], d: [['km', 'km'], ['mi', 'milles nautiques']] };
   const unites = () => f.querySelectorAll('.selU').forEach(el => {
     const k = el.dataset.k, u = Seances.unites()[k]; el.innerHTML = '';
     el.style.cssText = 'display:inline-flex;background:var(--bg);border:1px solid var(--ln);border-radius:10px;padding:2px';

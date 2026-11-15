@@ -1,9 +1,9 @@
 // Service worker du radar : fonctionnement hors ligne.
 // Tuiles Litto3D : cache dédié, « cache d'abord » (elles ne changent pas, et survivent aux mises à jour de l'appli).
 // Pages, noyau et marée : réseau d'abord, cache en secours. Le marégraphe (autre domaine) passe toujours par le réseau.
-const APP = 'radar-app-v7';
+const APP = 'radar-app-v8';
 const TUILES = 'radar-tuiles';
-const BASE = ['radar.html', 'rejeu.html', 'seances.html', 'seances.js', 'traces.js', 'noyau.js', 'theme.css', 'nav.js', 'fonds.js', 'zones.js', 'relief.js', 'nouveautes.js', 'nouveautes.json', 'logo.svg', 'donnees/zones.json']; // les données de chaque zone se mettent en cache à la première lecture
+const BASE = ['radar.html', 'rejeu.html', 'seances.html', 'seances.js', 'traces.js', 'donnees/cote.json', 'noyau.js', 'theme.css', 'nav.js', 'fonds.js', 'zones.js', 'relief.js', 'nouveautes.js', 'nouveautes.json', 'logo.svg', 'donnees/zones.json']; // les données de chaque zone se mettent en cache à la première lecture
 
 self.addEventListener('install', e => {
   self.skipWaiting();

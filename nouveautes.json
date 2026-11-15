@@ -2,6 +2,16 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 45,
+      "date": "2026-11-16",
+      "titre": "Séances : retouches",
+      "points": [
+        "Liste : le trait de côte apparaît sous la trace des vignettes. Appui long sur une séance pour la sélectionner, puis touche les autres (regrouper, supprimer) ; le bouton ☑ reste disponible.",
+        "Fiche : quand la frise est zoomée, les chiffres portent sur la portion affichée et le reste de la trace est grisé. Balaie le résumé vers le haut pour tous les chiffres, la feuille vers le bas pour la fermer.",
+        "Couleurs des sports plus vives, liste triée par ordre alphabétique avec Parawing. Distance en km ou en milles nautiques. Export « Logs pour débug » : le fichier à joindre à un retour sur l'appli."
+      ]
+    },
+    {
       "id": 44,
       "date": "2026-11-15",
       "titre": "Nouvel onglet Séances",
