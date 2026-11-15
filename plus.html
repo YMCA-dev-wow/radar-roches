@@ -52,6 +52,7 @@ const ENTREES = [
   null,
   ['reglages', 'radar.html#avance', 'Réglages avancés et essais', 'marée, sons, montre, mode test, simulation'],
   ['journal', '#journaux', 'Journaux de session', 'à envoyer pour analyser un problème'],
+  ['telecharger', '#canal', 'Canal de mise à jour', 'testeurs (versions validées) ou développement (chaque modification)'],
   ['moderation', 'carte.html#moderation', 'Modération', 'jeux de roches partagés à valider'],
 ];
 let cible = document.getElementById('menu');
@@ -67,6 +68,7 @@ for (const e of ENTREES) {
   if (href === '#nouveautes') a.onclick = e => { e.preventDefault(); nouveautes.ouvrir(true); };
   if (href === '#journaux') a.onclick = e => { e.preventDefault(); ouvrirJournaux(); };
   if (href === '#reglages') a.onclick = e => { e.preventDefault(); ouvrirReglagesGeneraux(); };
+  if (href === '#canal') a.onclick = e => { e.preventDefault(); ouvrirCanal(); };
   cible.append(a);
 }
 </script>
@@ -137,6 +139,35 @@ function ouvrirReglagesGeneraux() {
   unites(); sports();
 }
 if (location.hash === '#reglages') ouvrirReglagesGeneraux();
+
+// Canal de mise à jour : l'appli cherche ses mises à jour sur le canal choisi (par défaut celui de la version installée)
+async function ouvrirCanal() {
+  const f = document.createElement('div'); f.className = 'feuille on';
+  f.innerHTML = '<div class="in"><h2 style="margin-top:0">Canal de mise à jour</h2><div id="canaux"></div><div class="sub" id="canalInfo" style="margin-top:10px"></div>' +
+    '<button class="btn prim" style="width:100%;margin-top:16px" id="fermerCanal">Fermer</button></div>';
+  document.body.append(f);
+  const fermer = () => f.remove();
+  f.querySelector('#fermerCanal').onclick = fermer; f.onclick = e => { if (e.target === f) fermer(); };
+  if (!window.majCanal || !(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())) {
+    f.querySelector('#canalInfo').textContent = 'Réglage de l’appli Android (le site web est toujours à jour).'; return;
+  }
+  const OPTIONS = [['testeurs', 'Testeurs', 'versions validées, proposées de temps en temps'], ['dev', 'Développement', 'chaque modification, dès qu’elle est publiée (peut contenir des essais)']];
+  const rendre = async () => {
+    const e = await window.majCanal.etat(), box = f.querySelector('#canaux'); box.innerHTML = '';
+    for (const [id, nom, sous] of OPTIONS) {
+      const l = document.createElement('label'); l.className = 'ligne'; l.style.cursor = 'pointer';
+      l.innerHTML = '<span><span class="t"></span><small></small></span><input type="radio" name="canal">';
+      l.querySelector('.t').textContent = nom + (id === e.installe ? ' (version installée)' : ''); l.querySelector('small').textContent = sous;
+      const r = l.querySelector('input'); r.checked = e.suivi === id;
+      r.onchange = async () => { window.majCanal.choisir(id); await rendre(); if (typeof verifierMaj === 'function') verifierMaj(document.getElementById('maj'), true); };
+      box.append(l);
+    }
+    f.querySelector('#canalInfo').innerHTML = e.suivi === e.installe
+      ? 'Les mises à jour proposées en bas de Plus viennent de ce canal.'
+      : 'La prochaine version de ce canal sera proposée en bas de Plus dès que son numéro dépassera celui de ta version (' + e.ici + '). Une fois installée, l’appli restera sur ce canal.';
+  };
+  rendre();
+}
 </script>
 </body>
 </html>

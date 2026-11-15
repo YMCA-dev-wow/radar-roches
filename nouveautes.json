@@ -2,6 +2,14 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 47,
+      "date": "2026-11-16",
+      "titre": "Choix du canal de mise à jour",
+      "points": [
+        "Plus → Avancé → Canal de mise à jour : Testeurs (versions validées) ou Développement (chaque modification). L'appli propose ensuite les mises à jour du canal choisi."
+      ]
+    },
+    {
       "id": 46,
       "date": "2026-11-16",
       "titre": "Séances : trait de côte épuré",

@@ -10,7 +10,8 @@
     dev: { apk: 'https://github.com/YMCA-dev-wow/radar-roches/releases/download/appli-dev/radar-roches.apk',
            api: 'https://api.github.com/repos/YMCA-dev-wow/radar-roches/releases/tags/appli-dev' },
   };
-  let canal = 'testeurs';
+  // canal suivi : celui de l'appli installée, sauf choix contraire dans Plus → Avancé → Canal de mise à jour (radar.maj.canal)
+  let canal = 'testeurs', canalInstalle = 'testeurs';
   const C = window.Capacitor, appli = !!(C && C.isNativePlatform && C.isNativePlatform());
   const lire = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
   const ecrire = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
@@ -22,7 +23,8 @@
   async function nomLocal() {
     try {
       const v = await (await fetch('version.json', { cache: 'no-store' })).json();
-      if (CANAUX[v.canal]) canal = v.canal;
+      if (CANAUX[v.canal]) canal = canalInstalle = v.canal;
+      const choisi = lire('radar.maj.canal'); if (CANAUX[choisi]) canal = choisi;
       return v.version || '';
     } catch { return ''; }
   }
@@ -49,7 +51,7 @@
   };
   window.verifierMaj = async function (zone, force = false) {
     if (!appli || !zone) return;
-    const nom = await nomLocal(), ici = await versionLocale(), moi = affiche(nom, ici);
+    const nom = await nomLocal(), ici = await versionLocale(), moi = affiche(nom, ici, canalInstalle) + (canal !== canalInstalle ? ` (suit le canal ${canal === 'dev' ? 'développement' : 'testeurs'})` : '');
     const ligne = (...morceaux) => { zone.innerHTML = ''; morceaux.forEach((m, i) => { if (i) zone.append(' · '); zone.append(m); }); };
     let n;
     try { n = await versionPubliee(force); }
@@ -71,5 +73,11 @@
       a.onclick = e => { e.preventDefault(); zone.textContent = 'Vérification…'; window.verifierMaj(zone, true); };
       ligne(moi, a);
     }
+  };
+  // choix du canal (Plus → Avancé) : canal suivi, canal installé ; le choix « comme l'appli installée » efface la préférence
+  window.majCanal = {
+    async etat() { await nomLocal(); return { suivi: canal, installe: canalInstalle, ici: await versionLocale() }; },
+    choisir(c) { if (CANAUX[c]) ecrire('radar.maj.canal', c); try { localStorage.removeItem('maj.publiee'); } catch {} },
+    lien: c => CANAUX[c] && CANAUX[c].apk,
   };
 })();
