@@ -2,6 +2,15 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 46,
+      "date": "2026-11-16",
+      "titre": "Séances : trait de côte épuré",
+      "points": [
+        "Les vignettes de la liste ne montrent plus que le trait de côte : plus de lignes dans les terres basses derrière les digues (Paramé, derrière le Sillon) ni de bords de zone.",
+        "Fiche : la légende des couleurs de trace (Vitesse, Profondeur, Aucune) ne déborde plus de son cadre."
+      ]
+    },
+    {
       "id": 45,
       "date": "2026-11-16",
       "titre": "Séances : retouches",
