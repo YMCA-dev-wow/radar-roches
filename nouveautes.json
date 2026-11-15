@@ -2,6 +2,17 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 44,
+      "date": "2026-11-15",
+      "titre": "Nouvel onglet Séances",
+      "points": [
+        "L'onglet Rejeu devient Séances : toutes tes sorties en liste (trace, sport, chiffres clés), en calendrier (semaine, mois, année), sur une carte (toutes les traces d'une période) et en récapitulatif (filtres, regroupement par semaine, mois ou année).",
+        "Fiche d'une séance : la carte prend l'écran, trace colorée selon la vitesse ou la profondeur, sauts en pastilles avec leur hauteur. Le médaillon en haut à droite montre le radar, la montre ou les sauts : touche-le pour l'échanger avec la carte, ou masque-le.",
+        "Touche le résumé en bas pour tous les chiffres : vitesses max instantanée, sur 2 s, 100, 250, 500 m et 1 mille. Menu ⋮ : modifier le sport, le commentaire et le lieu, exporter la trace (GPX) ou le journal, réglages du rejeu, supprimer.",
+        "Regrouper ou supprimer des séances : bouton ☑ de la liste. Unités (nœuds, km/h, m/s ; km ou milles) et liste des sports : Plus → Réglages généraux. L'appli garde désormais jusqu'à 400 journaux."
+      ]
+    },
+    {
       "id": 43,
       "date": "2026-11-13",
       "titre": "Sauts : hauteur corrigée de la portance",

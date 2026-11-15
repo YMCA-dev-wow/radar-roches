@@ -3,89 +3,124 @@
 <head>
 <script src="diagnostic.js"></script>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Rejeu de session</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Séance</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <meta name="theme-color" content="#071318">
 <link rel="icon" href="logo.svg">
 <script src="nav.js"></script>
 <style>
-  :root { --bg: #071318; --panel: #0b2024; --text: #d6f3f1; --muted: #7fb8b2; --line: #14403f;
+  :root { --bg: #071318; --panel: #0b2024; --p2: #0d2a2e; --text: #d6f3f1; --muted: #7fb8b2; --line: #14403f; --ln2: #1f5a57;
     --accent: #5ee6d6; --a1: #ff9f0a; --a2: #ff3b30; --a3: #d81b60; }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  button, select, input { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+  body { display: flex; flex-direction: column; overflow: hidden; }
+  button, select, input, textarea { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
   button.primary { background: var(--accent); border-color: var(--accent); color: #04221f; font-weight: 650; }
+  button.on { outline: 2px solid var(--accent); }
+  input[type=number] { width: 70px; }
   .barre-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 3000; background: #061014; border-top: 1px solid var(--line); display: flex; justify-content: space-around; padding: 7px 4px 10px; }
   .barre-nav a { color: var(--muted); font-size: 11px; text-align: center; text-decoration: none; flex: 1; max-width: 140px; }
   .barre-nav a svg { display: block; margin: 0 auto 2px; } .barre-nav a.on { color: var(--accent); }
-  html.appli body { padding-bottom: 64px; }
-  html.appli footer { bottom: 63px !important; }
-  button.on { outline: 2px solid var(--accent); }
-  input[type=number] { width: 70px; }
-  /* journaux du téléphone : menu déroulant à cases, rejeu direct */
-  .mesJ { position: relative; }
-  /* fixé à l'écran (et non sous le bouton) : jamais plus large que la fenêtre, quel que soit l'endroit du bouton ;
-     haut et gauche placés à l'ouverture (placerMenuJ) */
-  .mesJPan { position: fixed; z-index: 3500; width: min(380px, calc(100vw - 24px)); max-height: 60vh; overflow: auto; box-sizing: border-box;
-    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px; box-shadow: 0 10px 30px #000a; }
-  .mesJPan .tete { display: flex; gap: 8px; align-items: center; position: sticky; top: -8px; background: var(--panel); padding: 4px 0 8px; border-bottom: 1px solid var(--line); }
-  .mesJPan .tete button { flex: 1; }
-  .mesJPan label { display: flex; padding: 9px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
-  .mesJPan label b { font-weight: 600; } .mesJPan label small { color: var(--muted); margin-left: auto; }
-  .mesJPan label.charge b::after { content: ' · affiché'; color: var(--accent); font-weight: 400; }
-  .mesJPan .groupe { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 10px 4px 2px; }
-  .mesJPan .ex { display: block; width: 100%; text-align: left; margin: 6px 0; padding: 9px 10px; }
-  .mesJPan .ex small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
-  /* séance d'exemple : ce qu'il faut regarder */
-  #bandeauEx { flex-basis: 100%; background: #0d2a2e; border: 1px solid var(--accent); border-radius: 12px; padding: 8px 34px 8px 12px; position: relative; font-size: 13px; }
+  html.appli body { padding-bottom: 62px; }
+  .sub { color: var(--muted); font-size: 12px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; display: inline-block; }
+  /* en-tête : retour, titre de la séance, menu */
+  #tete { flex: none; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  #tete .ico { width: 38px; height: 38px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; flex: none; text-decoration: none; color: var(--muted); background: var(--p2); border: 1px solid var(--line); border-radius: 10px; }
+  #titreS { flex: 1; min-width: 0; line-height: 1.25; }
+  #titreS b { display: block; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #titreS span { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+  /* scène : vue principale + médaillon (échangeables) */
+  #scene { flex: 1; position: relative; min-height: 0; overflow: hidden; }
+  #principal, #medaillon > .contenu { position: absolute; inset: 0; }
+  .vue { position: absolute; inset: 0; }
+  #map { background: #0c2a36; }
+  #boxRadar { display: flex; flex-direction: column; background: var(--bg); }
+  #radar { flex: 1; width: 100%; min-height: 0; display: block; }
+  #msg { text-align: center; min-height: 22px; padding: 2px 8px; color: var(--muted); }
+  #msg.alert { color: var(--a1); font-weight: 600; }
+  #stats { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; padding: 4px 4px 8px; }
+  #stats b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+  #stats span { font-size: 11px; color: var(--muted); text-transform: uppercase; }
+  #boxMontre { display: flex; flex-direction: column; align-items: center; justify-content: center; background: #000; }
+  .montre { flex: none; font: 15px/1.25 system-ui, sans-serif; padding: 22px; gap: 4px; overflow: hidden; background: #000; color: #e8edf3; border: 2px solid #444; border-radius: 50%; width: 170px; height: 170px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  .montre span { white-space: pre-line; }
+  .montre b { font-size: 17px; color: #ffd60a; border-bottom: 1px dotted #888; padding-bottom: 3px; }
+  #boxSauts { background: #0b1a1f; display: flex; flex-direction: column; }
+  #cMed { flex: 1; width: 100%; min-height: 0; display: block; }
+  #boxSauts .bas { display: flex; gap: 8px; align-items: center; padding: 6px 10px 10px; }
+  #medaillon { position: absolute; top: 10px; right: 10px; width: 124px; height: 124px; border-radius: 16px; overflow: hidden; border: 2px solid var(--ln2); z-index: 900; background: var(--bg); box-shadow: 0 6px 18px #000b; }
+  #medaillon .capot { position: absolute; inset: 0; z-index: 5; cursor: pointer; }
+  #medaillon .lab { position: absolute; bottom: 4px; left: 6px; z-index: 6; font-size: 10px; color: var(--muted); background: rgba(7,19,24,.8); border-radius: 6px; padding: 0 5px; pointer-events: none; }
+  #medaillon #msg, #medaillon #stats, #medaillon .legendeMontre, #medaillon #boxSauts .bas { display: none; }
+  #medaillon .montre { transform: scale(.62); }
+  #medaillon .leaflet-control-container { display: none; }
+  #medChoix { position: absolute; top: 140px; right: 10px; z-index: 900; display: flex; flex-direction: column; gap: 4px; width: 124px; }
+  #medChoix button { font-size: 11px; padding: 3px 0; border-radius: 8px; background: rgba(7,19,24,.9); color: var(--muted); }
+  #medChoix button.sel { color: var(--accent); border-color: var(--accent); }
+  #medAfficher { position: absolute; top: 10px; right: 10px; z-index: 900; padding: 6px 10px; font-size: 12px; background: rgba(7,19,24,.9); }
+  /* légende de la couleur de trace */
+  #legendeC { position: absolute; left: 10px; bottom: 10px; z-index: 800; background: rgba(7,19,24,.9); border: 1px solid var(--line); border-radius: 10px; padding: 5px 8px; font-size: 11px; color: var(--muted); width: 178px; }
+  #legendeC .modes { display: flex; gap: 4px; }
+  #legendeC .modes button { padding: 2px 7px; font-size: 11px; border-radius: 10px; }
+  #legendeC .modes button.sel { background: var(--accent); color: #04221f; border-color: var(--accent); font-weight: 600; }
+  #legendeC .grad { height: 7px; border-radius: 4px; margin: 5px 0 2px; }
+  #legendeC .ech { display: flex; justify-content: space-between; }
+  .pastilleSaut { background: none; border: 0; }
+  .pastilleSaut span { display: inline-block; transform: translate(-50%, -50%); padding: 1px 5px; border-radius: 9px; font: 600 11px/1.3 system-ui, sans-serif; color: #04221f; border: 1.5px solid #071318; white-space: nowrap; cursor: pointer; }
+  #bandeauEx { position: absolute; left: 10px; top: 10px; right: 150px; z-index: 850; background: #0d2a2e; border: 1px solid var(--accent); border-radius: 12px; padding: 8px 34px 8px 12px; font-size: 13px; max-height: 60%; overflow: auto; }
   #bandeauEx b { color: var(--accent); } #bandeauEx .lieu { color: var(--muted); font-size: 12px; }
   #bandeauEx ul { margin: 4px 0 0; padding-left: 18px; } #bandeauEx li { margin: 2px 0; }
   #bandeauEx .x { position: absolute; top: 4px; right: 4px; padding: 2px 9px; }
-  label { display: inline-flex; gap: 6px; align-items: center; }
-  #app { display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: 1fr 340px; grid-template-areas: "h h" "m s" "f s"; height: 100%; }
-  #app > header { grid-area: h; } #app > main { display: contents; } #app > footer { grid-area: f; } #map { grid-area: m; } #side { grid-area: s; }
-  header { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 12px; border-bottom: 1px solid var(--line); }
-  header h1 { font-size: 16px; margin: 0 8px 0 0; }
-  .sub { color: var(--muted); font-size: 12px; }
-  main { display: grid; grid-template-columns: 1fr 340px; min-height: 0; }
-  #map { min-height: 0; }
-  #side { display: flex; flex-direction: column; border-left: 1px solid var(--line); min-height: 0; }
-  #radar { width: 100%; height: 320px; display: block; }
-  #msg { text-align: center; min-height: 22px; padding: 2px 8px; color: var(--muted); }
-  #msg.alert { color: var(--a1); font-weight: 600; }
-  #stats { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; padding: 4px; }
-  #stats b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
-  #stats span { font-size: 11px; color: var(--muted); text-transform: uppercase; }
-  #settings { padding: 8px 12px; overflow-y: auto; border-top: 1px solid var(--line); }
-  #settings .r { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin: 6px 0; flex-wrap: wrap; }
-  #events { list-style: none; margin: 0; padding: 0; }
-  #events li { display: flex; gap: 8px; padding: 4px 2px; border-bottom: 1px solid var(--line); cursor: pointer; }
-  #events li:hover { background: var(--panel); }
-  .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; margin-top: 4px; }
-  footer { padding: 8px 12px 10px; border-top: 1px solid var(--line); }
-  #ctrl { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
-  #play { width: 64px; font-size: 18px; }
-  #clock { font-variant-numeric: tabular-nums; font-size: 16px; min-width: 150px; }
-  #tl { width: 100%; height: 110px; display: block; cursor: pointer; touch-action: none; border-radius: 6px; }
-  .zoom button { padding: 4px 10px; min-width: 36px; }
-  .suivre { font-size: 12px; color: var(--muted); }
-  #lecture { display: flex; align-items: flex-end; gap: 18px; margin: 2px 0 6px; flex-wrap: wrap; }
+  /* bas : lecture, frise, résumé */
+  #bas { flex: none; border-top: 1px solid var(--line); padding: 6px 10px 6px; background: var(--bg); }
+  #ctrl { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 4px; }
+  #play { width: 44px; font-size: 18px; padding: 4px; }
+  #speed { width: 56px; padding: 4px; }
+  #clock { font-variant-numeric: tabular-nums; font-size: 13px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  @media (max-width: 520px) { #clock { order: 9; flex-basis: 100%; } .zoom { margin-left: auto; } }
+  .zoom { display: flex; gap: 4px; } .zoom button { padding: 4px 6px; min-width: 34px; }
+  .suivre { font-size: 12px; color: var(--muted); display: inline-flex; gap: 5px; align-items: center; }
+  #lecture { display: flex; align-items: flex-end; gap: 14px; margin: 2px 0 4px; flex-wrap: wrap; }
   #lecture .val { display: grid; grid-template-columns: 4px auto; column-gap: 8px; align-items: center; }
   #lecture .val i { grid-row: span 2; align-self: stretch; border-radius: 2px; }
-  /* jauge façon Suunto : piste grise, remplie depuis le bas selon la valeur (--n de 0 à 1) */
   .jauge { --n: 0; --c: #5ac8fa; background: linear-gradient(to top, var(--c) calc(var(--n) * 100%), #3a4654 calc(var(--n) * 100%)); }
-  #lecture .val b { font-size: 20px; font-variant-numeric: tabular-nums; }
+  #lecture .val b { font-size: 16px; font-variant-numeric: tabular-nums; }
   #lecture .val small { color: var(--muted); font-size: 11px; }
-  #lecture .val[hidden] { display: none; }
-  #lecture .suivre { align-self: center; }
   #lecture .fen { margin-left: auto; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-  #tl.haute { height: 220px; }
+  #tl { width: 100%; height: 104px; display: block; cursor: pointer; touch-action: none; border-radius: 6px; }
+  #tl.haute { height: 200px; }
+  #resume { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; text-align: center; font-variant-numeric: tabular-nums; cursor: pointer; padding-top: 4px; }
+  #resume b { display: block; font-size: 16px; line-height: 1.15; } #resume small { font-size: 10px; color: var(--muted); }
+  .poignee { width: 40px; height: 4px; border-radius: 2px; background: var(--ln2); margin: 4px auto 2px; cursor: pointer; }
+  /* feuilles (panneaux qui montent du bas) */
+  .feuilleR { position: fixed; inset: 0; z-index: 3100; background: rgba(0,0,0,.5); display: flex; align-items: flex-end; justify-content: center; }
+  .feuilleR > .in { background: var(--panel); border: 1px solid var(--ln2); border-radius: 20px 20px 0 0; width: 100%; max-width: 560px; max-height: 86vh; overflow: auto; padding: 8px 14px 24px; }
+  html.appli .feuilleR > .in { padding-bottom: 80px; }
+  .feuilleR h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin: 10px 0 8px; font-weight: 600; }
+  .menuF button { width: 100%; text-align: left; display: flex; gap: 12px; align-items: center; padding: 12px 10px; margin-bottom: 6px; border-radius: 12px; background: var(--bg); font-size: 15px; }
+  .menuF button small { display: block; color: var(--muted); font-size: 12px; }
+  .menuF button .ic { width: 22px; text-align: center; color: var(--accent); font-size: 17px; }
+  .menuF button.danger, .menuF button.danger .ic { color: var(--a2); }
+  .grilleR { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .grilleR div { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; }
+  .grilleR b { display: block; font-size: 17px; font-variant-numeric: tabular-nums; } .grilleR b u { text-decoration: none; font-size: 11px; color: var(--muted); font-weight: 400; margin-left: 2px; }
+  .grilleR small { font-size: 11px; color: var(--muted); }
+  #settings .r { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin: 8px 0; flex-wrap: wrap; }
+  #settings label { display: inline-flex; gap: 6px; align-items: center; }
   .legend span { display: inline-flex; gap: 4px; align-items: center; margin-right: 10px; font-size: 12px; color: var(--muted); }
-  .montre { flex: none; font: 15px/1.25 system-ui, sans-serif; padding: 22px; gap: 4px; overflow: hidden; background: #000; color: #e8edf3; border: 2px solid #444; border-radius: 50%; width: 150px; height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; margin: 8px auto; }
-  .montre span { white-space: pre-line; }
-  .montre b { font-size: 17px; color: #ffd60a; border-bottom: 1px dotted #888; padding-bottom: 3px; }
+  .sportsM { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  .sportsM button { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 12px; background: var(--bg); text-align: left; }
+  .sportsM button.sel { border-color: var(--accent); color: var(--accent); }
+  #mComm { width: 100%; height: 76px; resize: none; }
+  #mLieu { width: 100%; }
+  #busy { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 3500; font-size: 16px; }
+  @media (min-width: 800px) {
+    #medaillon, #medChoix { width: 200px; } #medaillon { height: 200px; } #medChoix { top: 216px; }
+    #medaillon .montre { transform: scale(.9); }
+  }
   /* bilan des sauts : panneau latéral (plein écran sur téléphone) */
   #sautsBtn { border-color: var(--accent); color: var(--accent); }
   #sautsPan { position: fixed; top: 0; right: 0; bottom: 0; width: min(480px, 100vw); z-index: 3200; background: var(--bg); border-left: 1px solid var(--line);
@@ -115,103 +150,97 @@
   .repart { display: grid; grid-template-columns: 70px 1fr 26px; gap: 4px 8px; align-items: center; font-size: 12px; color: var(--muted); }
   .repart i { display: block; height: 10px; border-radius: 0 4px 4px 0; background: var(--accent); min-width: 2px; }
   .repart b { color: var(--text); text-align: right; font-weight: 500; }
-  #busy { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 2000; font-size: 16px; }
-  @media (max-width: 800px) {
-    #app { display: block; height: auto; }
-    main { display: block; }
-    #map { height: 45vh; }
-    #side { border-left: none; }
-    #radar { height: 260px; }
-    footer { position: sticky; bottom: 0; background: var(--bg); z-index: 1000; padding: 6px 10px 8px; }
-    html.appli footer { bottom: 62px; } /* au-dessus de la barre d'onglets de l'appli */
-    .legend { display: none; }
-    #ctrl { gap: 6px; margin-bottom: 4px; flex-wrap: wrap; }
-    #ctrl .sub, #ctrl label.sub { display: none; }
-    #play { width: 44px; padding: 4px; }
-    #speed { width: 52px; padding: 4px; }
-    .zoom { display: flex; gap: 4px; } .zoom button { padding: 4px 6px; min-width: 34px; }
-    #tl.haute { height: 200px; }
-    #clock { order: 9; flex-basis: 100%; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    #tl { height: 120px; }
-    #lecture { gap: 12px; } #lecture .val b { font-size: 16px; } #lecture .fen { flex-basis: 100%; margin-left: 0; }
-    #tl.haute { height: 240px; }
-  }
+
 </style>
 </head>
-<body data-onglet="rejeu">
-<div id="app">
-  <header>
-    <a href="index.html" id="retour" style="color:var(--muted);text-decoration:none;font-size:22px;line-height:1">‹</a>
-    <script>if (window.androidBridge) document.getElementById('retour').hidden = true; // onglet de l'appli : pas de retour</script>
-    <h1>Rejeu de session</h1>
-    <button class="primary" id="gpxBtn">Ouvrir une trace (FIT, GPX ou journal)…</button>
-    <input type="file" id="gpxFile" accept=".gpx,.fit,.jsonl,application/gpx+xml" hidden>
-    <div class="mesJ" id="mesJ"><button id="mesJBtn">Mes séances ▾</button><div class="mesJPan" id="mesJPan" hidden></div></div>
-    <button id="sautsBtn" hidden>⤴ Sauts</button>
-    <span class="sub" id="info">Charge une ancienne session (FIT de préférence : heures et vitesse exactes) pour rejouer les alertes du radar.</span>
-    <span style="flex:1"></span>
-    <div id="bandeauEx" hidden></div>
-  </header>
-  <main>
-    <div id="map"></div>
-    <div id="side">
-      <canvas id="radar"></canvas>
-      <div id="msg"></div>
-      <div id="stats">
-        <div><b id="sH">–</b><span>eau (m)</span></div>
-        <div><b id="sV">–</b><span>km/h</span></div>
-        <div><b id="sCap">–</b><span>cap</span></div>
-      </div>
-      <div class="montre" id="apercu" title="Aperçu en direct ; le cadran clignote en violet à chaque envoi vers la montre"><b>montre</b>–</div>
-      <div class="sub" style="text-align:center;margin-top:-4px">aperçu en direct · <span style="color:#bf5af2">violet = envoyé</span></div>
-      <div id="settings">
-        <div class="r" id="vRow" hidden><span>Trace sans heures : vitesse supposée (km/h)</span><input type="number" id="vSupp" step="1" min="3" value="22"></div>
-        <div class="r"><span>Marée</span>
-          <select id="tideMode">
-            <option value="mesure">Mesurée (marégraphe)</option>
-            <option value="prevue">Prédite (modèle)</option>
-            <option value="forcee">Forcée</option>
-          </select>
-        </div>
-        <div class="r" id="forceRow" hidden><input type="range" id="forceH" min="0" max="14" step="0.1" value="6" style="flex:1"><b id="forceTxt">6.0 m</b></div>
-        <div class="sub" id="tideInfo"></div>
-        <div class="r"><span>Eau minimale (m)</span><input type="number" id="seuil" step="0.1" min="0.5" value="2.0"></div>
-        <div class="r"><span>Alertes dès (km/h)</span><input type="number" id="vmin" step="1" min="0" value="8"></div>
-        <div class="r"><span>Anticipation (s)</span><input type="number" id="antic" step="1" min="3" value="7"></div>
-        <div class="r"><span>Angle d'alerte (±°)</span><input type="number" id="coneAlerte" step="5" min="10" max="110" value="50"></div>
-        <div class="r"><label><input type="checkbox" id="preAlerte" checked> Pré-alerte (2× la distance)</label><span>±</span><input type="number" id="conePre" step="5" min="5" max="150" value="10" style="width:56px"><span>°</span></div>
-        <div class="r"><label><input type="checkbox" id="veille" checked> Veille latérale jusqu'à</label><input type="number" id="coneVeille" step="5" min="30" max="170" value="110" style="width:56px"><span>°</span></div>
-        <div class="r"><label><input type="checkbox" id="smooth"> Fonds lisses aussi</label></div>
-        <div class="r"><label><input type="checkbox" id="sound" checked> Sons pendant la lecture (×1 à ×5)</label></div>
-        <div class="r"><label><input type="checkbox" id="bips" checked> Bips</label><label><input type="checkbox" id="voix" checked> Annonces vocales</label></div>
-        <div class="r"><label><input type="checkbox" id="relais"> Envoyer à la montre pendant la lecture (×1)</label><button id="testMontre">⌚ Tester</button></div>
-        <div class="r"><span>Format montre</span><select id="styleMontre"><option value="grille">Grille 3×3 (Ambit 3)</option><option value="mots">Mots (Tribord 60)</option><option value="heures">Heures (2h 60)</option><option value="fleches">Flèches (&gt; 60)</option></select></div>
-        <div class="sub" id="montreInfo"></div>
-        <h3 style="font-size:12px;text-transform:uppercase;color:var(--muted);margin:14px 0 4px">Alertes de la session <span id="evCount"></span></h3>
-        <ul id="events"></ul>
-      </div>
-    </div>
-  </main>
-  <footer>
-    <div id="ctrl">
-      <button id="play" disabled>▶</button>
-      <select id="speed"><option selected>1</option><option>2</option><option>5</option><option>10</option><option>30</option><option>60</option></select><span class="sub">× vitesse</span>
-      <span id="clock">–</span>
-      <label class="suivre"><input type="checkbox" id="follow"> Suivre</label>
-      <span class="zoom"><button id="zMoins" title="Zoom arrière">−</button><button id="zPlus" title="Zoom avant (ou pincer la frise)">+</button><button id="zTout">Tout</button><button id="zHaut" title="Hauteur de la frise">↕</button></span>
-      <span style="flex:1"></span>
-      <span class="legend"><span><i class="dot" style="background:#bf5af2"></i>montre</span><span><i class="dot" style="background:#5ac8fa"></i>veille</span><span><i class="dot" style="background:#ffd60a"></i>pré-alerte</span><span><i class="dot" style="background:var(--a1)"></i>bips</span><span><i class="dot" style="background:var(--a2)"></i>&lt; 10 m</span><span><i class="dot" style="background:var(--a3)"></i>contact</span><span><i class="dot" style="background:#5ac8fa"></i>marée</span><span>fond : <i class="dot" style="background:#6e6a66"></i>roche <i class="dot" style="background:#c2a46b"></i>sable, vase</span><span><i class="dot" style="background:#ff3b30"></i>eau mini</span></span>
-    </div>
-    <div id="lecture">
-      <span class="val"><i class="jauge" id="jFond" style="--c:#c2a46b"></i><b id="lFond">–</b><small>fond sous le rider</small></span>
-      <span class="val"><i class="jauge" id="jEau" style="--c:#5ac8fa"></i><b id="lEau">–</b><small>hauteur d'eau</small></span>
-      <span class="val" id="valVit"><i class="jauge" id="jVit" style="--c:#ff6482"></i><b id="lVit">–</b><small>vitesse</small></span>
-      <label class="suivre"><input type="checkbox" id="cVit"> Vitesse</label>
-      <span class="fen" id="lFen"></span>
-    </div>
-    <canvas id="tl"></canvas>
-  </footer>
+<body data-onglet="seances">
+<div id="tete">
+  <a class="ico" href="seances.html" id="retour" title="Séances">‹</a>
+  <div id="titreS"><b id="titre">Séance</b><span id="sousTitre">Ouvre une séance depuis l'onglet Séances</span></div>
+  <button class="ico" id="bSauts" hidden title="Bilan des sauts">⤴</button>
+  <button class="ico" id="bMenu" title="Menu">⋮</button>
 </div>
+<div id="scene">
+  <div id="principal">
+    <div class="vue" id="map"></div>
+  </div>
+  <div id="reserve" hidden>
+    <div class="vue" id="boxRadar"><canvas id="radar"></canvas><div id="msg"></div>
+      <div id="stats"><div><b id="sH">–</b><span>eau (m)</span></div><div><b id="sV">–</b><span id="sVu">km/h</span></div><div><b id="sCap">–</b><span>cap</span></div></div></div>
+    <div class="vue" id="boxMontre"><div class="montre" id="apercu" title="Aperçu en direct ; le cadran clignote en violet à chaque envoi vers la montre"><b>montre</b>–</div>
+      <div class="sub legendeMontre" style="margin-top:8px">aperçu en direct · <span style="color:#bf5af2">violet = envoyé</span></div></div>
+    <div class="vue" id="boxSauts"><canvas id="cMed"></canvas><div class="bas"><span class="sub" id="medSautTxt" style="flex:1"></span><button id="medBilan">Bilan des sauts</button></div></div>
+  </div>
+  <div id="medaillon"><div class="contenu" id="medContenu"></div><div class="capot" id="medCapot" title="Échanger avec la vue principale"></div><span class="lab" id="medLab"></span></div>
+  <div id="medChoix"><button data-v="radar">Radar</button><button data-v="montre">Montre</button><button data-v="sauts" id="medChoixSauts">Sauts</button><button data-v="masquer">Masquer</button></div>
+  <button id="medAfficher" hidden>▣ Médaillon</button>
+  <div id="legendeC"><div class="modes"><button data-v="vitesse">Vitesse</button><button data-v="profondeur">Profondeur</button><button data-v="aucune">Aucune</button></div>
+    <div id="legendeGrad"><div class="grad" id="gradC"></div><div class="ech"><span id="gradMin"></span><span id="gradMil"></span><span id="gradMax"></span></div></div></div>
+  <div id="bandeauEx" hidden></div>
+</div>
+<div id="bas">
+  <div id="ctrl">
+    <button id="play" disabled>▶</button>
+    <select id="speed" title="Vitesse de lecture"><option selected>1</option><option>2</option><option>5</option><option>10</option><option>30</option><option>60</option></select>
+    <span id="clock">–</span>
+    <label class="suivre"><input type="checkbox" id="follow"> Suivre</label>
+    <span class="zoom"><button id="zMoins" title="Zoom arrière">−</button><button id="zPlus" title="Zoom avant (ou pincer la frise)">+</button><button id="zTout">Tout</button><button id="zHaut" title="Hauteur de la frise">↕</button></span>
+  </div>
+  <div id="lecture">
+    <span class="val"><i class="jauge" id="jFond" style="--c:#c2a46b"></i><b id="lFond">–</b><small>fond sous le rider</small></span>
+    <span class="val"><i class="jauge" id="jEau" style="--c:#5ac8fa"></i><b id="lEau">–</b><small>hauteur d'eau</small></span>
+    <span class="val" id="valVit"><i class="jauge" id="jVit" style="--c:#ff6482"></i><b id="lVit">–</b><small>vitesse</small></span>
+    <label class="suivre"><input type="checkbox" id="cVit"> Vitesse</label>
+    <span class="fen" id="lFen"></span>
+  </div>
+  <canvas id="tl"></canvas>
+  <div class="poignee" id="poignee"></div>
+  <div id="resume" title="Tous les chiffres de la séance"></div>
+</div>
+
+<!-- feuille : menu ⋮ -->
+<div class="feuilleR" id="fMenu" hidden><div class="in"><div class="poignee"></div><div class="menuF" id="menuListe"></div></div></div>
+<!-- feuille : tous les chiffres -->
+<div class="feuilleR" id="fResume" hidden><div class="in"><div class="poignee"></div>
+  <div style="display:flex;align-items:center;gap:8px;margin:6px 0 2px"><i class="dot" id="rSportDot"></i><b id="rSport" style="flex:1;font-size:15px"></b></div>
+  <div class="sub" id="rComm" style="margin-bottom:8px"></div>
+  <div class="grilleR" id="rGrille"></div>
+  <div class="sub" id="info" style="margin-top:10px">Charge une séance pour rejouer les alertes du radar.</div>
+</div></div>
+<!-- feuille : réglages du rejeu -->
+<div class="feuilleR" id="fReglages" hidden><div class="in"><div class="poignee"></div><h2>Réglages du rejeu</h2>
+  <div id="settings">
+    <div class="r" id="vRow" hidden><span>Trace sans heures : vitesse supposée (km/h)</span><input type="number" id="vSupp" step="1" min="3" value="22"></div>
+    <div class="r"><span>Marée</span>
+      <select id="tideMode"><option value="mesure">Mesurée (marégraphe)</option><option value="prevue">Prédite (modèle)</option><option value="forcee">Forcée</option></select>
+    </div>
+    <div class="r" id="forceRow" hidden><input type="range" id="forceH" min="0" max="14" step="0.1" value="6" style="flex:1"><b id="forceTxt">6.0 m</b></div>
+    <div class="sub" id="tideInfo"></div>
+    <div class="r"><span>Eau minimale (m)</span><input type="number" id="seuil" step="0.1" min="0.5" value="2.0"></div>
+    <div class="r"><span>Alertes dès (km/h)</span><input type="number" id="vmin" step="1" min="0" value="8"></div>
+    <div class="r"><span>Anticipation (s)</span><input type="number" id="antic" step="1" min="3" value="7"></div>
+    <div class="r"><span>Angle d'alerte (±°)</span><input type="number" id="coneAlerte" step="5" min="10" max="110" value="50"></div>
+    <div class="r"><label><input type="checkbox" id="preAlerte" checked> Pré-alerte (2× la distance)</label><span>±</span><input type="number" id="conePre" step="5" min="5" max="150" value="10" style="width:56px"><span>°</span></div>
+    <div class="r"><label><input type="checkbox" id="veille" checked> Veille latérale jusqu'à</label><input type="number" id="coneVeille" step="5" min="30" max="170" value="110" style="width:56px"><span>°</span></div>
+    <div class="r"><label><input type="checkbox" id="smooth"> Fonds lisses aussi</label></div>
+    <div class="r"><label><input type="checkbox" id="sound" checked> Sons pendant la lecture (×1 à ×5)</label></div>
+    <div class="r"><label><input type="checkbox" id="bips" checked> Bips</label><label><input type="checkbox" id="voix" checked> Annonces vocales</label></div>
+    <div class="r"><label><input type="checkbox" id="relais"> Envoyer à la montre pendant la lecture (×1)</label><button id="testMontre">⌚ Tester</button></div>
+    <div class="r"><span>Format montre</span><select id="styleMontre"><option value="grille">Grille 3×3 (Ambit 3)</option><option value="mots">Mots (Tribord 60)</option><option value="heures">Heures (2h 60)</option><option value="fleches">Flèches (&gt; 60)</option></select></div>
+    <div class="sub" id="montreInfo"></div>
+    <div class="sub" style="margin-top:10px">Alertes : <span id="evCount"></span></div>
+    <h2>Légende de la frise</h2>
+    <div class="legend"><span><i class="dot" style="background:#bf5af2"></i>montre</span><span><i class="dot" style="background:#5ac8fa"></i>veille</span><span><i class="dot" style="background:#ffd60a"></i>pré-alerte</span><span><i class="dot" style="background:var(--a1)"></i>bips</span><span><i class="dot" style="background:var(--a2)"></i>&lt; 10 m</span><span><i class="dot" style="background:var(--a3)"></i>contact</span><span><i class="dot" style="background:#fff"></i>saut</span><span>fond : <i class="dot" style="background:#6e6a66"></i>roche <i class="dot" style="background:#c2a46b"></i>sable, vase</span><span><i class="dot" style="background:#ff3b30"></i>eau mini</span></div>
+  </div>
+</div></div>
+<!-- feuille : modifier la séance -->
+<div class="feuilleR" id="fModif" hidden><div class="in"><div class="poignee"></div><h2>Sport</h2>
+  <div class="sportsM" id="mSports"></div>
+  <h2>Commentaire</h2><textarea id="mComm" placeholder="Matériel, conditions…"></textarea>
+  <h2>Lieu</h2><input id="mLieu" placeholder="Lieu">
+  <div style="display:flex;gap:8px;margin-top:14px"><button id="mAnnul" style="flex:1">Annuler</button><button class="primary" id="mOk" style="flex:1">Enregistrer</button></div>
+</div></div>
+<input type="file" id="gpxFile" accept=".gpx,.fit,.jsonl,application/gpx+xml" hidden>
 <div id="busy" hidden></div>
 <div id="sautsPan" hidden>
   <div class="fTete"><h2>Sauts</h2><span class="sub" id="sautsSous"></span><button class="x" id="sautsX" title="Fermer">✕</button></div>
@@ -232,6 +261,8 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="relief.js"></script>
 <script src="noyau.js"></script>
+<script src="traces.js"></script>
+<script src="seances.js"></script>
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
@@ -250,8 +281,8 @@ const geopf = (layer, fmt, maxNative) => L.tileLayer('https://data.geopf.fr/wmts
   '&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=' + fmt, { maxZoom: 20, maxNativeZoom: maxNative, attribution: '© IGN / SHOM' });
 geopf('ORTHOIMAGERY.ORTHOPHOTOS', 'image/jpeg', 19).addTo(map);
 const shom = geopf('GEOGRAPHICALGRIDSYSTEMS.COASTALMAPS', 'image/png', 16).setOpacity(0.55).addTo(map);
-L.control.layers(null, { 'Carte SHOM': shom }).addTo(map);
-L.control.scale({ imperial: false }).addTo(map);
+L.control.layers(null, { 'Carte SHOM': shom }, { position: 'topleft' }).addTo(map); // à gauche : le médaillon occupe le coin droit
+L.control.scale({ imperial: false, position: 'bottomright' }).addTo(map);
 
 // Dangers Litto3D à la hauteur d'eau courante (zoom ≥ 15)
 let Wmap = null;
@@ -302,124 +333,8 @@ let pts = [], dernierGPX = null, notifs = [];       // { t, lat, lon, v (m/s), c
 let tMeasured = null; // fonction (marégraphe g, t) -> hauteur mesurée, si disponible
 
 let sansHeure = false;
-function lireGPX(txt, nom) {
-  const doc = new DOMParser().parseFromString(txt, 'application/xml');
-  let out = [];
-  const tous = [...doc.getElementsByTagName('trkpt'), ...doc.getElementsByTagName('rtept')];
-  for (const p of tous) {
-    const tm = p.getElementsByTagName('time')[0];
-    const t = tm ? Date.parse(tm.textContent) : NaN, lat = +p.getAttribute('lat'), lon = +p.getAttribute('lon');
-    if (!isFinite(lat) || !isFinite(lon)) continue;
-    out.push({ t, lat, lon });
-  }
-  sansHeure = out.length > 0 && out.filter(p => isFinite(p.t)).length < out.length / 2;
-  if (sansHeure) {
-    // heure de départ : métadonnées, sinon nom du fichier (…2026-10-04T14-06-35Z…), sinon maintenant
-    const mt = doc.querySelector('metadata > time');
-    const m = (doc.querySelector('metadata > name')?.textContent + ' ' + nom).match(/(\d{4}-\d\d-\d\d)T(\d\d)[-:](\d\d)[-:](\d\d)Z/);
-    let t = mt ? Date.parse(mt.textContent) : m ? Date.parse(`${m[1]}T${m[2]}:${m[3]}:${m[4]}Z`) : Date.now();
-    const v = Math.max(1, +$('vSupp').value) / 3.6;
-    out = out.map((p, i) => {
-      if (i) { const q = out[i - 1]; t += 1000 * Math.hypot((p.lon - q.lon) * 111320 * Math.cos(p.lat * Math.PI / 180), (p.lat - q.lat) * 110540) / v; }
-      return { t, lat: p.lat, lon: p.lon };
-    });
-  }
-  return completer(out);
-}
-// Fichier FIT (format natif des montres) : messages « record » = heure, position, vitesse mesurée
-function lireFIT(buf) {
-  const dv = new DataView(buf), hs = dv.getUint8(0), fin = hs + dv.getUint32(4, true);
-  if (String.fromCharCode(dv.getUint8(8), dv.getUint8(9), dv.getUint8(10), dv.getUint8(11)) !== '.FIT') throw new Error('fichier FIT invalide');
-  const defs = {}, out = [], EPOCH = 631065600000, SEMI = 180 / 2 ** 31;
-  const champsDev = {}; // « indexDev/numéro » -> nom, d'après les messages field_description (206) : champs Connect IQ
-  brutFIT = [];
-  let pos = hs, lastTs = 0;
-  while (pos < fin) {
-    const h = dv.getUint8(pos++);
-    let local, compTs = null;
-    if (h & 0x80) { local = (h >> 5) & 3; compTs = h & 0x1f; }
-    else if (h & 0x40) { // définition
-      local = h & 0x0f;
-      const le = dv.getUint8(pos + 1) === 0, glob = dv.getUint16(pos + 2, le), n = dv.getUint8(pos + 4);
-      pos += 5;
-      const fields = [];
-      for (let i = 0; i < n; i++, pos += 3) fields.push({ num: dv.getUint8(pos), size: dv.getUint8(pos + 1) });
-      let devSize = 0; const dev = [];
-      if (h & 0x20) { const nd = dv.getUint8(pos++); for (let i = 0; i < nd; i++, pos += 3) { dev.push({ num: dv.getUint8(pos), size: dv.getUint8(pos + 1), idx: dv.getUint8(pos + 2) }); devSize += dv.getUint8(pos + 1); } }
-      defs[local] = { le, glob, fields, devSize, dev };
-      continue;
-    } else local = h & 0x0f;
-    const d = defs[local];
-    if (!d) throw new Error('FIT : message sans définition');
-    const rec = {};
-    for (const f of d.fields) {
-      if (d.glob === 206) { // field_description : 0 index du développeur, 1 numéro du champ, 3 nom
-        if (f.num === 0 || f.num === 1) rec[f.num] = dv.getUint8(pos);
-        else if (f.num === 3) { let n = ''; for (let i = 0; i < f.size; i++) { const c = dv.getUint8(pos + i); if (!c) break; n += String.fromCharCode(c); } rec[3] = n; }
-      }
-      if (d.glob === 20 || d.glob === 0) {
-        if (f.size === 4) rec[f.num] = f.num === 0 || f.num === 1 ? dv.getInt32(pos, d.le) : dv.getUint32(pos, d.le);
-        else if (f.size === 2) rec[f.num] = dv.getUint16(pos, d.le);
-      }
-      if (d.glob === 285) { // jump (sauts natifs Garmin) : 0 distance, 1 hauteur, 3 temps de vol (flottants), 2 rotations, 5-6 position, 7/8 vitesse
-        if (f.size === 4 && (f.num <= 4)) rec[f.num] = dv.getFloat32(pos, d.le);
-        else if (f.num === 5 || f.num === 6) rec[f.num] = dv.getInt32(pos, d.le);
-        else if (f.size === 4) rec[f.num] = dv.getUint32(pos, d.le);
-        else if (f.size === 2) rec[f.num] = dv.getUint16(pos, d.le);
-        else if (f.size === 1) rec[f.num] = dv.getUint8(pos);
-      }
-      pos += f.size;
-    }
-    const devVal = {};
-    for (const f of d.dev) { // champs Connect IQ : flottants sur 4 octets (sauts de l'appli montre)
-      const nom = champsDev[f.idx + '/' + f.num];
-      if (nom && f.size === 4) devVal[nom] = dv.getFloat32(pos, d.le);
-      else if (nom && /^acc_[xyz]$/.test(nom) && f.size >= 4) { const a = []; for (let i = 0; i + 1 < f.size; i += 2) a.push(dv.getInt16(pos + i, d.le)); devVal[nom] = a; }
-      pos += f.size;
-    }
-    if (d.glob === 206 && rec[3]) champsDev[rec[0] + '/' + rec[1]] = rec[3];
-    if (rec[253] != null) lastTs = rec[253];
-    else if (compTs != null) lastTs = (compTs >= (lastTs & 0x1f) ? lastTs - (lastTs & 0x1f) + compTs : lastTs - (lastTs & 0x1f) + 32 + compTs);
-    if (d.glob === 20 && devVal.acc_x && devVal.acc_y && devVal.acc_z && devVal.acc_x[0] !== 32767) brutFIT.push({ t: EPOCH + lastTs * 1000, x: devVal.acc_x, y: devVal.acc_y, z: devVal.acc_z }); // 32767 : seconde sans mesure
-    if (d.glob === 285 && rec[3] > 0 && rec[3] < 10) {
-      const vN = rec[8] != null && rec[8] !== 0xffffffff ? rec[8] / 1000 : rec[7] != null && rec[7] !== 0xffff ? rec[7] / 1000 : null;
-      sautsJournal.push({ t: EPOCH + lastTs * 1000, vol: Math.round(rec[3] * 100) / 100, h: isFinite(rec[1]) && rec[1] > 0 ? Math.round(rec[1] * 10) / 10 : Math.round(9.81 * rec[3] * rec[3] / 8 * 10) / 10,
-        dNat: isFinite(rec[0]) && rec[0] > 0 ? rec[0] : null, vNat: vN, rot: rec[2] != null && rec[2] !== 0xff ? rec[2] : null, natif: true });
-      continue;
-    }
-    if (d.glob !== 20 || rec[0] == null || rec[1] == null || rec[0] === 0x7fffffff || rec[1] === 0x7fffffff) continue;
-    const v = rec[73] != null && rec[73] !== 0xffffffff ? rec[73] / 1000 : rec[6] != null && rec[6] !== 0xffff ? rec[6] / 1000 : null;
-    out.push({ t: EPOCH + lastTs * 1000, lat: rec[0] * SEMI, lon: rec[1] * SEMI, vDev: v });
-    if (devVal.saut > 0) sautsJournal.push({ t: EPOCH + lastTs * 1000, h: Math.round(devVal.saut * 10) / 10, vol: Math.round((devVal.saut_vol || 0) * 100) / 100, moy: devVal.saut_moy > 0 ? devVal.saut_moy : null, montre: true }); // sauts de l'appli montre
-  }
-  sansHeure = false;
-  return completer(out);
-}
-// Journal de session de l'appli (.jsonl) : une position par ligne « pos » (la, lo, v en km/h) ; l'en-tête « debut »
-// donne les réglages du radar pendant la séance, repris dans le rejeu pour retrouver les mêmes alertes
+// Lecture des fichiers : traces.js (commun avec la liste des séances)
 let reglagesJournal = null, sautsJournal = [], exempleJournal = null, chocsJournal = [], brutFIT = [];
-function lireJournal(txt) {
-  const out = []; reglagesJournal = null; sautsJournal = []; exempleJournal = null; chocsJournal = []; brutFIT = [];
-  for (const l of txt.split('\n')) {
-    if (!l.trim()) continue;
-    let e; try { e = JSON.parse(l); } catch { continue; }
-    if (e.type === 'debut') { reglagesJournal = reglagesJournal || e.reglages || null; exempleJournal = exempleJournal || e.exemple || null; } // plusieurs journaux : réglages de la première séance
-    else if (e.type === 'saut' && !e.ecarte && !pompage(e)) sautsJournal.push(e); // les candidats écartés (pompage, vitesse) restent dans le journal
-    else if (e.type === 'choc') chocsJournal.push(e); // chocs sans phase allégée (candidats sauts de kite, depuis le 13/11)
-    else if (e.type === 'pos' && isFinite(e.la) && isFinite(e.lo) && !e.sim) out.push({ t: e.t, lat: e.la, lon: e.lo, vDev: e.v != null ? e.v / 3.6 : null });
-  }
-  sansHeure = false;
-  return completer(out);
-}
-// Journaux d'avant le filtre du 26/10 (pas de champ « ecarte ») : même critère que SautPlugin.enVol sur la courbe
-// (25 Hz, décollage à 2 s) — vrai vol si moyenne < 0,35 g et au moins 70 % des mesures sous 0,6 g
-function pompage(e) {
-  if (!Array.isArray(e.courbe) || e.courbe.length < 60) return false;
-  const hz = e.hz || 25, i0 = Math.round((e.avant ?? 2) * hz), vol = e.courbe.slice(i0, i0 + Math.round(e.vol * hz));
-  if (vol.length < 10) return true;
-  const moy = vol.reduce((s, a) => s + a, 0) / vol.length, bas = vol.filter(a => a < 0.6).length;
-  return !(moy < 0.35 && bas >= 0.7 * vol.length);
-}
 function appliquerReglagesJournal() {
   const r = reglagesJournal; if (!r) return '';
   const pris = [];
@@ -430,22 +345,6 @@ function appliquerReglagesJournal() {
   }
   return pris.length ? ' · réglages de la séance repris' : '';
 }
-// Vitesse (mesurée par la montre si disponible) et cap sur une fenêtre de ±2 s (lisse le bruit GPS)
-function completer(out) {
-  out = out.filter((p, i, a) => isFinite(p.t) && (i === 0 || p.t > a[i - 1].t));
-  for (let i = 0; i < out.length; i++) {
-    let a = i, b = i;
-    while (a > 0 && out[i].t - out[a - 1].t <= 2000) a--;
-    while (b < out.length - 1 && out[b + 1].t - out[i].t <= 2000) b++;
-    if (a === b) { a = Math.max(0, i - 1); b = Math.min(out.length - 1, i + 1); }
-    const p = out[a], q = out[b], kx = 111320 * Math.cos(p.lat * Math.PI / 180);
-    const dx = (q.lon - p.lon) * kx, dy = (q.lat - p.lat) * 110540, dt = (q.t - p.t) / 1000 || 1;
-    out[i].v = out[i].vDev != null ? out[i].vDev : Math.hypot(dx, dy) / dt;
-    out[i].cap = Math.hypot(dx, dy) > 1 ? (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360 : (i ? out[i - 1].cap : 0);
-  }
-  return out;
-}
-
 function hauteurAt(p) {
   const mode = $('tideMode').value;
   if (mode === 'forcee') return +$('forceH').value;
@@ -528,15 +427,20 @@ function busy(txt) { $('busy').hidden = !txt; if (txt) $('busy').textContent = t
 
 function dessinerTrace() {
   trackLayer.clearLayers();
+  // trace de base : couleur selon le réglage (vitesse, profondeur) par petits tronçons de même teinte, ou bleu uni
+  const e = echelleTrace(), base = e ? RAMPE[modeTrace] : null, cle = p => { const x = e && e.f(p); return x == null ? -1 : Math.round(Math.max(0, Math.min(1, x)) * 16); };
+  let run = [pts[0]], k = e ? cle(pts[0]) : 0;
+  const flushB = () => run.length > 1 && L.polyline(run.map(p => [p.lat, p.lon]), { color: !e || k < 0 ? '#5ac8fa' : couleurRampe(base, k / 16), weight: 3.5, opacity: 0.95 }).addTo(trackLayer);
+  for (let i = 1; i < pts.length; i++) { run.push(pts[i]); const kk = e ? cle(pts[i]) : 0; if (kk !== k) { flushB(); run = [pts[i]]; k = kk; } }
+  flushB();
+  // alertes et pré-alertes par-dessus, plus épaisses
   const cls = p => p.lvl || (p.pre ? 'pre' : 0);
-  let run = [pts[0]], lvl = cls(pts[0]);
-  const flush = () => run.length > 1 && L.polyline(run.map(p => [p.lat, p.lon]), { color: lvl === 'pre' ? '#ffd60a' : COLS[lvl] || '#5ac8fa', weight: lvl ? 5 : 3, opacity: 0.95 }).addTo(trackLayer);
-  for (let i = 1; i < pts.length; i++) {
-    run.push(pts[i]);
-    if (cls(pts[i]) !== lvl) { flush(); run = [pts[i]]; lvl = cls(pts[i]); }
-  }
-  flush();
+  run = []; let lvl = 0;
+  const flushA = () => run.length > 1 && lvl && L.polyline(run.map(p => [p.lat, p.lon]), { color: lvl === 'pre' ? '#ffd60a' : COLS[lvl], weight: 6, opacity: 0.95 }).addTo(trackLayer);
+  for (let i = 0; i < pts.length; i++) { const c = cls(pts[i]); if (c !== lvl) { if (c && lvl) run.push(pts[i]); flushA(); run = []; lvl = c; } if (c) run.push(pts[i]); }
+  flushA();
   boat.addTo(trackLayer);
+  majLegendeC();
 }
 
 let events = [];
@@ -551,26 +455,8 @@ function listerEvenements() {
   });
   let nPre = 0; pts.forEach((p, i) => { if (p.pre && (i === 0 || !pts[i - 1].pre)) nPre++; });
   const nVeille = pts.filter(p => p.veille).length;
-  $('evCount').textContent = `(${events.length}${$('preAlerte').checked ? ` · ${nPre} pré-alerte(s)` : ''}${$('veille').checked ? ` · ${nVeille} veille(s)` : ''})`;
-  $('evCount').textContent = $('evCount').textContent.replace(/\)$/, ` · ${notifs.length} notif. montre${sautsJournal.length ? ` · ${sautsJournal.length} saut(s)` : ''})`);
-  const ul = $('events'); ul.innerHTML = '';
-  const lignes = events.map(ev => ({ t: pts[ev.debut].t, ev })).concat(notifs.map(n => ({ t: n.t, n })), sautsJournal.map(s => ({ t: s.t, s }))).sort((a, b) => a.t - b.t);
-  for (const { t, ev, n, s } of lignes) {
-    const li = document.createElement('li');
-    if (s) {
-      li.innerHTML = `<i class="dot" style="background:#fff"></i><span>${heure(t)} · <b>saut</b> ${String(s.hc ?? s.h).replace('.', ',')} m · ${String(s.vol).replace('.', ',')} s de vol${s.hBaro != null ? ` · baromètre ${String(s.hBaro).replace('.', ',')} m` : ''}</span>`;
-      li.onclick = () => seek(t - 3000);
-    } else if (ev) {
-      const p = pts[ev.debut];
-      li.innerHTML = `<i class="dot" style="background:${COLS[ev.max]}"></i><span>${heure(p.t)} · ${ev.max === 3 ? 'contact' : ev.max === 2 ? 'moins de 10 m' : 'bips'} · ${Math.round(ev.dmin)} m mini · ${Math.round((pts[ev.fin].t - p.t) / 1000)} s · eau ${p.W.toFixed(1)} m</span>`;
-      li.onclick = () => { seek(p.t - 10000); map.setView([p.lat, p.lon], Math.max(map.getZoom(), 17)); };
-    } else {
-      li.innerHTML = `<i class="dot" style="background:#bf5af2"></i><span class="sub">${heure(t)} · ⌚ <b></b> : <span></span></span>`;
-      li.querySelector('b').textContent = n.titre; li.querySelector('span span').textContent = n.texte;
-      li.onclick = () => seek(t - 3000);
-    }
-    ul.appendChild(li);
-  }
+  $('evCount').textContent = `${events.length}${$('preAlerte').checked ? ` · ${nPre} pré-alerte(s)` : ''}${$('veille').checked ? ` · ${nVeille} veille(s)` : ''} · ${notifs.length} notif. montre`;
+  majResume();
 }
 const heure = t => new Date(t).toLocaleTimeString('fr-FR');
 
@@ -674,7 +560,7 @@ function dessinerFrise() {
   if (pi) { g.fillStyle = '#5ac8fa'; g.beginPath(); g.arc(xc, yZ(pi.W), 4 * k, 0, 7); g.fill(); }
   if (pi && vitOn) { g.fillStyle = '#ff6482'; g.beginPath(); g.arc(xc, yV(pc.speed * 3.6), 4 * k, 0, 7); g.fill(); }
   $('valVit').hidden = !vitOn;
-  if (vitOn) { $('lVit').textContent = Math.round(pc.speed * 3.6) + ' km/h'; $('lVit').nextElementSibling.textContent = 'vitesse · ' + (pc.speed * 1.944).toFixed(1).replace('.', ',') + ' nœuds'; }
+  if (vitOn) { const vv = Seances.vit(pc.speed); $('lVit').textContent = vv.n + ' ' + vv.u; $('lVit').nextElementSibling.textContent = 'vitesse'; }
   // jauges façon Suunto : valeur à l'instant sur l'étendue de la portion affichée
   const prs = visibles.map(p => p.prof).filter(v => v != null && v !== Infinity);
   const jauge = (el, v, a, b) => { el.style.setProperty('--n', v == null || !(b > a) ? 0 : Math.max(0.04, Math.min(1, (v - a) / (b - a)))); };
@@ -746,7 +632,7 @@ $('follow').onchange = () => { try { localStorage.setItem('rejeu.suivre', $('fol
 try { $('cVit').checked = localStorage.getItem('rejeu.vitesse') === '1'; } catch {}
 $('cVit').onchange = () => { try { localStorage.setItem('rejeu.vitesse', $('cVit').checked ? '1' : '0'); } catch {} dessinerFrise(); };
 $('zMoins').onclick = () => vueZoom(1.6); $('zPlus').onclick = () => vueZoom(0.6); $('zTout').onclick = () => { vueTout(); recadrerCarte(); };
-addEventListener('resize', () => { dessinerFrise(); resizeRadar(); });
+addEventListener('resize', () => { dessinerFrise(); resizeRadar(); map.invalidateSize(); dessinerMed(); });
 
 // =====================================================================
 // Bilan des sauts (appli montre : champs Connect IQ du FIT ; téléphone : journal ; Garmin : message « jump » natif)
@@ -774,16 +660,17 @@ function preparerSauts() {
     hauteurCorrigee(r);
     return r;
   });
-  $('sautsBtn').hidden = !sauts.length;
-  $('sautsBtn').textContent = `⤴ ${sauts.length} saut${sauts.length > 1 ? 's' : ''}`;
-  if (!sauts.length) { $('sautsPan').hidden = true; return; }
-  const hmax = Math.max(...sauts.map(s => s.hc), 0.1);
+  $('bSauts').hidden = !sauts.length;
+  if (!sauts.length) { $('sautsPan').hidden = true; if (vueMed === 'sauts' || vuePrinc === 'sauts') { if (vuePrinc === 'sauts') vuePrinc = 'carte'; vueMed = 'radar'; } placerVues(); return; }
+  // pastilles sur la trace : hauteur inscrite, couleur d'autant plus claire que le saut est haut ; toucher = curseur + médaillon
+  const hmax = Math.max(...sauts.map(s => s.hc), 0.1), RS = ['#7fbfe6', '#5ee6d6', '#b9f3c9', '#f4f7a8'];
   for (const s of sauts) {
-    const m = L.circleMarker([s.lat, s.lon], { radius: 4 + 6 * s.hc / hmax, color: '#04221f', weight: 1.5, fillColor: '#5ee6d6', fillOpacity: 0.9 })
-      .bindTooltip(`Saut ${s.n} · ${fr(s.hc)} m · ${fr(s.vol, 2)} s`, { direction: 'top' });
-    m.on('click', () => ouvrirSauts(s)); m.addTo(sautsLayer);
+    const ic = L.divIcon({ className: 'pastilleSaut', html: `<span style="background:${couleurRampe(RS, s.hc / hmax)}">${fr(s.hc)}</span>`, iconSize: [0, 0] });
+    const m = L.marker([s.lat, s.lon], { icon: ic, zIndexOffset: 500 + Math.round(s.hc * 100), title: `Saut ${s.n} · ${fr(s.hc)} m · ${fr(s.vol, 2)} s` });
+    m.on('click', () => choisirSaut(s)); m.addTo(sautsLayer);
   }
   sautSel = sauts.reduce((a, b) => b.hc > a.hc ? b : a);
+  placerVues();
   if (!$('sautsPan').hidden) dessinerSauts();
 }
 // Courbes de la montre reconstituées depuis les accélérations brutes du FIT (25 mesures par enregistrement d'une seconde) :
@@ -826,7 +713,6 @@ function hauteurCorrigee(s) {
   if (s.moy != null && s.moy >= 0 && s.moy < 1) { s.hc = Math.round((1 - s.moy) * 9.81 * s.vol * s.vol / 8 * 10) / 10; s.calc = 'portance moyenne'; }
 }
 function ouvrirSauts(s) { if (s) sautSel = s; $('sautsPan').hidden = false; dessinerSauts(); }
-$('sautsBtn').onclick = () => $('sautsPan').hidden ? ouvrirSauts() : ($('sautsPan').hidden = true);
 $('sautsX').onclick = () => { $('sautsPan').hidden = true; };
 $('sautsTous').onclick = () => { sautsTous = !sautsTous; dessinerSauts(); };
 addEventListener('resize', () => { if (!$('sautsPan').hidden) dessinerSauts(); });
@@ -844,26 +730,28 @@ function dessinerSauts() {
     + tuile(fr(best('hc').hc), 'm', 'plus haut') + tuile(fr(best('vol').vol, 2), 's', 'plus long vol')
     + tuile(Math.round(best('d').d), 'm', 'plus loin') + tuile(fr(tAir, 0), 's', 'en l\'air au total')
     + tuile(serie, '', serie > 1 ? `en 10 min dès ${new Date(sT).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : 'meilleure série');
-  dessinerTraj(); detailSaut(); dessinerFil(); repartition(); classement();
+  dessinerTraj(); detailSaut(); dessinerFil(); repartition(); classement(); dessinerMed();
 }
 
 // Trajectoires superposées : chaque saut dessiné comme sa parabole depuis le même point de décollage ;
 // le saut choisi en blanc, les autres en turquoise d'autant plus opaque qu'ils sont hauts ; silhouette de 1,80 m pour l'échelle
 let geoTraj = null;
-function dessinerTraj() {
-  const c = $('cTraj'), { g, k, W, H } = toile(c);
+function dessinerTraj(c = $('cTraj')) {
+  const { g, k, W, H } = toile(c);
+  if (!W || !H) return;
+  const petit = W < 260 * k, txt = petit ? () => {} : g.fillText.bind(g); // médaillon : courbes seules, sans textes
   const dmax = Math.max(4, ...sauts.map(s => s.d)) * 1.08, hmax = Math.max(2, ...sauts.map(s => s.hc), sautSel ? sautSel.hLibre : 0) * 1.18;
-  const L0 = 34 * k, B0 = H - 24 * k, T0 = 10 * k, u = 1.8 / hmax * (B0 - T0) / 7.5; // u : module de la silhouette
+  const L0 = (petit ? 8 : 34) * k, B0 = H - (petit ? 10 : 24) * k, T0 = 10 * k, u = 1.8 / hmax * (B0 - T0) / 7.5; // u : module de la silhouette
   const R0 = W - 3.4 * u - 10 * k;
   const X = d => L0 + d / dmax * (R0 - L0), Y = h => B0 - h / hmax * (B0 - T0);
-  geoTraj = { X, Y };
+  if (c.id === 'cTraj') geoTraj = { X, Y };
   // graduations
   const pasH = hmax > 6 ? 2 : hmax > 3 ? 1 : 0.5;
   g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = k; g.fillStyle = '#5d7a80'; g.textAlign = 'right';
-  for (let h = pasH; h < hmax; h += pasH) { g.beginPath(); g.moveTo(L0, Y(h)); g.lineTo(R0, Y(h)); g.stroke(); g.fillText(fr(h, pasH < 1 ? 1 : 0) + ' m', L0 - 4 * k, Y(h) + 4 * k); }
+  for (let h = pasH; h < hmax; h += pasH) { g.beginPath(); g.moveTo(L0, Y(h)); g.lineTo(R0, Y(h)); g.stroke(); txt(fr(h, pasH < 1 ? 1 : 0) + ' m', L0 - 4 * k, Y(h) + 4 * k); }
   g.textAlign = 'center';
   const pasD = dmax > 30 ? 10 : dmax > 12 ? 5 : 2;
-  for (let d = pasD; d < dmax; d += pasD) g.fillText(d + ' m', X(d), H - 6 * k);
+  for (let d = pasD; d < dmax; d += pasD) txt(d + ' m', X(d), H - 6 * k);
   // eau : vaguelettes
   g.fillStyle = 'rgba(90,200,250,.16)'; g.beginPath(); g.moveTo(0, H);
   for (let x = 0; x <= W; x += 4 * k) g.lineTo(x, B0 + 2 * k + Math.sin(x / (9 * k)) * 2 * k);
@@ -877,7 +765,7 @@ function dessinerTraj() {
   g.beginPath(); g.arc(xs, yT + u, u, 0, 7); g.fill();
   g.beginPath(); g.moveTo(xs, yT + 2 * u); g.lineTo(xs, yT + 4.6 * u); g.moveTo(xs, yT + 4.6 * u); g.lineTo(xs - 1.3 * u, yP); g.moveTo(xs, yT + 4.6 * u); g.lineTo(xs + 1.3 * u, yP);
   g.moveTo(xs - 1.6 * u, yT + 3.6 * u); g.lineTo(xs, yT + 2.6 * u); g.lineTo(xs + 1.6 * u, yT + 3.6 * u); g.stroke();
-  g.textAlign = 'center'; g.fillText('1,80 m', xs, T0 + 2 * k); g.lineCap = 'butt';
+  g.textAlign = 'center'; txt('1,80 m', xs, T0 + 2 * k); g.lineCap = 'butt';
   // trajectoires : les autres d'abord, le choisi par-dessus
   const arc = (s, couleur, ep, libre) => { // profil intégré si connu, sinon parabole de la hauteur retenue (ou de chute libre)
     g.strokeStyle = couleur; g.lineWidth = ep; g.beginPath();
@@ -895,7 +783,7 @@ function dessinerTraj() {
     const xa = X(sautSel.d * im), ya = Y(sautSel.hc);
     g.fillStyle = '#fff'; g.beginPath(); g.arc(xa, ya, 4 * k, 0, 7); g.fill();
     g.font = `600 ${12 * k}px system-ui`; g.textAlign = xa > W * 0.6 ? 'right' : 'left';
-    g.fillText(`${fr(sautSel.hc)} m · ${fr(sautSel.vol, 2)} s · ${Math.round(sautSel.d)} m`, xa + (xa > W * 0.6 ? -8 : 8) * k, Math.max(T0 + 10 * k, ya - 6 * k));
+    txt(`${fr(sautSel.hc)} m · ${fr(sautSel.vol, 2)} s · ${Math.round(sautSel.d)} m`, xa + (xa > W * 0.6 ? -8 : 8) * k, Math.max(T0 + 10 * k, ya - 6 * k));
   }
   g.textAlign = 'left';
 }
@@ -1024,7 +912,7 @@ function rendre(sonner = false) {
   $('apercu').innerHTML = '<b></b><span></span>';
   $('apercu').firstChild.textContent = g ? g.titre : 'montre'; $('apercu').lastChild.textContent = g ? (g.lignes ? g.texte.replace(/ /g, '\n') : g.texte) : '–';
   if (playing && relais.actif && +$('speed').value === 1) relaisPas(cur, analysis, fix.course, armed, tt => hauteurAt({ lon: fix.lon, t: tt }));
-  $('sH').textContent = W.toFixed(1); $('sV').textContent = (fix.speed * 3.6).toFixed(0); $('sCap').textContent = Math.round(fix.course) + '°';
+  $('sH').textContent = W.toFixed(1); { const vv = Seances.vit(fix.speed, 0); $('sV').textContent = vv.n; $('sVu').textContent = vv.u; } $('sCap').textContent = Math.round(fix.course) + '°';
   $('clock').textContent = `${heure(cur)}  (+${fmtDuree(cur - pts[0].t)})`;
   boat.setLatLng([fix.lat, fix.lon]);
   if ($('follow').checked && !map.getBounds().pad(-0.2).contains(boat.getLatLng())) map.panTo(boat.getLatLng(), { animate: false });
@@ -1081,51 +969,62 @@ const recalc = () => { clearTimeout(recalcTimer); recalcTimer = setTimeout(calcu
 ['seuil', 'vmin', 'antic', 'coneAlerte', 'conePre', 'coneVeille', 'preAlerte', 'veille', 'smooth', 'tideMode'].forEach(k => $(k).onchange = recalc);
 $('forceH').oninput = () => { $('forceTxt').textContent = (+$('forceH').value).toFixed(1) + ' m'; };
 $('forceH').onchange = recalc;
-$('vSupp').onchange = () => dernierGPX && ouvrirTrace(...dernierGPX);
 
-$('gpxBtn').onclick = () => $('gpxFile').click();
+// =====================================================================
+// Ouverture : une séance (liste des séances), un journal (Plus → Journaux), un exemple ou un fichier
+// =====================================================================
+let seanceCourante = null;   // séance de Seances.liste() (titre, sport, commentaire), ou null (fichier ouvert directement)
+let contenusCourants = [];   // [{ contenu, nom, src }] pour l'export
 $('gpxFile').onchange = async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-  try { await ouvrirTrace(/\.fit$/i.test(f.name) ? await f.arrayBuffer() : await f.text(), f.name); } catch (err) { alert('Trace illisible : ' + err.message); }
+  try { const src = await Seances.ajouterFichier(f); history.replaceState(null, '', 'rejeu.html?seance=' + encodeURIComponent(src)); await ouvrirSeance(src); }
+  catch (err) { alert('Trace illisible : ' + err.message); }
 };
-async function ouvrirTrace(txt, nom) {
+// contenus : [{ contenu (texte ou ArrayBuffer), nom, src }] mis bout à bout (séance regroupée)
+async function ouvrirContenus(contenus, nom) {
   togglePlay(false);
-  const journal = typeof txt === 'string' && (/\.jsonl$/i.test(nom) || txt.trimStart().startsWith('{'));
-  if (!journal) sautsJournal = [];
-  pts = journal ? lireJournal(txt) : typeof txt === 'string' ? lireGPX(txt, nom) : lireFIT(txt);
+  contenusCourants = contenus;
+  const R = contenus.map(c => Traces.lire(c.contenu, c.nom, { vSupp: +$('vSupp').value }));
+  pts = Traces.completer(R.flatMap(r => r.pts).sort((a, b) => a.t - b.t));
+  sautsJournal = R.flatMap(r => r.sauts); chocsJournal = R.flatMap(r => r.chocs); brutFIT = R.flatMap(r => r.brut);
+  reglagesJournal = (R.find(r => r.reglages) || {}).reglages || null; exempleJournal = (R.find(r => r.exemple) || {}).exemple || null;
+  sansHeure = R.some(r => r.sansHeure);
+  const journal = R.some(r => r.type === 'journal');
   const repris = journal ? appliquerReglagesJournal() : '';
-  if (typeof afficherBandeauEx === 'function') afficherBandeauEx(journal ? exempleJournal : null);
+  afficherBandeauEx(exempleJournal);
   $('vRow').hidden = !sansHeure;
-  dernierGPX = [txt, nom];
+  dernierGPX = [contenus, nom];
   if (pts.length < 10) throw new Error('trop peu de points');
-  const dist = pts.reduce((s, p, i) => i ? s + Math.hypot((p.lon - pts[i - 1].lon) * 111320 * Math.cos(p.lat * Math.PI / 180), (p.lat - pts[i - 1].lat) * 110540) : 0, 0);
-  $('info').textContent = (sansHeure ? '⚠ trace sans heures, vitesse supposée constante · ' : '') + `${nom} · ${new Date(pts[0].t).toLocaleDateString('fr-FR')} ${heure(pts[0].t)} · ${fmtDuree(pts[pts.length - 1].t - pts[0].t)} · ${(dist / 1000).toFixed(1)} km · ${pts.length} points${repris}`;
+  chiffresSeance = Traces.chiffres(pts);
+  $('info').textContent = (sansHeure ? '⚠ trace sans heures, vitesse supposée constante · ' : '') + `${nom} · ${new Date(pts[0].t).toLocaleDateString('fr-FR')} ${heure(pts[0].t)} · ${pts.length} points${repris}`;
+  majTitre();
+  map.invalidateSize();
   map.fitBounds(L.latLngBounds(pts.map(p => [p.lat, p.lon])), { padding: [30, 30] });
   cur = pts[0].t; idx = 0; Wmap = null; vue.t0 = vue.t1 = 0;
   $('play').disabled = false;
   preparerSauts();
+  majResume();
   await calculer();
 }
-
-(async () => {
-  resizeRadar(); dessinerFrise();
-  try { await chargerDonnees(); }
-  catch (err) {
-    $('info').textContent = location.protocol === 'file:'
-      ? 'Ouvert par double-clic : le navigateur bloque la lecture des données. Lance lancer_outils.bat (ou utilise l’adresse en ligne).'
-      : 'Données introuvables : ' + err.message;
-    $('gpxBtn').disabled = true;
-  }
-  const q = new URLSearchParams(location.search), nj = q.get('journal'), njs = q.get('journaux');
-  if (APPLI && (nj || njs)) await rejouerJournaux(nj ? [nj] : njs.split(',').filter(Boolean));
-  if (q.get('exemple')) await ouvrirExemple(q.get('exemple'), false);   // lien depuis l'accueil ou Premiers pas
-})();
+$('vSupp').onchange = () => dernierGPX && ouvrirContenus(...dernierGPX);
+async function ouvrirSeance(id) {
+  busy('Lecture de la séance…');
+  try {
+    seanceCourante = await Seances.seance(id);
+    const srcs = seanceCourante ? seanceCourante.sources : [id];
+    const contenus = [];
+    for (const src of srcs) contenus.push({ contenu: await Seances.contenu(src), nom: await Seances.nomSource(src), src });
+    await ouvrirContenus(contenus, seanceCourante ? Seances.titre(seanceCourante) : srcs[0]);
+  } catch (err) { busy(null); $('sousTitre').textContent = 'Séance illisible : ' + err.message; }
+}
+function majTitre() {
+  const s = seanceCourante, d = pts.length ? new Date(pts[0].t) : null;
+  $('titre').textContent = s ? Seances.titre(s) + (d ? ' · ' + d.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit' }) : '') : (dernierGPX ? dernierGPX[1] : 'Séance');
+  $('sousTitre').textContent = d ? [heure(pts[0].t).slice(0, 5) + ' – ' + heure(pts[pts.length - 1].t).slice(0, 5), s && s.lieu, s && s.commentaire].filter(Boolean).join(' · ') : '';
+  document.title = $('titre').textContent;
+}
 
 // Séances d'exemple livrées avec l'appli (outils/exemples_rejeu.py) : un rejeu commenté, sans avoir encore navigué
-const EXEMPLES = [
-  ['1', 'Exemple 1 : alerte entendue, roche évitée', 'Sillon · séance réelle avec le radar · 2 min 30'],
-  ['2', 'Exemple 2 : pas d\'alerte, collision avec roche', 'Sillon · séance sans le radar · 2 min 40'],
-];
 function afficherBandeauEx(ex) {
   const b = $('bandeauEx');
   if (!ex) { b.hidden = true; return; }
@@ -1137,78 +1036,187 @@ function afficherBandeauEx(ex) {
 }
 async function ouvrirExemple(n, lancer) {
   try {
-    const txt = await (await fetch(`donnees/exemples/exemple${n}.jsonl`)).text();
-    await ouvrirTrace(txt, 'Exemple ' + n);
-    journauxAffiches = ['exemple' + n];
-    afficherBandeauEx(exempleJournal);
+    seanceCourante = null;
+    await ouvrirContenus([{ contenu: await Seances.contenu('ex:' + n), nom: 'Exemple ' + n, src: 'ex:' + n }], 'Exemple ' + n);
+    $('titre').textContent = 'Exemple ' + n;
     history.replaceState(null, '', 'rejeu.html?exemple=' + n);
-    if (lancer) togglePlay(true);   // appui sur le menu : le son peut démarrer tout de suite
-  } catch (err) { $('info').textContent = 'Exemple illisible : ' + err.message; }
+    if (lancer) togglePlay(true);
+  } catch (err) { busy(null); $('sousTitre').textContent = 'Exemple illisible : ' + err.message; }
 }
-
-// Journaux de session du téléphone : un ou plusieurs (à la suite, réglages de la première séance), sans passer par Plus
-let journauxAffiches = [];
 async function rejouerJournaux(noms) {
   try {
-    const textes = [];
-    for (const n of noms) textes.push((await Natif.journal.lire({ nom: n })).texte);
-    await ouvrirTrace(textes.join('\n'), noms.length > 1 ? noms.length + ' journaux' : noms[0]);
-    journauxAffiches = noms;
-    history.replaceState(null, '', 'rejeu.html?' + (noms.length > 1 ? 'journaux=' + noms.map(encodeURIComponent).join(',') : 'journal=' + encodeURIComponent(noms[0])));
-  } catch (err) { $('info').textContent = (noms.length > 1 ? 'Journaux illisibles : ' : 'Journal illisible : ') + err.message; }
+    seanceCourante = null;
+    const c = []; for (const n of noms) c.push({ contenu: (await Natif.journal.lire({ nom: n })).texte, nom: n, src: 'j:' + n });
+    await ouvrirContenus(c, noms.length + ' journaux');
+  } catch (err) { busy(null); $('sousTitre').textContent = 'Journaux illisibles : ' + err.message; }
 }
-$('mesJBtn').onclick = async e => {
-  e.stopPropagation();
-  const pan = $('mesJPan');
-  if (!pan.hidden) { pan.hidden = true; return; }
-  // sous le bouton, aligné sur lui si la place le permet, sinon décalé pour rester dans l'écran (12 px de marge)
-  const r = $('mesJBtn').getBoundingClientRect(), largeur = Math.min(380, innerWidth - 24);
-  pan.style.top = (r.bottom + 6) + 'px';
-  pan.style.left = Math.max(12, Math.min(r.left, innerWidth - 12 - largeur)) + 'px';
-  pan.style.maxHeight = Math.max(200, innerHeight - r.bottom - 90) + 'px';   // au-dessus de la barre d'onglets
-  pan.hidden = false; pan.innerHTML = '';
-  // tes séances d'abord (dès la première, c'est elles qu'on rejoue), les exemples en bas
-  const exemples = () => {
-    pan.append(Object.assign(document.createElement('div'), { className: 'groupe', textContent: 'Exemples' }));
-    for (const [n, titre, sous] of EXEMPLES) {
-      const b = document.createElement('button'); b.className = 'ex' + (journauxAffiches.includes('exemple' + n) ? ' on' : '');
-      b.innerHTML = '<span></span><small></small>'; b.firstChild.textContent = titre; b.lastChild.textContent = sous;
-      b.onclick = () => { pan.hidden = true; ouvrirExemple(n, true); };
-      pan.append(b);
-    }
-  };
-  const vide = t => pan.append(Object.assign(document.createElement('div'), { className: 'sub', textContent: t, style: 'padding:4px' }));
-  if (!APPLI) { vide("Tes séances : dans l'appli Android, ou « Ouvrir une trace » ci-dessus."); exemples(); return; }
-  pan.append(Object.assign(document.createElement('div'), { className: 'groupe', textContent: 'Mes séances (téléphone)' }));
-  let l = [];
-  try { l = (await Natif.journal.liste()).journaux || []; } catch (err) { vide('Lecture impossible : ' + err.message); exemples(); return; }
-  if (!l.length) { vide('Pas encore de séance : un journal est créé à chaque lancement du radar.'); exemples(); return; }
-  const choisis = new Set(journauxAffiches.filter(n => l.some(j => j.nom === n)));
-  const tete = document.createElement('div'); tete.className = 'tete';
-  const bRej = document.createElement('button'); bRej.className = 'primary';
-  const bAucun = document.createElement('button'); bAucun.textContent = 'Aucun';
-  tete.append(bRej, bAucun); pan.append(tete);
-  const maj = () => { bRej.textContent = choisis.size > 1 ? `Rejouer les ${choisis.size} à la suite` : 'Rejouer'; bRej.disabled = !choisis.size; };
-  const cases = [];
-  for (const j of l) { // du plus récent au plus ancien
-    const lab = document.createElement('label'); if (journauxAffiches.includes(j.nom)) lab.className = 'charge';
-    const c = document.createElement('input'); c.type = 'checkbox'; c.checked = choisis.has(j.nom);
-    c.onchange = () => { c.checked ? choisis.add(j.nom) : choisis.delete(j.nom); maj(); };
-    const b = document.createElement('b');
-    b.textContent = new Date(j.date).toLocaleString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-    const s = document.createElement('small'); s.textContent = Math.max(1, Math.round(j.taille / 1024)) + ' Ko';
-    lab.append(c, b, s); pan.append(lab); cases.push(c);
+
+// =====================================================================
+// Vue principale et médaillon : carte, radar, montre ou sauts ; toucher le médaillon échange les deux
+// =====================================================================
+const VUES = { carte: 'map', radar: 'boxRadar', montre: 'boxMontre', sauts: 'boxSauts' };
+const NOMS_VUES = { carte: 'Carte', radar: 'Radar', montre: 'Montre', sauts: 'Sauts' };
+let vuePrinc = Seances.pref('fiche.principal', 'carte'), vueMed = Seances.pref('fiche.medaillon', 'radar'), medVisible = Seances.pref('fiche.medVisible', true);
+if (vuePrinc === vueMed) vueMed = vuePrinc === 'carte' ? 'radar' : 'carte';
+function placerVues() {
+  for (const [v, id] of Object.entries(VUES)) {
+    const el = $(id), cible = v === vuePrinc ? $('principal') : v === vueMed && medVisible ? $('medContenu') : $('reserve');
+    if (el.parentNode !== cible) cible.append(el);
   }
-  bAucun.onclick = () => { choisis.clear(); cases.forEach(c => c.checked = false); maj(); };
-  bRej.onclick = async () => {
-    const noms = l.filter(j => choisis.has(j.nom)).sort((a, b) => a.date - b.date).map(j => j.nom);   // ordre chronologique
-    pan.hidden = true;
-    await rejouerJournaux(noms);
-  };
-  maj();
-  exemples();
+  $('medaillon').hidden = !medVisible; $('medChoix').hidden = !medVisible; $('medAfficher').hidden = medVisible;
+  $('medLab').textContent = NOMS_VUES[vueMed];
+  // les boutons choisissent ce qui n'est pas la carte (dans le médaillon, ou en grand si la carte est dans le médaillon)
+  const autre = vuePrinc === 'carte' ? vueMed : vuePrinc;
+  document.querySelectorAll('#medChoix button').forEach(b => b.classList.toggle('sel', b.dataset.v === autre));
+  $('medChoixSauts').hidden = !sauts.length;
+  $('legendeC').hidden = vuePrinc !== 'carte';
+  Seances.setPref('fiche.principal', vuePrinc); Seances.setPref('fiche.medaillon', vueMed); Seances.setPref('fiche.medVisible', medVisible);
+  requestAnimationFrame(() => { map.invalidateSize(); resizeRadar(); dessinerMed(); });
+}
+$('medCapot').onclick = () => { [vuePrinc, vueMed] = [vueMed, vuePrinc]; placerVues(); };
+document.querySelectorAll('#medChoix button').forEach(b => b.onclick = () => {
+  if (b.dataset.v === 'masquer') { medVisible = false; if (vuePrinc !== 'carte') { vueMed = vuePrinc; vuePrinc = 'carte'; } placerVues(); return; }
+  if (vuePrinc === 'carte') vueMed = b.dataset.v; else vuePrinc = b.dataset.v;
+  placerVues();
+});
+$('medAfficher').onclick = () => { medVisible = true; placerVues(); };
+// vue « sauts » : trajectoires superposées, le saut choisi en blanc
+function dessinerMed() {
+  if (!sauts.length || $('boxSauts').parentNode === $('reserve')) return;
+  dessinerTraj($('cMed'));
+  $('medSautTxt').textContent = sautSel ? `Saut ${sautSel.n} · ${fr(sautSel.hc)} m · ${fr(sautSel.vol, 2)} s · ${heure(sautSel.t0)}` : '';
+}
+$('medBilan').onclick = () => ouvrirSauts();
+// pastille d'un saut touchée sur la carte : curseur au décollage, saut affiché dans le médaillon
+function choisirSaut(s) {
+  sautSel = s; seek(s.t0 - 2000);
+  if (vuePrinc === 'carte') { medVisible = true; vueMed = 'sauts'; } else vuePrinc = 'sauts';
+  placerVues();
+  if (!$('sautsPan').hidden) dessinerSauts();
+}
+
+// =====================================================================
+// Couleur de la trace : vitesse, profondeur (eau sous la planche) ou aucune ; les alertes restent dessinées par-dessus
+// =====================================================================
+let modeTrace = Seances.pref('fiche.couleur', 'vitesse');
+const RAMPE = { vitesse: ['#1d3f8c', '#2f7fb0', '#5ee6d6', '#b9f3c9', '#f4f7a8'], profondeur: ['#e6f6ff', '#9fd2f0', '#4f9fd6', '#1f5fa8', '#0b2a63'] };
+function couleurRampe(r, x) { // x de 0 à 1
+  x = Math.max(0, Math.min(1, x)); const n = r.length - 1, i = Math.min(n - 1, Math.floor(x * n)), f = x * n - i;
+  const a = parseInt(r[i].slice(1), 16), b = parseInt(r[i + 1].slice(1), 16), m = (s) => Math.round(((a >> s) & 255) + f * (((b >> s) & 255) - ((a >> s) & 255)));
+  return `rgb(${m(16)},${m(8)},${m(0)})`;
+}
+function echelleTrace() {
+  if (modeTrace === 'vitesse') { const tri = pts.map(p => Math.min(p.v, 30)).sort((a, b) => a - b), vm = Math.max(3, tri[Math.floor(tri.length * 0.98)] || 0); return { max: vm, f: p => Math.min(p.v, 30) / vm, lib: [Seances.vit(0, 0).n, Seances.vit(vm / 2, 0).n, Seances.vit(vm, 0).n + ' ' + Seances.vit(0).u] }; }
+  if (modeTrace === 'profondeur') return { max: 10, f: p => p.prof == null ? null : p.prof === Infinity ? 1 : p.prof / 10, lib: ['0', '5', '10 m et +'] };
+  return null;
+}
+function majLegendeC() {
+  document.querySelectorAll('#legendeC .modes button').forEach(b => b.classList.toggle('sel', b.dataset.v === modeTrace));
+  const e = echelleTrace(); $('legendeGrad').hidden = !e;
+  if (e) { $('gradC').style.background = `linear-gradient(90deg,${RAMPE[modeTrace].join(',')})`; [$('gradMin').textContent, $('gradMil').textContent, $('gradMax').textContent] = e.lib; }
+}
+document.querySelectorAll('#legendeC .modes button').forEach(b => b.onclick = () => { modeTrace = b.dataset.v; Seances.setPref('fiche.couleur', modeTrace); if (pts.length) dessinerTrace(); majLegendeC(); });
+
+// =====================================================================
+// Résumé (bas de l'écran) et tous les chiffres (feuille)
+// =====================================================================
+let chiffresSeance = null;
+function majResume() {
+  const c = chiffresSeance; if (!c) return;
+  const v = Seances.vit(c.v2s), d = Seances.dist(c.dist);
+  $('resume').innerHTML = `<span><b>${Seances.duree(c.duree)}</b><small>durée</small></span><span><b>${d.n}</b><small>${d.u}</small></span><span><b>${v.n}</b><small>${v.u} max</small></span><span><b id="resAl">${events.length}</b><small>alerte${events.length > 1 ? 's' : ''}</small></span>`;
+}
+function ouvrirResume() {
+  const c = chiffresSeance; if (!c) return;
+  const s = seanceCourante, sp = s && Seances.sport(s.sport);
+  $('rSport').textContent = s ? Seances.titre(s) : $('titre').textContent; $('rSportDot').style.background = sp ? sp.c : '#8a9aa0';
+  $('rComm').textContent = s && s.commentaire ? '« ' + s.commentaire + ' »' : '';
+  const V = x => { const v = Seances.vit(x); return `${v.n}<u>${v.u}</u>`; }, D = Seances.dist(c.dist);
+  const hm = sauts.length ? Math.max(...sauts.map(x => x.hc)) : 0;
+  const cases = [[Seances.duree(c.duree), 'durée'], [`${D.n}<u>${D.u}</u>`, 'distance'], [V(c.vmoy), 'moyenne'], [V(c.vInst), 'vitesse instantanée'], [V(c.v2s), 'max sur 2 s'],
+    [V(c.v100), 'max sur 100 m'], [V(c.v250), 'max sur 250 m'], [V(c.v500), 'max sur 500 m'], [c.v1852 ? V(c.v1852) : '–', 'max sur 1 mille'],
+    [events.length, events.length > 1 ? 'alertes' : 'alerte'], [sauts.length, sauts.length > 1 ? 'sauts' : 'saut'], [sauts.length ? fr(hm) + '<u>m</u>' : '–', 'plus haut saut']];
+  $('rGrille').innerHTML = cases.map(([b, l]) => `<div><b>${b}</b><small>${l}</small></div>`).join('');
+  $('fResume').hidden = false;
+}
+$('resume').onclick = ouvrirResume; $('poignee').onclick = ouvrirResume;
+document.querySelectorAll('.feuilleR').forEach(f => f.addEventListener('click', e => { if (e.target === f) f.hidden = true; }));
+
+// =====================================================================
+// Menu ⋮ : modifier, exporter, bilan des sauts, réglages, séparer, supprimer, ouvrir un fichier
+// =====================================================================
+const nomFichier = ext => {
+  const d = pts.length ? new Date(pts[0].t) : new Date(), p = n => String(n).padStart(2, '0');
+  return `radar_${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}h${p(d.getMinutes())}.${ext}`;
 };
-document.addEventListener('click', e => { if (!$('mesJ').contains(e.target)) $('mesJPan').hidden = true; });
+function menuAction(ic, titre, sous, f, cls = '') {
+  const b = document.createElement('button'); if (cls) b.className = cls;
+  b.innerHTML = `<span class="ic">${ic}</span><span><span></span><small></small></span>`;
+  b.querySelector('span:not(.ic) > span').textContent = titre; b.querySelector('small').textContent = sous || '';
+  b.onclick = () => { $('fMenu').hidden = true; f(); };
+  return b;
+}
+$('bMenu').onclick = () => {
+  const l = $('menuListe'); l.innerHTML = '';
+  const s = seanceCourante;
+  if (s) l.append(menuAction('✎', 'Modifier', 'sport, commentaire, lieu', ouvrirModif));
+  if (pts.length) l.append(menuAction('⇩', 'Exporter la trace (GPX)', 'pour Strava, Garmin Connect, Suunto…', () => Seances.exporter(nomFichier('gpx'), Traces.gpx(pts, $('titre').textContent), 'application/gpx+xml').catch(e => alert(e.message))));
+  const journaux = contenusCourants.filter(c => typeof c.contenu === 'string' && c.src && !c.src.startsWith('ex:') && /^\s*\{/.test(c.contenu));
+  if (journaux.length) l.append(menuAction('⇩', 'Exporter le journal (.jsonl)', 'détails de la séance : positions, sons, sauts, état du téléphone', () => Seances.exporter(nomFichier('jsonl'), journaux.map(c => c.contenu).join('\n'), 'application/octet-stream').catch(e => alert(e.message))));
+  const fichiers = contenusCourants.filter(c => c.src && c.src.startsWith('f:') && !/^\s*\{/.test(typeof c.contenu === 'string' ? c.contenu : ''));
+  for (const c of fichiers) l.append(menuAction('⇩', "Exporter le fichier d'origine", c.nom, () => Seances.exporter(c.nom, c.contenu).catch(e => alert(e.message))));
+  if (sauts.length) l.append(menuAction('⤴', 'Bilan des sauts', `${sauts.length} saut${sauts.length > 1 ? 's' : ''}`, () => ouvrirSauts()));
+  l.append(menuAction('⚙', 'Réglages du rejeu', 'marée, eau minimale, angles, sons, montre', () => { $('fReglages').hidden = false; }));
+  l.append(menuAction('📂', 'Ouvrir un fichier', 'FIT, GPX ou journal : ajouté aux séances', () => $('gpxFile').click()));
+  if (s && s.groupe) l.append(menuAction('⇹', 'Séparer', `${s.sources.length} journaux regroupés`, async () => { Seances.separer(s.id); location.href = 'seances.html'; }));
+  if (s) l.append(menuAction('🗑', 'Supprimer la séance', 'définitif : journal ou fichier effacé', async () => {
+    if (!confirm('Supprimer cette séance ? Le journal est effacé du téléphone (ou le fichier importé de l’appli). C’est définitif.')) return;
+    await Seances.supprimer(s); location.href = 'seances.html';
+  }, 'danger'));
+  $('fMenu').hidden = false;
+};
+// Modifier : sport (liste réglable dans Plus → Réglages généraux), commentaire, lieu
+let sportChoisi = null;
+function ouvrirModif() {
+  const s = seanceCourante; if (!s) return;
+  sportChoisi = s.sport;
+  const box = $('mSports'); box.innerHTML = '';
+  for (const sp of Seances.sports()) {
+    const b = document.createElement('button'); b.className = sp.id === sportChoisi ? 'sel' : '';
+    b.innerHTML = `<i class="dot" style="background:${sp.c}"></i>`; b.append(sp.nom);
+    b.onclick = () => { sportChoisi = sp.id; box.querySelectorAll('button').forEach(x => x.classList.toggle('sel', x === b)); };
+    box.append(b);
+  }
+  $('mComm').value = s.commentaire || ''; $('mLieu').value = s.lieu || '';
+  $('fModif').hidden = false;
+}
+$('mAnnul').onclick = () => { $('fModif').hidden = true; };
+$('mOk').onclick = () => {
+  const s = seanceCourante;
+  Seances.modifier(s.id, { sport: sportChoisi, commentaire: $('mComm').value.trim(), lieu: $('mLieu').value.trim() });
+  Object.assign(s, { sport: sportChoisi, commentaire: $('mComm').value.trim(), lieu: $('mLieu').value.trim() });
+  $('fModif').hidden = true; majTitre();
+};
+$('bSauts').onclick = () => $('sautsPan').hidden ? ouvrirSauts() : ($('sautsPan').hidden = true);
+majLegendeC();
+// démarrage (à la fin : toutes les variables ci-dessus sont déclarées)
+(async () => {
+  placerVues(); dessinerFrise();
+  try { await chargerDonnees(); }
+  catch (err) {
+    $('sousTitre').textContent = location.protocol === 'file:'
+      ? 'Ouvert par double-clic : le navigateur bloque la lecture des données. Lance lancer_outils.bat (ou utilise l’adresse en ligne).'
+      : 'Données introuvables : ' + err.message;
+    return;
+  }
+  const q = new URLSearchParams(location.search), nj = q.get('journal'), njs = q.get('journaux');
+  if (q.get('seance')) await ouvrirSeance(q.get('seance'));
+  else if (APPLI && nj) await ouvrirSeance('j:' + nj);           // Plus → Journaux de session → Rejouer
+  else if (APPLI && njs) await rejouerJournaux(njs.split(',').filter(Boolean));
+  else if (q.get('exemple')) await ouvrirExemple(q.get('exemple'), false);
+  else { $('sousTitre').textContent = 'Choisis une séance dans l’onglet Séances, ou ouvre un fichier (menu ⋮).'; }
+})();
+
 </script>
 </body>
 </html>

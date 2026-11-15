@@ -57,7 +57,7 @@ Garde la carte marine en tête et ta vigilance : l'appli ne la remplace pas.</di
   <li><a href="#test">Utilisation en test (à terre)</a></li>
   <li><a href="#carte">Carte, téléchargements et roches partagées</a></li>
   <li><a href="#editeur">Ajouter ses propres roches (Plus → Mes roches)</a></li>
-  <li><a href="#rejeu">Rejouer une session</a></li>
+  <li><a href="#rejeu">Séances et rejeu</a></li>
   <li><a href="#web">Version web (ordinateur)</a></li>
   <li><a href="#maj">Mises à jour</a></li>
   <li><a href="#depannage">Dépannage</a></li>
@@ -104,7 +104,7 @@ Par défaut, seules les <b>roches</b> déclenchent une alerte ; les fonds lisses
 
 <h2 id="radar">3. Utiliser le radar (téléphone)</h2>
 <p>Au premier lancement, quatre écrans d'accueil présentent l'appli, sa zone, les sons et ce qu'il faut faire avant d'aller à l'eau (à revoir dans
-<b>Plus → Premiers pas</b>). L'appli s'ouvre ensuite sur le radar. En bas, trois onglets : <b>Radar</b>, <b>Rejeu</b> (§ 10) et <b>Plus</b>
+<b>Plus → Premiers pas</b>). L'appli s'ouvre ensuite sur le radar. En bas, trois onglets : <b>Radar</b>, <b>Séances</b> (§ 10) et <b>Plus</b>
 (premiers pas, carte et téléchargements, mes roches § 9, profils, notice, nouveautés ; sous « Avancé » : réglages avancés, journaux de session, modération).
 Après une séance de plus de 3 minutes, l'appli propose de la revoir dans le rejeu.</p>
 <h3>L'accueil : prêt à partir</h3>
@@ -302,45 +302,60 @@ ou en grand (touche la barrette ou le titre « Mes roches »). Sur ordinateur, l
   <li><b>Partager</b> ouvre le dépôt de tes roches (§ 8). Sur ordinateur, <b>Exporter (GeoJSON)</b> enregistre une sauvegarde ; <b>Importer</b> recharge un fichier.</li>
 </ol>
 
-<h2 id="rejeu">10. Rejouer une session</h2>
-<p>Le rejeu refait le calcul des alertes sur une trace enregistrée : utile pour comprendre une alerte ou régler l'anticipation.</p>
-<h3>Récupérer le fichier</h3>
+<h2 id="rejeu">10. Séances et rejeu</h2>
+<p>L'onglet <b>Séances</b> rassemble tes sorties : chaque lancement du radar (journal du téléphone) et chaque fichier FIT ou GPX ouvert. Une séance s'ouvre dans sa
+<b>fiche</b>, qui refait le calcul des alertes sur la trace : utile pour comprendre une alerte ou régler l'anticipation.</p>
+<h3>Les quatre vues</h3>
 <ul>
-  <li><b>Appli téléphone</b> : chaque lancement du radar enregistre la trace dans le journal de session. <b>Plus → Journaux de session → Rejouer</b>
-    l'ouvre directement dans le rejeu, avec les réglages de la séance (eau minimale, anticipation, angles…). Dans le rejeu, le menu
-    <b>Mes séances</b> fait de même : coche une ou plusieurs séances puis Rejouer (à la suite). En tête de ce menu, deux <b>exemples</b> commentés
-    (séances réelles au Sillon : roche évitée après une alerte, collision sans radar) montrent le radar en action. Sur ordinateur : envoie-toi le journal
-    (bouton Envoyer) puis ouvre le fichier .jsonl avec <b>Ouvrir une trace</b>.</li>
+  <li><b>Liste</b> : une carte par séance (vignette de la trace, sport, date, commentaire, lieu, durée, distance, vitesse max sur 2 s, sauts). Les lancements du radar
+    sans navigation (moins de 2 min ou de 200 m) sont masqués. <b>＋ Ouvrir un fichier</b> ajoute un FIT, un GPX ou un journal aux séances. En bas, deux <b>exemples</b>
+    commentés (séances réelles au Sillon : roche évitée après une alerte, collision sans radar).</li>
+  <li><b>Calendrier</b> : semaine, mois ou année, une pastille par séance à la couleur de son sport ; touche un jour pour voir ses séances.</li>
+  <li><b>Carte</b> : toutes les traces d'une semaine, d'un mois, d'une année, de toujours ou entre deux dates, filtrées par sport ; fond de carte au choix (🗺).
+    Touche une trace pour ouvrir la séance.</li>
+  <li><b>Récap</b> : filtres (sports, dates, distance, durée) et regroupement par séance, semaine, mois ou année : heures en barres, puis tableau (séances, durée,
+    distance, vitesse max, sauts). Touche une ligne pour voir ses séances.</li>
+</ul>
+<p><b>Regrouper ou supprimer</b> : bouton ☑ en haut de la liste, coche les séances puis <b>Regrouper</b> (plusieurs journaux d'une même sortie, par exemple après un
+redémarrage du radar) ou <b>Supprimer</b> (définitif : le journal est effacé du téléphone, le fichier importé de l'appli). Une séance regroupée se sépare depuis sa fiche
+(menu ⋮ → Séparer).</p>
+<h3>Récupérer un fichier de montre</h3>
+<ul>
   <li><b>Montre Garmin, depuis le téléphone</b> : dans Chrome, ouvre <span class="url">connect.garmin.com</span> (menu ⋮ → « Version pour ordinateur » si besoin) → Activités → la session → <b>⚙ → Exporter au format GPX</b>.
     « Exporter l'original » donne le fichier FIT, plus précis, mais dans un .zip à extraire avec l'appli Fichiers.</li>
   <li><b>Montre Garmin, avec un ordinateur</b> : montre en USB → <b>GARMIN → Activity</b> → fichier .fit à la date de la session.</li>
-  <li><b>Suunto</b> : bouton d'export dans la vue de l'activité de l'appli Suunto.</li>
+  <li><b>Suunto</b> : appli Suunto → l'activité → ⋮ → <b>Télécharger le fichier FIT</b> (ou Exporter l'entraînement GPX).</li>
 </ul>
-<h3>Rejouer</h3>
+<h3>La fiche d'une séance</h3>
 <ol>
-  <li><b>Rejeu de session → Ouvrir une trace (FIT ou GPX)</b>. La zone est choisie d'après la trace.</li>
-  <li>Marée : <b>Mesurée</b> (marégraphe, le plus fidèle), <b>Prédite</b> (modèle) ou <b>Forcée</b>.</li>
-  <li>Règle eau minimale, anticipation, etc. : tout est recalculé.</li>
-  <li>La frise montre les alertes (couleurs), la pré-alerte (jaune), la veille (triangles bleus), les envois à la montre (losanges violets), la marée (trait bleu)
-    et une coupe empilée sur le zéro des cartes : le <b>fond</b> en bas (gris = roche, beige = sable ou vase, vert = terre), l'<b>eau</b> en bleu jusqu'à la surface
-    (hauteur d'eau) ; l'épaisseur bleue est l'eau sous la planche, et le pointillé rouge marque l'eau minimale sous la surface (fond au-dessus = danger).
-    Au-dessus, les valeurs à l'instant du curseur avec leurs jauges (comme dans l'appli Suunto), et le début, la fin et la durée de la portion affichée.
-    Coche <b>Vitesse</b> pour ajouter la courbe de vitesse (rose, avec sa valeur en km/h et en nœuds) ; fais glisser le doigt sur la frise pour te déplacer,
-    touche une ligne de la liste « Alertes de la session » pour y aller, ▶ pour lire (vitesse ×1 à ×60, sons jusqu'à ×5).</li>
-  <li><b>Zoom</b> sur une portion de la session : pince la frise à deux doigts (molette sur ordinateur), ou boutons − / + ; la carte se recadre sur la portion.
-    Session entière : glisser déplace le curseur. Portion zoomée : glisser fait défiler la frise, toucher place le curseur, glisser en partant du curseur le déplace.
-    Double toucher ou <b>Tout</b> pour revoir toute la session ; <b>↕</b> double la hauteur de la frise.
-    La carte reste où tu la places ; coche <b>Suivre</b> pour qu'elle suive le rider et se recadre sur la portion zoomée. Sur la carte, les roches émergées à la hauteur d'eau du moment sont en noir.</li>
+  <li>La <b>carte</b> occupe l'écran. La trace est colorée selon le réglage en bas à gauche : <b>Vitesse</b>, <b>Profondeur</b> (eau sous la planche) ou <b>Aucune</b>
+    (choix retenu) ; les alertes et pré-alertes sont dessinées par-dessus. Les <b>sauts</b> y sont des pastilles avec leur hauteur, d'autant plus claires que le saut
+    est haut : touche-en une pour placer le curseur au décollage et voir le saut dans le médaillon.</li>
+  <li>Le <b>médaillon</b> en haut à droite montre le <b>radar</b>, l'aperçu de la <b>montre</b> ou les <b>sauts</b> (boutons dessous). Touche-le pour l'échanger avec
+    la vue principale ; <b>Masquer</b> le cache (<b>▣ Médaillon</b> pour le revoir). La disposition est retenue.</li>
+  <li>En bas : ▶ pour lire (vitesse ×1 à ×60, sons jusqu'à ×5), l'heure, <b>Suivre</b> (la carte suit le rider), le zoom de la frise, les valeurs à l'instant du curseur
+    avec leurs jauges, puis la <b>frise</b> : alertes (couleurs), pré-alerte (jaune), veille (triangles bleus), sauts (triangles blancs), envois à la montre (losanges violets),
+    et une coupe empilée sur le zéro des cartes : le <b>fond</b> en bas (gris = roche, beige = sable ou vase, vert = terre), l'<b>eau</b> en bleu jusqu'à la surface ;
+    le pointillé rouge marque l'eau minimale sous la surface (fond au-dessus = danger). Coche <b>Vitesse</b> pour ajouter la courbe de vitesse.</li>
+  <li><b>Zoom</b> sur une portion : pince la frise à deux doigts (molette sur ordinateur), ou boutons − / + ; double toucher ou <b>Tout</b> pour toute la séance ;
+    <b>↕</b> double la hauteur de la frise. Session entière : glisser déplace le curseur. Portion zoomée : glisser fait défiler, toucher place le curseur.</li>
+  <li>Sous la frise, le <b>résumé</b> (durée, distance, vitesse max, alertes) : touche-le pour tous les chiffres, dont les vitesses max instantanée, sur 2 s, 100 m,
+    250 m, 500 m et 1 mille, et le plus haut saut.</li>
+  <li>Menu <b>⋮</b> : <b>Modifier</b> (sport, commentaire, lieu), <b>Exporter</b> la trace en GPX, le journal (.jsonl) ou le fichier d'origine, <b>Bilan des sauts</b>,
+    <b>Réglages du rejeu</b> (marée mesurée, prédite ou forcée, eau minimale, anticipation, angles, sons, montre : tout est recalculé ; les réglages de la séance
+    sont repris d'un journal), <b>Ouvrir un fichier</b>, <b>Séparer</b>, <b>Supprimer</b>.</li>
 </ol>
+<p>Le <b>sport</b> d'une nouvelle séance vient du profil du radar (Foil → Wingfoil, Planche → Windsurf, Kite → Kitesurf) ou du fichier FIT ; la liste des sports, leurs
+couleurs et les unités (nœuds, km/h ou m/s ; km ou milles) se règlent dans <b>Plus → Réglages généraux</b>. Après une séance de plus de 3 minutes, le radar propose
+de la revoir ; <b>Plus → Journaux de session</b> garde l'envoi des journaux pour analyser un problème.</p>
 <h3>Bilan des sauts</h3>
 <p>Si la séance contient des sauts (journal du téléphone avec « Sauts (essai) », appli montre Radar roches, ou sauts enregistrés nativement par une montre Garmin),
-le bouton <b>⤴ Sauts</b> apparaît en haut du rejeu et les sauts sont marqués sur la carte (pastilles turquoise, d'autant plus grosses que le saut est haut ; touche-en une pour l'ouvrir).
-Le bilan montre :</p>
+le bouton <b>⤴</b> apparaît en haut de la fiche (aussi dans le menu ⋮). Le bilan montre :</p>
 <ul>
   <li>le nombre de sauts (et par heure), le plus haut, le plus long vol, le plus loin, le temps total en l'air et la meilleure série (le plus de sauts en 10 minutes) ;</li>
   <li>les <b>trajectoires superposées</b> : chaque saut dessiné depuis le même point de décollage, le saut choisi en blanc, avec une silhouette de 1,80 m pour l'échelle. Touche une trajectoire pour la choisir ;</li>
   <li>le <b>détail</b> du saut choisi : hauteur, temps de vol, distance, vitesse au décollage (nœuds et km/h), hauteur au baromètre si le téléphone en a un, et pour le téléphone
-    la courbe d'accélération (en l'air, elle tombe vers 0 g ; pic à la réception). <b>▶ Revoir</b> lance le rejeu quelques secondes avant le saut ;</li>
+    la courbe d'accélération (en l'air, elle tombe vers 0 g ; pic à la réception). <b>▶ Revoir</b> lance la lecture quelques secondes avant le saut ;</li>
   <li>les sauts <b>au fil de la séance</b>, la <b>répartition des hauteurs</b> et le <b>classement</b> (10 meilleurs, ou tous).</li>
 </ul>
 <p><b>Hauteur corrigée</b> : en l'air, l'accéléromètre ne mesure pas la gravité mais les forces qui te portent (aile, kite). Quand la courbe d'accélération du vol est connue
@@ -354,7 +369,7 @@ La distance est la vitesse au décollage multipliée par le temps de vol. Les an
 <p class="url"><a href="https://ymca-dev-wow.github.io/radar-roches/">https://ymca-dev-wow.github.io/radar-roches/</a></p>
 <ul>
   <li><b>Éditeur de roches</b> : plus confortable à la souris, pour déclarer tes roches, caler des captures de carte et les exporter.</li>
-  <li><b>Rejeu de session</b> : ouvre directement les fichiers .fit copiés depuis la montre.</li>
+  <li><b>Séances</b> : ouvre directement les fichiers .fit copiés depuis la montre ; ils restent dans ce navigateur (liste, calendrier, carte, récap).</li>
   <li><b>Carte et téléchargements</b> : télécharge les fichiers .prg directement sur l'ordinateur, prêts à copier sur la montre ; partage et modération.</li>
   <li>Lien de téléchargement de l'appli Android.</li>
 </ul>

@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<script src="diagnostic.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Séances</title>
+<meta name="theme-color" content="#071318">
+<link rel="icon" href="logo.svg">
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="nav.js"></script>
+<style>
+  body { overscroll-behavior: none; }
+  .page { max-width: 760px; }
+  .onglets { display: flex; gap: 4px; background: var(--p1); border: 1px solid var(--ln); border-radius: 12px; padding: 3px; margin-bottom: 10px; }
+  .onglets button { flex: 1; border: 0; background: none; padding: 7px 2px; font-size: 13px; color: var(--mu); border-radius: 9px; justify-content: center; }
+  .onglets button.on { background: var(--p2); color: var(--ac); font-weight: 600; }
+  .ico { width: 38px; height: 38px; padding: 0; justify-content: center; font-size: 17px; flex: none; }
+  .ouvrir { width: 100%; justify-content: center; border-style: dashed; color: var(--mu); margin-bottom: 10px; }
+  .groupe { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--mu); margin: 12px 2px 6px; }
+  .carteS { display: flex; gap: 10px; background: var(--p1); border: 1px solid var(--ln); border-radius: 14px; padding: 9px; margin-bottom: 8px; cursor: pointer; align-items: center; }
+  .carteS:active { background: var(--p2); }
+  .vign { width: 76px; height: 76px; border-radius: 10px; background: #0f2b33; flex: none; }
+  .carteS .info { flex: 1; min-width: 0; }
+  .carteS .t { display: flex; align-items: baseline; gap: 6px; font-weight: 600; font-size: 14px; }
+  .carteS .t small { color: var(--mu); font-weight: 400; margin-left: auto; font-size: 12px; white-space: nowrap; }
+  .carteS .c { color: var(--mu); font-size: 12px; margin: 1px 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chiffres { display: flex; gap: 14px; font-variant-numeric: tabular-nums; }
+  .chiffres b { font-size: 16px; display: block; line-height: 1.1; } .chiffres small { font-size: 10px; color: var(--mu); }
+  .carteS input[type=checkbox] { flex: none; }
+  .barreSel { position: fixed; left: 0; right: 0; bottom: 0; z-index: 45; background: var(--p1); border-top: 1px solid var(--ln2); padding: 10px 12px 14px; display: flex; gap: 8px; }
+  html.appli .barreSel { bottom: 62px; }
+  .barreSel button { flex: 1; justify-content: center; }
+  .filtreListe { margin-bottom: 8px; }
+  .sel { display: inline-flex; background: var(--p1); border: 1px solid var(--ln); border-radius: 10px; padding: 2px; }
+  .sel button { border: 0; background: none; padding: 5px 11px; font-size: 13px; color: var(--mu); border-radius: 8px; }
+  .sel button.on { background: var(--p2); color: var(--ac); }
+  .navPer { display: flex; align-items: center; justify-content: space-between; margin: 8px 0; }
+  .navPer b { font-size: 15px; }
+  /* calendrier */
+  .mois { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; font-size: 13px; }
+  .mois .j { color: var(--mu); font-size: 11px; }
+  .mois .d { height: 46px; border-radius: 10px; background: var(--p1); border: 1px solid transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-variant-numeric: tabular-nums; cursor: pointer; }
+  .mois .d.sel { border-color: var(--ac); } .mois .d.vide { background: none; cursor: default; } .mois .d.auj { color: var(--ac); font-weight: 650; }
+  .pts { display: flex; gap: 2px; min-height: 7px; } .pts i { width: 7px; height: 7px; border-radius: 50%; }
+  .semaine .jour { display: flex; gap: 10px; align-items: center; padding: 9px 4px; border-bottom: 1px solid var(--ln); cursor: pointer; }
+  .semaine .jour.sel { background: var(--p1); border-radius: 10px; }
+  .semaine .jour b { width: 64px; flex: none; font-size: 13px; } .semaine .jour span { color: var(--mu); font-size: 12px; }
+  .annee { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 10px; }
+  .annee .m { font-size: 12px; color: var(--mu); cursor: pointer; }
+  .annee .g { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-top: 4px; }
+  .annee .g i { aspect-ratio: 1; border-radius: 50%; background: #16262b; }
+  .annee .g i.x { background: none; }
+  .legende { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--mu); margin: 10px 2px; }
+  .legende span { display: inline-flex; align-items: center; gap: 5px; } .legende i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  /* carte */
+  #vCarte { position: relative; }
+  #carteS { height: calc(100vh - 230px); min-height: 320px; border-radius: 14px; overflow: hidden; }
+  html.appli #carteS { height: calc(100vh - 290px); }
+  .ligneF { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+  .ligneF select, .ligneF input { padding: 6px 8px; font-size: 13px; }
+  #fondsPan { position: absolute; z-index: 1000; right: 8px; top: 52px; width: min(300px, calc(100% - 16px)); background: var(--p1); border: 1px solid var(--ln); border-radius: 12px; padding: 8px 10px; }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--p1); color: var(--tx); }
+  .leaflet-popup-content { margin: 10px 12px; font: 13px/1.4 system-ui, sans-serif; }
+  .leaflet-popup-content b { font-size: 14px; } .leaflet-popup-content a { display: inline-block; margin-top: 6px; font-weight: 600; }
+  /* récap */
+  details.filtres { background: var(--p1); border: 1px solid var(--ln); border-radius: 12px; padding: 8px 10px; margin-bottom: 10px; }
+  details.filtres summary { cursor: pointer; font-size: 13px; color: var(--ac); }
+  .grilleF { display: grid; grid-template-columns: auto 1fr 1fr; gap: 8px 8px; align-items: center; margin-top: 8px; font-size: 13px; }
+  .grilleF input { width: 100%; padding: 6px 8px; }
+  .chipsSport { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chipsSport button { padding: 4px 10px; font-size: 12px; border-radius: 16px; }
+  .chipsSport button.on { border-color: var(--ac); color: var(--ac); }
+  .chipsSport i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .barres { display: flex; align-items: flex-end; gap: 5px; height: 110px; margin: 6px 2px 2px; }
+  .barres div { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; min-width: 0; }
+  .barres i { display: block; border-radius: 4px 4px 0 0; min-height: 0; }
+  .barres small { font-size: 10px; color: var(--mu); text-align: center; white-space: nowrap; overflow: hidden; }
+  .tab { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .tab th { color: var(--mu); font-weight: 500; text-align: right; padding: 6px 4px; border-bottom: 1px solid var(--ln); font-size: 11px; }
+  .tab td { text-align: right; padding: 9px 4px; border-bottom: 1px solid var(--ln); }
+  .tab th:first-child, .tab td:first-child { text-align: left; }
+  .tab tr.tot td { font-weight: 650; } .tab tr[data-i] { cursor: pointer; } .tab td.per { color: var(--ac); font-weight: 600; }
+  #chargement { color: var(--mu); padding: 20px 4px; text-align: center; }
+</style>
+</head>
+<body data-onglet="seances">
+<div class="page">
+  <div class="entete">
+    <h1>Séances</h1>
+    <button class="ico" id="bSel" title="Sélectionner pour regrouper ou supprimer">☑</button>
+    <a class="btn ico" href="plus.html#reglages" title="Réglages généraux (unités, sports)">⚙</a>
+  </div>
+  <div class="onglets" id="onglets"><button data-v="liste">Liste</button><button data-v="cal">Calendrier</button><button data-v="carte">Carte</button><button data-v="recap">Récap</button></div>
+  <div id="chargement">Lecture des séances…</div>
+
+  <section id="vListe" hidden>
+    <button class="ouvrir" id="bOuvrir">＋ Ouvrir un fichier (FIT, GPX, journal)</button>
+    <input type="file" id="fichier" accept=".gpx,.fit,.jsonl" hidden>
+    <div class="filtreListe" id="filtreListe" hidden></div>
+    <div id="liste"></div>
+    <div class="groupe">Exemples</div>
+    <div id="exemples"></div>
+  </section>
+
+  <section id="vCal" hidden>
+    <div class="sel" id="calMode"><button data-v="semaine">Semaine</button><button data-v="mois">Mois</button><button data-v="annee">Année</button></div>
+    <div class="navPer"><button class="ico" id="calPrec">‹</button><b id="calTitre"></b><button class="ico" id="calSuiv">›</button></div>
+    <div id="calCorps"></div>
+    <div class="legende" id="calLegende"></div>
+    <div id="calJour"></div>
+  </section>
+
+  <section id="vCarte" hidden>
+    <div class="ligneF">
+      <select id="cPer"><option value="semaine">Semaine</option><option value="mois">Mois</option><option value="annee">Année</option><option value="tout">Tout</option><option value="dates">Dates…</option></select>
+      <button class="ico" id="cPrec" style="width:34px;height:34px">‹</button><b id="cTitre" style="font-size:13px"></b><button class="ico" id="cSuiv" style="width:34px;height:34px">›</button>
+      <span id="cDates" hidden><input type="date" id="cDu"> → <input type="date" id="cAu"></span>
+      <select id="cSport"></select>
+      <button class="ico" id="cFonds" style="width:34px;height:34px" title="Fonds de carte">🗺</button>
+    </div>
+    <div id="fondsPan" hidden></div>
+    <div id="carteS"></div>
+    <div class="legende" id="cLegende"></div>
+  </section>
+
+  <section id="vRecap" hidden>
+    <details class="filtres" id="rFiltres"><summary id="rResume">Filtres</summary>
+      <div class="chipsSport" id="rSports"></div>
+      <div class="grilleF">
+        <span>Dates</span><input type="date" id="rDu"><input type="date" id="rAu">
+        <span>Distance (<span class="uD">km</span>)</span><input type="number" id="rDmin" placeholder="min" min="0" step="1"><input type="number" id="rDmax" placeholder="max" min="0" step="1">
+        <span>Durée (min)</span><input type="number" id="rTmin" placeholder="min" min="0" step="5"><input type="number" id="rTmax" placeholder="max" min="0" step="5">
+      </div>
+      <button id="rRaz" style="margin-top:8px;padding:6px 10px;font-size:13px">Réinitialiser</button>
+    </details>
+    <div class="sel" id="rGroupe"><button data-v="seance">Séance</button><button data-v="semaine">Semaine</button><button data-v="mois">Mois</button><button data-v="annee">Année</button></div>
+    <div class="groupe" id="rTitreB">Heures</div>
+    <div class="barres" id="rBarres"></div>
+    <table class="tab" id="rTab"></table>
+  </section>
+</div>
+<div class="barreSel" id="barreSel" hidden><button id="bRegr">Regrouper</button><button id="bSupp" class="danger">Supprimer</button><button id="bAnnul">Annuler</button></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="traces.js"></script>
+<script src="seances.js"></script>
+<script src="fonds.js"></script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const S = Seances;
+let toutes = [], vue = S.pref('vue', 'liste'), selMode = false, choisies = new Set(), filtreListe = null;
+const ouvrirSeance = id => { location.href = 'rejeu.html?seance=' + encodeURIComponent(id); };
+const jourCle = t => { const d = new Date(t); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
+const MOISC = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+const debutSemaine = d => { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - (x.getDay() + 6) % 7); return x; };
+
+// ---------- vignette : trace dans un carré, proportions gardées ----------
+function vignette(s, taille = 76) {
+  const pts = s.trace || [];
+  if (pts.length < 2) return `<svg class="vign" viewBox="0 0 76 76"></svg>`;
+  const k = Math.cos(pts[0][0] * Math.PI / 180), xs = pts.map(p => p[1] * k), ys = pts.map(p => -p[0]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys), e = Math.max(x1 - x0, y1 - y0) || 1e-6, m = 8, r = (76 - 2 * m) / e;
+  const ox = m + (76 - 2 * m - (x1 - x0) * r) / 2, oy = m + (76 - 2 * m - (y1 - y0) * r) / 2;
+  const d = (s.traces || [pts]).map(tr => tr.map((p, i) => (i ? 'L' : 'M') + (ox + (p[1] * k - x0) * r).toFixed(1) + ' ' + (oy + (-p[0] - y0) * r).toFixed(1)).join('')).join('');
+  return `<svg class="vign" style="width:${taille}px;height:${taille}px" viewBox="0 0 76 76"><path d="${d}" fill="none" stroke="var(--ac)" stroke-width="2" stroke-linejoin="round"/></svg>`;
+}
+function carteSeance(s, petite = false) {
+  const el = document.createElement('div'); el.className = 'carteS';
+  const d = new Date(s.t0), v = S.vit(s.v2s), di = S.dist(s.dist);
+  const quand = d.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit' }) + ' · ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  const c = [s.commentaire, s.lieu].filter(Boolean).join(' · ');
+  el.innerHTML = (selMode ? `<input type="checkbox" ${choisies.has(s.id) ? 'checked' : ''}>` : '') + vignette(s, petite ? 52 : 76) +
+    `<div class="info"><div class="t"><span class="nomS"></span><small>${quand}</small></div><div class="c"></div>
+     <div class="chiffres"><span><b>${S.duree(s.duree)}</b><small>durée</small></span><span><b>${di.n}</b><small>${di.u}</small></span><span><b>${v.n}</b><small>${v.u} max</small></span>${s.nSauts ? `<span><b>${s.nSauts}</b><small>saut${s.nSauts > 1 ? 's' : ''}</small></span>` : ''}</div></div>`;
+  el.querySelector('.nomS').textContent = S.titre(s); el.querySelector('.c').textContent = c || ' ';
+  el.onclick = e => {
+    if (!selMode) return ouvrirSeance(s.id);
+    choisies.has(s.id) ? choisies.delete(s.id) : choisies.add(s.id);
+    const cb = el.querySelector('input'); if (cb && e.target !== cb) cb.checked = choisies.has(s.id);
+    majBarreSel();
+  };
+  return el;
+}
+
+// ---------- liste ----------
+function rendreListe() {
+  const l = $('liste'); l.innerHTML = '';
+  let ss = toutes;
+  if (filtreListe) ss = ss.filter(filtreListe.f);
+  $('filtreListe').hidden = !filtreListe;
+  if (filtreListe) { $('filtreListe').innerHTML = '<span class="chip"></span>'; const c = $('filtreListe').firstChild; c.textContent = 'Filtre : ' + filtreListe.lib + '  ✕'; c.style.cursor = 'pointer'; c.onclick = () => { filtreListe = null; rendreListe(); }; }
+  if (!ss.length) l.innerHTML = `<div class="sub" style="padding:8px 2px">${S.APPLI ? 'Pas encore de séance : chaque lancement du radar en crée une (les lancements sans navigation sont masqués).' : 'Ouvre une trace FIT ou GPX : elle sera gardée ici, dans ce navigateur.'}</div>`;
+  let mois = '';
+  for (const s of ss) {
+    const d = new Date(s.t0), m = MOIS[d.getMonth()] + ' ' + d.getFullYear();
+    if (m !== mois) { mois = m; l.insertAdjacentHTML('beforeend', `<div class="groupe">${m}</div>`); }
+    l.append(carteSeance(s));
+  }
+  const ex = $('exemples'); ex.innerHTML = '';
+  for (const [n, t, st] of [['1', 'Exemple 1 : alerte entendue, roche évitée', 'Sillon · séance réelle avec le radar · 2 min 30'], ['2', "Exemple 2 : pas d'alerte, collision avec roche", 'Sillon · séance sans le radar · 2 min 40']]) {
+    const b = document.createElement('div'); b.className = 'carteS';
+    b.innerHTML = '<div class="info"><div class="t"></div><div class="c"></div></div><span style="color:var(--ac)">›</span>';
+    b.querySelector('.t').textContent = t; b.querySelector('.c').textContent = st;
+    b.onclick = () => { location.href = 'rejeu.html?exemple=' + n; };
+    ex.append(b);
+  }
+}
+$('bOuvrir').onclick = () => $('fichier').click();
+$('fichier').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try { const src = await S.ajouterFichier(f); await charger(); const s = toutes.find(x => x.sources.includes(src)); if (s) ouvrirSeance(s.id); else alert('Trace trop courte ou illisible : elle est gardée mais masquée.'); }
+  catch (err) { alert('Fichier illisible : ' + err.message); }
+};
+// sélection : regrouper ou supprimer
+function majBarreSel() {
+  $('barreSel').hidden = !selMode;
+  $('bRegr').disabled = choisies.size < 2; $('bRegr').textContent = 'Regrouper' + (choisies.size > 1 ? ` (${choisies.size})` : '');
+  $('bSupp').disabled = !choisies.size; $('bSupp').textContent = 'Supprimer' + (choisies.size ? ` (${choisies.size})` : '');
+}
+function modeSel(on) { selMode = on; choisies.clear(); $('bSel').classList.toggle('on', on); if (on && vue !== 'liste') changerVue('liste'); rendreListe(); majBarreSel(); }
+$('bSel').onclick = () => modeSel(!selMode);
+$('bAnnul').onclick = () => modeSel(false);
+$('bRegr').onclick = async () => { const l = toutes.filter(s => choisies.has(s.id)); S.regrouper(l); modeSel(false); await charger(); };
+$('bSupp').onclick = async () => {
+  const l = toutes.filter(s => choisies.has(s.id));
+  if (!confirm(`Supprimer ${l.length} séance${l.length > 1 ? 's' : ''} ? Les journaux sont effacés du téléphone et les fichiers importés de l'appli. C'est définitif.`)) return;
+  for (const s of l) await S.supprimer(s);
+  modeSel(false); await charger();
+};
+
+// ---------- calendrier ----------
+let calMode = S.pref('cal.mode', 'mois'), calDate = new Date(), calJour = null;
+const parJour = () => { const m = new Map(); for (const s of toutes) { const k = jourCle(s.t0); if (!m.has(k)) m.set(k, []); m.get(k).push(s); } return m; };
+const points = l => (l || []).slice(0, 3).map(s => `<i style="background:${S.couleur(s)}"></i>`).join('');
+function rendreCal() {
+  document.querySelectorAll('#calMode button').forEach(b => b.classList.toggle('on', b.dataset.v === calMode));
+  const pj = parJour(), corps = $('calCorps'), auj = jourCle(Date.now());
+  corps.innerHTML = '';
+  if (calMode === 'mois') {
+    const y = calDate.getFullYear(), m = calDate.getMonth(), n = new Date(y, m + 1, 0).getDate(), dec = (new Date(y, m, 1).getDay() + 6) % 7;
+    $('calTitre').textContent = MOIS[m][0].toUpperCase() + MOIS[m].slice(1) + ' ' + y;
+    let h = '<div class="mois">' + ['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(j => `<div class="j">${j}</div>`).join('') + '<div class="d vide"></div>'.repeat(dec);
+    for (let d = 1; d <= n; d++) { const k = y + '-' + (m + 1) + '-' + d; h += `<div class="d${k === calJour ? ' sel' : ''}${k === auj ? ' auj' : ''}" data-k="${k}">${d}<span class="pts">${points(pj.get(k))}</span></div>`; }
+    corps.innerHTML = h + '</div>';
+  } else if (calMode === 'semaine') {
+    const d0 = debutSemaine(calDate), d6 = new Date(d0); d6.setDate(d6.getDate() + 6);
+    $('calTitre').textContent = `${d0.getDate()} ${MOISC[d0.getMonth()]} – ${d6.getDate()} ${MOISC[d6.getMonth()]} ${d6.getFullYear()}`;
+    let h = '<div class="semaine">';
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(d0); d.setDate(d.getDate() + i); const k = jourCle(d), l = pj.get(k) || [];
+      h += `<div class="jour${k === calJour ? ' sel' : ''}" data-k="${k}"><b>${d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })}</b><span class="pts">${points(l)}</span><span>${l.length ? l.map(s => S.titre(s) + ' ' + S.duree(s.duree)).join(' · ') : ''}</span></div>`;
+    }
+    corps.innerHTML = h + '</div>';
+  } else {
+    const y = calDate.getFullYear(); $('calTitre').textContent = y + ` · ${toutes.filter(s => new Date(s.t0).getFullYear() === y).length} séances`;
+    let h = '<div class="annee">';
+    for (let m = 0; m < 12; m++) {
+      const n = new Date(y, m + 1, 0).getDate(), dec = (new Date(y, m, 1).getDay() + 6) % 7;
+      h += `<div><div class="m" data-m="${m}">${MOIS[m][0].toUpperCase() + MOIS[m].slice(1)}</div><div class="g">` + '<i class="x"></i>'.repeat(dec);
+      for (let d = 1; d <= n; d++) { const l = pj.get(y + '-' + (m + 1) + '-' + d); h += `<i${l ? ` style="background:${S.couleur(l[0])}"` : ''}></i>`; }
+      h += '</div></div>';
+    }
+    corps.innerHTML = h + '</div>';
+    corps.querySelectorAll('.m').forEach(e => e.onclick = () => { calMode = 'mois'; calDate = new Date(y, +e.dataset.m, 1); S.setPref('cal.mode', calMode); rendreCal(); });
+  }
+  corps.querySelectorAll('[data-k]').forEach(e => e.onclick = () => { calJour = e.dataset.k; rendreCal(); });
+  // légende : sports présents
+  const vus = [...new Set(toutes.map(s => s.sport))];
+  $('calLegende').innerHTML = vus.map(id => { const sp = S.sport(id); return `<span><i style="background:${sp ? sp.c : '#8a9aa0'}"></i>${sp ? sp.nom : 'Sans sport'}</span>`; }).join('');
+  const j = $('calJour'); j.innerHTML = '';
+  if (calJour && calMode !== 'annee') {
+    const [y, m, d] = calJour.split('-').map(Number), l = pj.get(calJour) || [];
+    j.insertAdjacentHTML('beforeend', `<div class="groupe">${new Date(y, m - 1, d).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</div>`);
+    if (!l.length) j.insertAdjacentHTML('beforeend', '<div class="sub">Pas de séance ce jour-là.</div>');
+    for (const s of l) j.append(carteSeance(s, true));
+  }
+}
+document.querySelectorAll('#calMode button').forEach(b => b.onclick = () => { calMode = b.dataset.v; S.setPref('cal.mode', calMode); rendreCal(); });
+const decaler = (d, mode, k) => { const x = new Date(d); if (mode === 'semaine') x.setDate(x.getDate() + 7 * k); else if (mode === 'mois') x.setMonth(x.getMonth() + k, 1); else x.setFullYear(x.getFullYear() + k); return x; };
+$('calPrec').onclick = () => { calDate = decaler(calDate, calMode, -1); rendreCal(); };
+$('calSuiv').onclick = () => { calDate = decaler(calDate, calMode, 1); rendreCal(); };
+
+// ---------- carte de toutes les traces ----------
+let carte = null, couche = null, cPer = S.pref('carte.per', 'mois'), cDate = new Date();
+function bornesPer(per, d) {
+  if (per === 'semaine') { const a = debutSemaine(d), b = new Date(a); b.setDate(b.getDate() + 7); return [a, b]; }
+  if (per === 'mois') return [new Date(d.getFullYear(), d.getMonth(), 1), new Date(d.getFullYear(), d.getMonth() + 1, 1)];
+  if (per === 'annee') return [new Date(d.getFullYear(), 0, 1), new Date(d.getFullYear() + 1, 0, 1)];
+  if (per === 'dates') { const a = $('cDu').value ? new Date($('cDu').value) : new Date(0), b = $('cAu').value ? new Date($('cAu').value) : new Date(); b.setDate(b.getDate() + 1); return [a, b]; }
+  return [new Date(0), new Date(8.64e15)];
+}
+function titrePer(per, d) {
+  if (per === 'semaine') { const [a] = bornesPer(per, d); return 'semaine du ' + a.getDate() + ' ' + MOISC[a.getMonth()]; }
+  if (per === 'mois') return MOIS[d.getMonth()] + ' ' + d.getFullYear();
+  if (per === 'annee') return '' + d.getFullYear();
+  return '';
+}
+function rendreCarte() {
+  if (!carte) {
+    carte = L.map('carteS', { zoomControl: true }).setView([48.65, -2.05], 11);
+    fondsCarte(carte, $('fondsPan'), 'seances.fonds', { base: 'ortho', shom: false });
+    couche = L.layerGroup().addTo(carte);
+    $('cSport').innerHTML = '<option value="">Tous sports</option>' + S.sports().map(s => `<option value="${s.id}">${s.nom}</option>`).join('');
+    $('cSport').value = S.pref('carte.sport', '');
+  }
+  setTimeout(() => carte.invalidateSize(), 50);
+  $('cPer').value = cPer; $('cDates').hidden = cPer !== 'dates';
+  const nav = cPer !== 'tout' && cPer !== 'dates';
+  $('cPrec').hidden = $('cSuiv').hidden = !nav; $('cTitre').textContent = titrePer(cPer, cDate);
+  const [a, b] = bornesPer(cPer, cDate), sp = $('cSport').value;
+  const ss = toutes.filter(s => s.t0 >= +a && s.t0 < +b && (!sp || s.sport === sp));
+  couche.clearLayers();
+  const tous = [];
+  for (const s of ss) for (const tr of s.traces) {
+    if (tr.length < 2) continue;
+    const pl = L.polyline(tr, { color: S.couleur(s), weight: 3, opacity: .9 }).addTo(couche); tous.push(...tr);
+    const v = S.vit(s.v2s), di = S.dist(s.dist);
+    pl.bindPopup(`<b>${S.titre(s)} · ${new Date(s.t0).toLocaleDateString('fr-FR')}</b><br>${S.duree(s.duree)} · ${di.n} ${di.u} · ${v.n} ${v.u} max${s.lieu ? '<br>' + s.lieu : ''}<br><a href="rejeu.html?seance=${encodeURIComponent(s.id)}">Ouvrir la séance ›</a>`);
+  }
+  if (tous.length) carte.fitBounds(L.latLngBounds(tous), { padding: [20, 20], maxZoom: 15 });
+  const vus = [...new Set(ss.map(s => s.sport))];
+  $('cLegende').innerHTML = `<span>${ss.length} séance${ss.length > 1 ? 's' : ''}</span>` + vus.map(id => { const x = S.sport(id); return `<span><i style="background:${x ? x.c : '#8a9aa0'}"></i>${x ? x.nom : 'Sans sport'}</span>`; }).join('');
+}
+$('cPer').onchange = () => { cPer = $('cPer').value; cDate = new Date(); S.setPref('carte.per', cPer); rendreCarte(); };
+$('cPrec').onclick = () => { cDate = decaler(cDate, cPer, -1); rendreCarte(); };
+$('cSuiv').onclick = () => { cDate = decaler(cDate, cPer, 1); rendreCarte(); };
+$('cSport').onchange = () => { S.setPref('carte.sport', $('cSport').value); rendreCarte(); };
+$('cDu').onchange = $('cAu').onchange = rendreCarte;
+$('cFonds').onclick = () => { $('fondsPan').hidden = !$('fondsPan').hidden; };
+
+// ---------- récapitulatif ----------
+const RF_DEF = { sports: [], du: '', au: '', dmin: '', dmax: '', tmin: '', tmax: '', groupe: 'mois' };
+let rf = Object.assign({}, RF_DEF, S.pref('recap', {}));
+function filtrees() {
+  const kD = S.unites().d === 'mi' ? 1852 : 1000;
+  return toutes.filter(s => (!rf.sports.length || rf.sports.includes(s.sport)) && (!rf.du || s.t0 >= +new Date(rf.du)) && (!rf.au || s.t0 < +new Date(rf.au) + 864e5)
+    && (rf.dmin === '' || s.dist >= rf.dmin * kD) && (rf.dmax === '' || s.dist <= rf.dmax * kD) && (rf.tmin === '' || s.duree >= rf.tmin * 60000) && (rf.tmax === '' || s.duree <= rf.tmax * 60000));
+}
+function cleGroupe(s, g) {
+  const d = new Date(s.t0);
+  if (g === 'annee') return { k: '' + d.getFullYear(), lib: '' + d.getFullYear(), court: '' + d.getFullYear(), a: new Date(d.getFullYear(), 0, 1), b: new Date(d.getFullYear() + 1, 0, 1) };
+  if (g === 'mois') { const a = new Date(d.getFullYear(), d.getMonth(), 1); return { k: d.getFullYear() + '-' + d.getMonth(), lib: MOISC[d.getMonth()] + ' ' + d.getFullYear(), court: MOIS[d.getMonth()][0].toUpperCase(), a, b: new Date(d.getFullYear(), d.getMonth() + 1, 1) }; }
+  if (g === 'semaine') { const a = debutSemaine(d), b = new Date(a); b.setDate(b.getDate() + 7); return { k: '' + +a, lib: 'sem. ' + a.getDate() + '/' + (a.getMonth() + 1), court: a.getDate() + '/' + (a.getMonth() + 1), a, b }; }
+  return { k: s.id, lib: d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' }), court: d.getDate() + '/' + (d.getMonth() + 1), seance: s };
+}
+function rendreRecap() {
+  S.setPref('recap', rf);
+  document.querySelectorAll('.uD').forEach(e => e.textContent = S.unites().d === 'mi' ? 'milles' : 'km');
+  $('rSports').innerHTML = '';
+  for (const sp of S.sports()) {
+    const b = document.createElement('button'); b.className = rf.sports.includes(sp.id) ? 'on' : '';
+    b.innerHTML = `<i style="background:${sp.c}"></i>`; b.append(sp.nom);
+    b.onclick = () => { rf.sports = rf.sports.includes(sp.id) ? rf.sports.filter(x => x !== sp.id) : [...rf.sports, sp.id]; rendreRecap(); };
+    $('rSports').append(b);
+  }
+  for (const [k, id] of [['du', 'rDu'], ['au', 'rAu'], ['dmin', 'rDmin'], ['dmax', 'rDmax'], ['tmin', 'rTmin'], ['tmax', 'rTmax']]) $(id).value = rf[k];
+  const nf = ['du', 'au', 'dmin', 'dmax', 'tmin', 'tmax'].filter(k => rf[k] !== '').length + (rf.sports.length ? 1 : 0);
+  $('rResume').textContent = 'Filtres' + (nf ? ` (${nf} actif${nf > 1 ? 's' : ''})` : ' : toutes les séances');
+  document.querySelectorAll('#rGroupe button').forEach(b => b.classList.toggle('on', b.dataset.v === rf.groupe));
+  const ss = filtrees(), grp = new Map();
+  for (const s of ss) { const c = cleGroupe(s, rf.groupe); if (!grp.has(c.k)) grp.set(c.k, Object.assign(c, { l: [] })); grp.get(c.k).l.push(s); }
+  const G = [...grp.values()]; // du plus récent au plus ancien (séances déjà triées)
+  // barres : heures par groupe et par sport, 12 derniers groupes, du plus ancien au plus récent
+  const B = G.slice(0, 12).reverse(), hm = Math.max(1, ...B.map(g => g.l.reduce((a, s) => a + s.duree, 0)));
+  $('rTitreB').textContent = 'Heures' + (B.length < G.length ? ' · les 12 dernières périodes' : '');
+  $('rBarres').innerHTML = B.map(g => {
+    const parSport = new Map(); for (const s of g.l) parSport.set(s.sport, (parSport.get(s.sport) || 0) + s.duree);
+    return `<div title="${g.lib} : ${S.duree(g.l.reduce((a, s) => a + s.duree, 0))}">` + [...parSport].map(([sp, d]) => `<i style="height:${d / hm * 96}px;background:${(S.sport(sp) || {}).c || '#8a9aa0'}"></i>`).join('') + `<small>${g.court}</small></div>`;
+  }).join('');
+  const v = S.vit(0), di = S.dist(0), tot = l => ({ n: l.length, d: l.reduce((a, s) => a + s.duree, 0), km: l.reduce((a, s) => a + s.dist, 0), vm: Math.max(0, ...l.map(s => s.v2s)), sa: l.reduce((a, s) => a + s.nSauts, 0) });
+  const ligne = (lib, t, i, cls = '') => `<tr class="${cls}"${i != null ? ` data-i="${i}"` : ''}><td class="${i != null ? 'per' : ''}">${lib}</td><td>${t.n}</td><td>${S.duree(t.d)}</td><td>${S.dist(t.km, 0).n}</td><td>${S.vit(t.vm).n}</td><td>${t.sa}</td></tr>`;
+  $('rTab').innerHTML = `<tr><th></th><th>séances</th><th>durée</th><th>${di.u}</th><th>${v.u} max</th><th>sauts</th></tr>` + ligne('Total', tot(ss), null, 'tot') + G.map((g, i) => ligne(g.lib, tot(g.l), i)).join('');
+  $('rTab').querySelectorAll('tr[data-i]').forEach(tr => tr.onclick = () => {
+    const g = G[+tr.dataset.i];
+    if (g.seance) return ouvrirSeance(g.seance.id);
+    const ids = new Set(g.l.map(s => s.id));
+    filtreListe = { lib: g.lib, f: s => ids.has(s.id) }; changerVue('liste');
+  });
+}
+for (const [k, id] of [['du', 'rDu'], ['au', 'rAu'], ['dmin', 'rDmin'], ['dmax', 'rDmax'], ['tmin', 'rTmin'], ['tmax', 'rTmax']]) $(id).onchange = () => { rf[k] = $(id).value === '' ? '' : $(id).type === 'number' ? +$(id).value : $(id).value; rendreRecap(); };
+document.querySelectorAll('#rGroupe button').forEach(b => b.onclick = () => { rf.groupe = b.dataset.v; rendreRecap(); });
+$('rRaz').onclick = () => { rf = Object.assign({}, RF_DEF, { groupe: rf.groupe }); rendreRecap(); };
+
+// ---------- vues ----------
+function changerVue(v) {
+  vue = v; S.setPref('vue', v);
+  document.querySelectorAll('#onglets button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  $('vListe').hidden = v !== 'liste'; $('vCal').hidden = v !== 'cal'; $('vCarte').hidden = v !== 'carte'; $('vRecap').hidden = v !== 'recap';
+  if (v === 'liste') rendreListe(); else if (v === 'cal') rendreCal(); else if (v === 'carte') rendreCarte(); else rendreRecap();
+}
+document.querySelectorAll('#onglets button').forEach(b => b.onclick = () => { if (selMode && b.dataset.v !== 'liste') modeSel(false); changerVue(b.dataset.v); });
+
+async function charger() {
+  $('chargement').hidden = false;
+  try { toutes = await S.liste((f, n) => { $('chargement').textContent = `Lecture des séances… ${f} / ${n}`; }); }
+  catch (e) { $('chargement').textContent = 'Lecture impossible : ' + e.message; return; }
+  $('chargement').hidden = true;
+  changerVue(vue);
+}
+if ('serviceWorker' in navigator && !S.APPLI) navigator.serviceWorker.register('sw.js').catch(() => {});
+charger();
+</script>
+</body>
+</html>

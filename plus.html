@@ -46,6 +46,7 @@ const ENTREES = [
   ['carte', 'carte.html', 'Carte et téléchargements', 'relief à télécharger, applis montre, roches partagées'],
   ['roches', 'editeur_zones.html', 'Mes roches', 'marquer les roches et hauts-fonds que le relevé ne voit pas'],
   ['profils', 'radar.html#profils', 'Profils de navigation', 'créer, modifier, dupliquer'],
+  ['reglages', '#reglages', 'Réglages généraux', 'unités de vitesse et de distance, liste des sports'],
   ['notice', 'notice.html', 'Notice', 'tout le détail : réglages, dépannage'],
   ['nouveautes', '#nouveautes', 'Nouveautés', 'ce qui a changé à chaque version'],
   null,
@@ -65,6 +66,7 @@ for (const e of ENTREES) {
   a.querySelector('.t').textContent = titre; a.querySelector('small').textContent = sous;
   if (href === '#nouveautes') a.onclick = e => { e.preventDefault(); nouveautes.ouvrir(true); };
   if (href === '#journaux') a.onclick = e => { e.preventDefault(); ouvrirJournaux(); };
+  if (href === '#reglages') a.onclick = e => { e.preventDefault(); ouvrirReglagesGeneraux(); };
   cible.append(a);
 }
 </script>
@@ -78,6 +80,7 @@ fetch('version.json').then(r => r.ok ? r.json() : null).catch(() => null).then(v
 <script src="maj.js"></script>
 <script>verifierMaj(document.getElementById('maj'));</script>
 <script src="journal.js"></script>
+<script src="seances.js"></script>
 <script>
 if (location.hash === '#zones') location.replace('carte.html#zones');   // ancien lien : les zones sont dans la carte
 
@@ -92,6 +95,48 @@ function ouvrirJournaux() {
   f.onclick = e => { if (e.target === f) f.remove(); };
   afficherJournaux(f.querySelector('#listeJournaux'));
 }
+
+// Réglages généraux : unités (séances, rejeu) et liste des sports (personnalisable, couleur pour le calendrier et la carte)
+function ouvrirReglagesGeneraux() {
+  const f = document.createElement('div'); f.className = 'feuille on';
+  f.innerHTML = '<div class="in"><h2 style="margin-top:0">Réglages généraux</h2>' +
+    '<div class="ligne"><span>Vitesse</span><span class="selU" data-k="v"></span></div>' +
+    '<div class="ligne"><span>Distance</span><span class="selU" data-k="d"></span></div>' +
+    '<h2>Sports</h2><div class="sub">Touche la pastille pour changer la couleur (calendrier, carte des séances).</div><div id="listeSports" style="margin-top:6px"></div>' +
+    '<div style="display:flex;gap:8px;margin-top:10px"><button class="btn" id="ajSport" style="flex:1">＋ Ajouter un sport</button><button class="btn" id="razSports">Liste d’origine</button></div>' +
+    '<button class="btn prim" style="width:100%;margin-top:16px" id="fermerReg">Fermer</button></div>';
+  document.body.append(f);
+  const fermer = () => { f.remove(); if (location.hash === '#reglages') history.replaceState(null, '', 'plus.html'); };
+  f.querySelector('#fermerReg').onclick = fermer; f.onclick = e => { if (e.target === f) fermer(); };
+  const CHOIX = { v: [['kmh', 'km/h'], ['nd', 'nœuds'], ['ms', 'm/s']], d: [['km', 'km'], ['mi', 'milles']] };
+  const unites = () => f.querySelectorAll('.selU').forEach(el => {
+    const k = el.dataset.k, u = Seances.unites()[k]; el.innerHTML = '';
+    el.style.cssText = 'display:inline-flex;background:var(--bg);border:1px solid var(--ln);border-radius:10px;padding:2px';
+    for (const [v, lib] of CHOIX[k]) {
+      const b = document.createElement('button'); b.textContent = lib;
+      b.style.cssText = 'border:0;padding:6px 11px;border-radius:8px;font-size:13px;' + (v === u ? 'background:var(--p2);color:var(--ac)' : 'background:none;color:var(--mu)');
+      b.onclick = () => { Seances.setUnites({ [k]: v }); unites(); };
+      el.append(b);
+    }
+  });
+  const sports = () => {
+    const box = f.querySelector('#listeSports'), l = Seances.sports(); box.innerHTML = '';
+    l.forEach((sp, i) => {
+      const r = document.createElement('div'); r.className = 'ligne';
+      r.innerHTML = '<button title="Couleur" style="width:30px;height:30px;padding:0;border-radius:50%;flex:none"></button><input style="flex:1"><button title="Supprimer" style="padding:6px 10px">✕</button>';
+      const [bc, inp, bx] = r.children;
+      bc.style.background = sp.c; inp.value = sp.nom;
+      bc.onclick = () => { const P = Seances.PALETTE; sp.c = P[(P.indexOf(sp.c) + 1) % P.length]; Seances.setSports(l); sports(); };
+      inp.onchange = () => { sp.nom = inp.value.trim() || sp.nom; Seances.setSports(l); };
+      bx.onclick = () => { if (confirm('Retirer « ' + sp.nom + ' » de la liste ? Les séances de ce sport passent « sans sport ».')) { l.splice(i, 1); Seances.setSports(l); sports(); } };
+      box.append(r);
+    });
+  };
+  f.querySelector('#ajSport').onclick = () => { const n = prompt('Nom du sport'); if (!n) return; const l = Seances.sports(); l.push({ id: 's' + Date.now().toString(36), nom: n.trim(), c: Seances.PALETTE[l.length % Seances.PALETTE.length] }); Seances.setSports(l); sports(); };
+  f.querySelector('#razSports').onclick = () => { if (confirm('Revenir à la liste de sports d’origine ?')) { Seances.setSports(Seances.SPORTS_DEFAUT.map(s => ({ ...s }))); sports(); } };
+  unites(); sports();
+}
+if (location.hash === '#reglages') ouvrirReglagesGeneraux();
 </script>
 </body>
 </html>

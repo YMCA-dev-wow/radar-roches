@@ -34,7 +34,7 @@ import java.util.Arrays;
  */
 @CapacitorPlugin(name = "Journal")
 public class JournalPlugin extends Plugin {
-    private static final int GARDER = 30; // journaux conservés
+    private static final int GARDER = 400; // journaux conservés (15/11/2026 : historique des séances, ~1 Mo par séance de 2 h)
     private FileWriter sortie; private String nom;
     private HandlerThread filBattement; private Handler battement;
     private volatile boolean ecranAllume = true;
@@ -169,6 +169,27 @@ public class JournalPlugin extends Plugin {
             byte[] b = java.nio.file.Files.readAllBytes(f.toPath());
             JSObject r = new JSObject(); r.put("texte", new String(b, java.nio.charset.StandardCharsets.UTF_8)); call.resolve(r);
         } catch (IOException e) { call.reject(e.getMessage()); }
+    }
+
+    // Export d'un fichier (GPX, journal, FIT d'origine) : écrit dans le cache puis fenêtre de partage d'Android
+    @PluginMethod
+    public void partagerFichier(PluginCall call) {
+        String n = call.getString("nom", "seance.gpx").replaceAll("[^A-Za-z0-9._ -]", "_");
+        try {
+            File d = new File(getContext().getCacheDir(), "export"); d.mkdirs();
+            File f = new File(d, n);
+            java.nio.file.Files.write(f.toPath(), android.util.Base64.decode(call.getString("base64", ""), android.util.Base64.DEFAULT));
+            Uri u = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", f);
+            Intent i = new Intent(Intent.ACTION_SEND);
+            i.setType(call.getString("type", "application/octet-stream"));
+            i.putExtra(Intent.EXTRA_STREAM, u);
+            i.putExtra(Intent.EXTRA_SUBJECT, "Radar roches : " + n);
+            i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            Intent choix = Intent.createChooser(i, "Exporter " + n);
+            choix.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(choix);
+            call.resolve();
+        } catch (Exception e) { call.reject(e.getMessage()); }
     }
 
     @PluginMethod

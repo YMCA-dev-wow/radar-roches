@@ -1,5 +1,5 @@
-// Barre de navigation du bas de l'appli (Radar, Rejeu, Plus ; l'éditeur de roches est dans Plus) et petites icônes communes, sans dépendance réseau.
-// L'onglet actif vient de <body data-onglet="radar|rejeu|plus">. La barre n'apparaît que dans l'appli Android :
+// Barre de navigation du bas de l'appli (Radar, Séances, Plus ; l'éditeur de roches est dans Plus) et petites icônes communes, sans dépendance réseau.
+// L'onglet actif vient de <body data-onglet="radar|seances|plus"> (le rejeu, fiche d'une séance, est dans « Séances »). La barre n'apparaît que dans l'appli Android :
 // la version web (ordinateur) a sa propre page d'accueil.
 (function () {
   const svg = (d, t = 24) => `<svg width="${t}" height="${t}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
@@ -8,6 +8,7 @@
     roches: '<path d="M3 19 L8 10 L12 14 L15 9 L21 19 Z"/><path d="M2 21 h20"/>',
     plus: '<circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="19" cy="12" r="1.5" fill="currentColor"/>',
     carte: '<path d="M3 6 l6-2 6 2 6-2 v14 l-6 2 -6-2 -6 2 z"/><path d="M9 4 v14 M15 6 v14"/>',
+    seances: '<path d="M4 5 h16 v15 H4 z"/><path d="M4 9 h16 M8 3 v4 M16 3 v4"/><path d="M8 13 h3 M8 16 h6"/>',
     rejeu: '<path d="M3 12 a9 9 0 1 0 3-6.7"/><path d="M3 4 v4 h4"/><path d="M12 8 v4 l3 2"/>',
     profils: '<path d="M4 6 h10 M18 6 h2 M4 12 h4 M12 12 h8 M4 18 h12 M20 18 h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
     reglages: '<circle cx="12" cy="12" r="3"/><path d="M12 2 v3 M12 19 v3 M2 12 h3 M19 12 h3 M5 5 l2 2 M17 17 l2 2 M5 19 l2-2 M17 7 l2-2"/>',
@@ -27,7 +28,7 @@
   const appli = !!window.androidBridge;
   document.documentElement.classList.toggle('appli', appli);
   if (!appli) return;
-  const onglets = [['radar', 'radar.html', 'Radar'], ['rejeu', 'rejeu.html', 'Rejeu'], ['plus', 'plus.html', 'Plus']];
+  const onglets = [['radar', 'radar.html', 'Radar'], ['seances', 'seances.html', 'Séances'], ['plus', 'plus.html', 'Plus']];
   document.addEventListener('DOMContentLoaded', () => {
     if (document.body.dataset.sansBarre != null) return;
     const actif = document.body.dataset.onglet || 'plus';
