@@ -2,6 +2,14 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 48,
+      "date": "2026-11-16",
+      "titre": "Essai : Health Connect",
+      "points": [
+        "Plus → Avancé → Health Connect (essai) : regarde ce que Garmin Connect et les autres applis déposent sur le téléphone (séances, fréquence cardiaque, trace) et permet d'envoyer un rapport sans positions. Première étape pour récupérer les données de la montre sans câble."
+      ]
+    },
+    {
       "id": 47,
       "date": "2026-11-16",
       "titre": "Choix du canal de mise à jour",

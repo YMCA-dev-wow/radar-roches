@@ -14,6 +14,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(ZonesPlugin.class);   // relief des zones téléchargé à la demande
         registerPlugin(TuilesPlugin.class);  // tuiles du relevé décodées par Android (écran éteint)
         registerPlugin(SautPlugin.class);    // détection des sauts (accéléromètre, baromètre), version d'essai
+        registerPlugin(SantePlugin.class);   // Health Connect : séances et fréquence cardiaque des autres applis (prototype)
         super.onCreate(savedInstanceState);
 
         // Geste retour : page précédente ; pendant la navigation radar, il ne quitte jamais le radar

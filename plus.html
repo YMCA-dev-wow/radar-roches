@@ -52,6 +52,7 @@ const ENTREES = [
   null,
   ['reglages', 'radar.html#avance', 'Réglages avancés et essais', 'marée, sons, montre, mode test, simulation'],
   ['journal', '#journaux', 'Journaux de session', 'à envoyer pour analyser un problème'],
+  ['montre', '#sante', 'Health Connect (essai)', 'ce que Garmin Connect et les autres applis déposent sur le téléphone : séances, fréquence cardiaque, trace'],
   ['telecharger', '#canal', 'Canal de mise à jour', 'testeurs (versions validées) ou développement (chaque modification)'],
   ['moderation', 'carte.html#moderation', 'Modération', 'jeux de roches partagés à valider'],
 ];
@@ -69,6 +70,7 @@ for (const e of ENTREES) {
   if (href === '#journaux') a.onclick = e => { e.preventDefault(); ouvrirJournaux(); };
   if (href === '#reglages') a.onclick = e => { e.preventDefault(); ouvrirReglagesGeneraux(); };
   if (href === '#canal') a.onclick = e => { e.preventDefault(); ouvrirCanal(); };
+  if (href === '#sante') a.onclick = e => { e.preventDefault(); ouvrirSante(); };
   cible.append(a);
 }
 </script>
@@ -139,6 +141,64 @@ function ouvrirReglagesGeneraux() {
   unites(); sports();
 }
 if (location.hash === '#reglages') ouvrirReglagesGeneraux();
+if (location.hash === '#sante') ouvrirSante();
+
+// Health Connect (prototype) : diagnostic de ce que les autres applis déposent dans le carnet de santé d'Android
+// (séances, fréquence cardiaque, vitesse, distance, trace GPS), et rapport à envoyer (comptes seulement, sans positions)
+function ouvrirSante() {
+  const f = document.createElement('div'); f.className = 'feuille on';
+  f.innerHTML = '<div class="in"><h2 style="margin-top:0">Health Connect (essai)</h2>' +
+    '<div class="sub">Health Connect est le carnet de santé d’Android : Garmin Connect (et d’autres applis) y déposent tes séances et ta fréquence cardiaque. ' +
+    'Cet essai regarde ce qui y est disponible, pour savoir si Radar roches pourra un jour les afficher sans câble ni fichier à copier.</div>' +
+    '<div id="sEtat" style="margin-top:10px">…</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn prim" id="sAut" style="flex:1">Autoriser l’accès</button><button class="btn" id="sReg">Autorisations Android</button></div>' +
+    '<div class="ligne"><span>Période analysée</span><select id="sJours"><option value="7">7 jours</option><option value="30" selected>30 jours</option><option value="90">90 jours</option></select></div>' +
+    '<button class="btn prim" id="sAna" style="width:100%">Analyser</button>' +
+    '<div id="sRes" style="margin-top:10px"></div>' +
+    '<button class="btn" id="sEnv" style="width:100%;margin-top:10px" hidden>Envoyer le rapport (sans positions)</button>' +
+    '<button class="btn" style="width:100%;margin-top:16px" id="sFermer">Fermer</button></div>';
+  document.body.append(f);
+  const fermer = () => { f.remove(); if (location.hash === '#sante') history.replaceState(null, '', 'plus.html'); };
+  f.querySelector('#sFermer').onclick = fermer; f.onclick = e => { if (e.target === f) fermer(); };
+  const $s = id => f.querySelector('#' + id), C = window.Capacitor;
+  if (!(C && C.isNativePlatform && C.isNativePlatform())) { $s('sEtat').textContent = 'Réglage de l’appli Android seulement.'; ['sAut', 'sReg', 'sAna'].forEach(i => $s(i).disabled = true); return; }
+  const P = C.registerPlugin('Sante');
+  const NOMS = { READ_EXERCISE: 'séances', READ_EXERCISE_ROUTES: 'traces GPS', READ_HEART_RATE: 'fréquence cardiaque', READ_SPEED: 'vitesse', READ_DISTANCE: 'distance', READ_HEALTH_DATA_HISTORY: 'historique (plus de 30 jours)' };
+  const APPLIS = { 'com.garmin.android.apps.connectmobile': 'Garmin Connect', 'com.stt.android.suunto': 'Suunto', 'com.strava': 'Strava', 'com.google.android.apps.fitness': 'Google Fit', 'com.sec.android.app.shealth': 'Samsung Health' };
+  const nomAppli = p => APPLIS[p] || p;
+  let rapport = null;
+  const afficherEtat = e => {
+    const ok = Object.values(e.permissions || {}).filter(Boolean).length;
+    $s('sEtat').innerHTML = `<div class="sub">Android ${e.android} · Health Connect ${e.disponible ? 'intégré' : 'absent (Android 14 ou plus requis)'} · Garmin Connect ${e.garminConnect ? 'installé' : 'non installé'}</div>` +
+      `<div class="sub" style="margin-top:4px">Autorisations (${ok}/6) : ` + Object.entries(e.permissions || {}).map(([k, v]) => `${v ? '✓' : '✗'} ${NOMS[k] || k}`).join(' · ') + '</div>';
+  };
+  P.etat().then(afficherEtat).catch(e => { $s('sEtat').textContent = 'Erreur : ' + e.message; });
+  $s('sAut').onclick = () => P.demander().then(afficherEtat).catch(e => alert(e.message));
+  $s('sReg').onclick = () => P.reglages().catch(e => alert(e.message));
+  $s('sAna').onclick = async () => {
+    $s('sRes').textContent = 'Lecture de Health Connect…'; $s('sEnv').hidden = true;
+    try {
+      const r = await P.diagnostic({ jours: +$s('sJours').value }); rapport = r; afficherEtat(r);
+      const h = t => new Date(t).toLocaleString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      let html = '';
+      const err = Object.entries(r.erreurs || {});
+      if (err.length) html += '<div class="sub" style="color:var(--warn)">Lecture refusée : ' + err.map(([k]) => k).join(', ') + ' (autorisation manquante ?)</div>';
+      html += '<h2>Par appli</h2>' + ((r.origines || []).length ? r.origines.map(o => `<div class="ligne"><span>${nomAppli(o.appli)}<small>${o.seances} séance(s) · FC : ${o.mesuresFC} mesures · vitesse : ${o.vitesse} · distance : ${o.distance}</small></span></div>`).join('') : '<div class="sub">Rien sur la période.</div>');
+      html += `<h2>Séances (${(r.seances || []).length})</h2>`;
+      for (const s of (r.seances || []).sort((a, b) => b.debut - a.debut)) {
+        const tr = typeof s.tracePoints === 'number' ? (s.tracePoints ? `${s.tracePoints} points${s.tracePas ? ' (1 toutes les ' + String(s.tracePas).replace('.', ',') + ' s)' : ''}` : 'aucune') : s.tracePoints;
+        const fc = s.fcMesures ? `${s.fcMesures} mesures${s.fcPas ? ' (1 toutes les ' + String(s.fcPas).replace('.', ',') + ' s)' : ''}, ${s.fcMin}–${s.fcMoy}–${s.fcMax} bpm` : 'aucune';
+        html += `<div class="ligne"><span>${h(s.debut)} · ${s.type}${s.titre ? ' · ' + s.titre : ''}<small>${nomAppli(s.origine)} · ${Math.round((s.fin - s.debut) / 60000)} min · trace : ${tr} · FC : ${fc} · vitesse : ${s.vitesseMesures} mesures · distance : ${(s.distance / 1000).toFixed(1).replace('.', ',')} km</small></span></div>`;
+      }
+      $s('sRes').innerHTML = html; $s('sEnv').hidden = false;
+    } catch (e) { $s('sRes').textContent = 'Erreur : ' + e.message; }
+  };
+  $s('sEnv').onclick = async () => {
+    let v = ''; try { v = await (await fetch('version.json')).text(); } catch {}
+    const d = new Date(), n = `rapport_health_connect_${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}.json`;
+    Seances.exporter(n, JSON.stringify(Object.assign({ version: v, date: d.toISOString() }, rapport), null, 1), 'application/json').catch(e => alert(e.message));
+  };
+}
 
 // Canal de mise à jour : l'appli cherche ses mises à jour sur le canal choisi (par défaut celui de la version installée)
 async function ouvrirCanal() {
