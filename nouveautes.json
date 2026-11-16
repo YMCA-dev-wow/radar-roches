@@ -2,6 +2,16 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 50,
+      "date": "2026-11-16",
+      "titre": "Vent et VMG dans les séances",
+      "points": [
+        "Fiche d'une séance : pastille vent (vent, direction, rafales à l'instant du curseur) d'après la prévision AROME HD de Météo-France. Touche-la pour le détail.",
+        "Saisis tes propres relevés (Holfuy, WindsUp, anémo…), en valeur unique ou heure par heure : la pastille affiche « Saisi ».",
+        "Avec le vent : meilleure VMG au près et au portant (sur 10 s), angle au vent par amure, virements et empannages, part du temps au près, au travers et au portant ; trace colorable par allure et courbe du vent sur la frise. Le vent moyen apparaît aussi dans la liste des séances."
+      ]
+    },
+    {
       "id": 49,
       "date": "2026-11-16",
       "titre": "Sons sur le volume média",

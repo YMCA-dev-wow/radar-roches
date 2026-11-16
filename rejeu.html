@@ -66,6 +66,18 @@
   #legendeC .modes { display: flex; gap: 4px; flex-wrap: nowrap; }
   #legendeC .modes button { padding: 2px 7px; font-size: 11px; line-height: 1.4; border-radius: 10px; white-space: nowrap; flex: none; }
   #legendeC .modes button.sel { background: var(--accent); color: #04221f; border-color: var(--accent); font-weight: 600; }
+  /* pastille vent (en haut à gauche de la carte) */
+  #ventP { position: absolute; left: 10px; top: 10px; z-index: 850; display: flex; align-items: center; gap: 8px; background: rgba(7,19,24,.92); border: 1px solid var(--ln2); border-radius: 14px; padding: 5px 10px 5px 5px; cursor: pointer; max-width: calc(100% - 160px); }
+  #ventP svg { width: 38px; height: 38px; flex: none; }
+  #ventP b { font-size: 15px; display: block; line-height: 1.15; } #ventP small { display: block; font-size: 10px; color: var(--muted); white-space: nowrap; }
+  .srcV { font-size: 9px; border-radius: 6px; padding: 0 5px; background: var(--p2); color: var(--muted); border: 1px solid var(--line); margin-left: 3px; }
+  .srcV.saisi { color: var(--accent); border-color: var(--accent); }
+  #legendeAll { display: flex; gap: 8px; margin-top: 5px; } #legendeAll i { display: inline-block; width: 14px; height: 4px; border-radius: 2px; vertical-align: middle; margin-right: 3px; }
+  .barreAll { display: flex; height: 10px; border-radius: 5px; overflow: hidden; margin: 6px 0 3px; }
+  .ligneK { display: flex; gap: 12px; font-size: 11px; color: var(--muted); } .ligneK i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+  table.vh { width: 100%; border-collapse: collapse; font-size: 13px; } table.vh th { color: var(--muted); font-weight: 500; font-size: 11px; text-align: left; padding: 3px 2px; }
+  table.vh td { padding: 3px 2px; } table.vh input { width: 100%; padding: 5px 6px; } table.vh tr.sel td:first-child { color: var(--accent); font-weight: 600; }
+  #roseV { display: block; margin: 8px auto; width: 170px; height: 170px; touch-action: none; cursor: pointer; }
   #legendeC .grad { height: 7px; border-radius: 4px; margin: 5px 0 2px; }
   #legendeC .ech { display: flex; justify-content: space-between; }
   .pastilleSaut { background: none; border: 0; }
@@ -106,7 +118,8 @@
   .menuF button small { display: block; color: var(--muted); font-size: 12px; }
   .menuF button .ic { width: 22px; text-align: center; color: var(--accent); font-size: 17px; }
   .menuF button.danger, .menuF button.danger .ic { color: var(--a2); }
-  .grilleR { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .grilleR { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .grilleR b { overflow-wrap: anywhere; }
   .grilleR div { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; }
   .grilleR b { display: block; font-size: 17px; font-variant-numeric: tabular-nums; } .grilleR b u { text-decoration: none; font-size: 11px; color: var(--muted); font-weight: 400; margin-left: 2px; }
   .grilleR small { font-size: 11px; color: var(--muted); }
@@ -176,7 +189,9 @@
   <div id="medaillon"><div class="contenu" id="medContenu"></div><div class="capot" id="medCapot" title="Échanger avec la vue principale"></div><span class="lab" id="medLab"></span></div>
   <div id="medChoix"><button data-v="radar">Radar</button><button data-v="montre">Montre</button><button data-v="sauts" id="medChoixSauts">Sauts</button><button data-v="masquer">Masquer</button></div>
   <button id="medAfficher" hidden>▣ Médaillon</button>
-  <div id="legendeC"><div class="modes"><button data-v="vitesse">Vitesse</button><button data-v="profondeur">Profondeur</button><button data-v="aucune">Aucune</button></div>
+  <div id="ventP" hidden title="Vent : touche pour le détail"></div>
+  <div id="legendeC"><div class="modes"><button data-v="vitesse">Vitesse</button><button data-v="profondeur">Profondeur</button><button data-v="allure" id="modeAllure" hidden>Allure</button><button data-v="aucune">Aucune</button></div>
+    <div id="legendeAll" hidden><span><i style="background:#ff7ab6"></i>près</span><span><i style="background:#9be15d"></i>travers</span><span><i style="background:#5ac8fa"></i>portant</span></div>
     <div id="legendeGrad"><div class="grad" id="gradC"></div><div class="ech"><span id="gradMin"></span><span id="gradMil"></span><span id="gradMax"></span></div></div></div>
   <div id="bandeauEx" hidden></div>
 </div>
@@ -193,6 +208,7 @@
     <span class="val"><i class="jauge" id="jEau" style="--c:#5ac8fa"></i><b id="lEau">–</b><small>hauteur d'eau</small></span>
     <span class="val" id="valVit"><i class="jauge" id="jVit" style="--c:#ff6482"></i><b id="lVit">–</b><small>vitesse</small></span>
     <label class="suivre"><input type="checkbox" id="cVit"> Vitesse</label>
+    <label class="suivre" id="cVentL" hidden><input type="checkbox" id="cVent"> Vent</label>
     <span class="fen" id="lFen"></span>
   </div>
   <canvas id="tl"></canvas>
@@ -208,6 +224,27 @@
   <div class="sub" id="rComm" style="margin-bottom:8px"></div>
   <div class="grilleR" id="rGrille"></div>
   <div class="sub" id="info" style="margin-top:10px">Charge une séance pour rejouer les alertes du radar.</div>
+</div></div>
+<!-- feuille : vent et VMG -->
+<div class="feuilleR" id="fVent" hidden><div class="in"><div class="poignee"></div>
+  <h2 style="display:flex;align-items:center;gap:6px">Vent pendant la séance <span class="srcV" id="vSrc" style="margin-left:auto"></span></h2>
+  <div class="sub" id="vPortion"></div>
+  <div class="grilleR" id="vGrille"></div>
+  <h2>VMG <span class="sub" id="vVmgNote" style="text-transform:none;letter-spacing:0;font-weight:400"></span></h2>
+  <div class="grilleR" id="vVmg"></div>
+  <h2>Allures</h2>
+  <div class="barreAll" id="vBarre"></div><div class="ligneK" id="vK"></div>
+  <div style="display:flex;gap:8px;margin-top:14px"><button class="primary" id="vModif" style="flex:1">✎ Modifier le vent</button><button id="vArome">Revenir à AROME</button></div>
+  <div class="sub" id="vNote" style="margin-top:10px"></div>
+</div></div>
+<!-- feuille : saisie du vent -->
+<div class="feuilleR" id="fVentModif" hidden><div class="in"><div class="poignee"></div><h2>Modifier le vent</h2>
+  <div class="r" style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><span id="vmType" style="display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:2px"></span></div>
+  <table class="vh" id="vmTable"></table>
+  <div class="sub" style="margin:6px 0">Direction : d'où vient le vent, en degrés (225) ou en points (SO, OSO…). Rafales facultatives. Ou touche la rose pour la ligne choisie.</div>
+  <svg id="roseV" viewBox="0 0 170 170"></svg>
+  <h2>Source (facultatif)</h2><input id="vmSource" placeholder="Holfuy Lancieux, WindsUp, anémo perso…" style="width:100%">
+  <div style="display:flex;gap:8px;margin-top:14px"><button id="vmAnnul" style="flex:1">Annuler</button><button class="primary" id="vmOk" style="flex:1">Enregistrer</button></div>
 </div></div>
 <!-- feuille : réglages du rejeu -->
 <div class="feuilleR" id="fReglages" hidden><div class="in"><div class="poignee"></div><h2>Réglages du rejeu</h2>
@@ -265,6 +302,7 @@
 <script src="noyau.js"></script>
 <script src="traces.js"></script>
 <script src="seances.js"></script>
+<script src="vent.js"></script>
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
@@ -283,7 +321,8 @@ const geopf = (layer, fmt, maxNative) => L.tileLayer('https://data.geopf.fr/wmts
   '&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=' + fmt, { maxZoom: 20, maxNativeZoom: maxNative, attribution: '© IGN / SHOM' });
 geopf('ORTHOIMAGERY.ORTHOPHOTOS', 'image/jpeg', 19).addTo(map);
 const shom = geopf('GEOGRAPHICALGRIDSYSTEMS.COASTALMAPS', 'image/png', 16).setOpacity(0.55).addTo(map);
-L.control.layers(null, { 'Carte SHOM': shom }, { position: 'topleft' }).addTo(map); // à gauche : le médaillon occupe le coin droit
+map.zoomControl.setPosition('bottomright'); // coins du haut : pastille vent à gauche, médaillon à droite
+L.control.layers(null, { 'Carte SHOM': shom }, { position: 'bottomright' }).addTo(map);
 L.control.scale({ imperial: false, position: 'bottomright' }).addTo(map);
 
 // Dangers Litto3D à la hauteur d'eau courante (zoom ≥ 15)
@@ -432,7 +471,8 @@ function dessinerTrace() {
   // trace de base : couleur selon le réglage (vitesse, profondeur) par petits tronçons de même teinte, ou bleu uni
   // hors de la portion de frise affichée (zoom) : trace grisée
   const [f0, f1] = fenetre(), dedans = p => p.t >= f0 && p.t <= f1;
-  const e = echelleTrace(), base = e ? RAMPE[modeTrace] : null, cle = p => { if (!dedans(p)) return -2; const x = e && e.f(p); return x == null ? -1 : Math.round(Math.max(0, Math.min(1, x)) * 16); };
+  const ALL_C = ['#ff7ab6', '#9be15d', '#5ac8fa']; // près, travers, portant
+  const e = echelleTrace(), base = e && !e.categ ? RAMPE[modeTrace] : null, cle = p => { if (!dedans(p)) return -2; const x = e && e.f(p); return x == null ? -1 : e.categ ? x : Math.round(Math.max(0, Math.min(1, x)) * 16); };
   let run = [pts[0]], k = cle(pts[0]);
   const flushB = () => {
     if (run.length < 2) return;
@@ -440,7 +480,7 @@ function dessinerTrace() {
     if (k === -2) { // hors portion : gris avec un liseré sombre, lisible sur tous les fonds
       L.polyline(ll, { color: '#10181c', weight: 5, opacity: 0.45, interactive: false }).addTo(trackLayer);
       L.polyline(ll, { color: '#b4bec4', weight: 2.5, opacity: 0.9, interactive: false }).addTo(trackLayer);
-    } else L.polyline(ll, { color: !e || k < 0 ? '#5ac8fa' : couleurRampe(base, k / 16), weight: 3.5, opacity: 0.95 }).addTo(trackLayer);
+    } else L.polyline(ll, { color: !e || k < 0 ? (e && e.categ ? '#8a9399' : '#5ac8fa') : e.categ ? ALL_C[k] : couleurRampe(base, k / 16), weight: 3.5, opacity: 0.95 }).addTo(trackLayer);
   };
   for (let i = 1; i < pts.length; i++) { run.push(pts[i]); const kk = cle(pts[i]); if (kk !== k) { flushB(); run = [pts[i]]; k = kk; } }
   flushB();
@@ -568,12 +608,20 @@ function dessinerFrise() {
   visibles.forEach((p, i) => i ? g.lineTo(x(p.t), yZ(p.W)) : g.moveTo(x(p.t), yZ(p.W))); g.stroke();
   g.fillStyle = '#ff6b5b'; g.fillText('eau mini ' + fr1(seuil) + ' m', 3 * k, yZ(visibles[0].W - seuil) + 11 * k);
   // vitesse (option) : trait rose, échelle propre (0 en bas du cadre), maximum indiqué en haut à droite
-  const vitOn = $('cVit').checked, vs = visibles.map(p => p.v * 3.6), vmax = Math.max(10, ...vs) * 1.08;
+  const vitOn = $('cVit').checked, vs = visibles.map(p => p.v * 3.6), ventOn = !!ventCourant && $('cVent').checked;
+  const wvs = ventOn ? visibles.filter((p, i) => i % 5 === 0).map(p => Vent.a(ventCourant, p.t).v * 3.6) : [];
+  const vmax = Math.max(10, ...(vitOn ? vs : []), ...wvs, ...(vitOn || ventOn ? [] : vs)) * 1.08;
   const yV = v => yC + hC - Math.max(0, Math.min(1, v / vmax)) * hC;
   if (vitOn) {
     g.strokeStyle = '#ff6482'; g.lineWidth = 1.5 * k; g.beginPath();
     visibles.forEach((p, i) => i ? g.lineTo(x(p.t), yV(p.v * 3.6)) : g.moveTo(x(p.t), yV(p.v * 3.6))); g.stroke();
-    g.fillStyle = '#ff6482'; g.textAlign = 'right'; g.fillText(Math.round(vmax / 1.08) + ' km/h', W - 3 * k, yC + 10 * k); g.textAlign = 'left';
+    g.fillStyle = '#ff6482'; g.textAlign = 'right'; g.fillText(Seances.vit(vmax / 1.08 / 3.6, 0).n + ' ' + Seances.vit(0).u, W - 3 * k, yC + 10 * k); g.textAlign = 'left';
+  }
+  if (ventOn) { // vent : trait violet, même échelle que la vitesse
+    g.strokeStyle = '#c9b6ff'; g.lineWidth = 2 * k; g.beginPath();
+    for (let t = t0, i = 0; t <= t1; t += (t1 - t0) / 120, i++) { const y = yV(Vent.a(ventCourant, t).v * 3.6); i ? g.lineTo(x(t), y) : g.moveTo(x(t), y); }
+    g.stroke();
+    g.fillStyle = '#c9b6ff'; g.textAlign = 'right'; g.fillText('vent', W - 3 * k, yC + (vitOn ? 22 : 10) * k); g.textAlign = 'left';
   }
   // curseur : trait pointillé, points sur la surface et sur le fond
   const xc = x(cur), pc = etatA(cur), pi = pts[Math.min(pts.length - 1, pc.i ?? 0)];
@@ -581,6 +629,7 @@ function dessinerFrise() {
   if (pi && pi.prof != null) { g.fillStyle = FOND[pi.nature] || FOND.lisse; g.beginPath(); g.arc(xc, yZ(cote(pi)), 4 * k, 0, 7); g.fill(); }
   if (pi) { g.fillStyle = '#5ac8fa'; g.beginPath(); g.arc(xc, yZ(pi.W), 4 * k, 0, 7); g.fill(); }
   if (pi && vitOn) { g.fillStyle = '#ff6482'; g.beginPath(); g.arc(xc, yV(pc.speed * 3.6), 4 * k, 0, 7); g.fill(); }
+  if (ventOn) { g.fillStyle = '#c9b6ff'; g.beginPath(); g.arc(xc, yV(Vent.a(ventCourant, cur).v * 3.6), 4 * k, 0, 7); g.fill(); }
   $('valVit').hidden = !vitOn;
   if (vitOn) { const vv = Seances.vit(pc.speed); $('lVit').textContent = vv.n + ' ' + vv.u; $('lVit').nextElementSibling.textContent = 'vitesse'; }
   // jauges façon Suunto : valeur à l'instant sur l'étendue de la portion affichée
@@ -652,7 +701,8 @@ $('zHaut').onclick = () => { try { localStorage.setItem('rejeu.friseHaute', tl.c
 hauteurFrise();
 try { $('follow').checked = localStorage.getItem('rejeu.suivre') === '1'; } catch {}
 $('follow').onchange = () => { try { localStorage.setItem('rejeu.suivre', $('follow').checked ? '1' : '0'); } catch {} };
-try { $('cVit').checked = localStorage.getItem('rejeu.vitesse') === '1'; } catch {}
+try { $('cVit').checked = localStorage.getItem('rejeu.vitesse') === '1'; $('cVent').checked = localStorage.getItem('rejeu.vent') === '1'; } catch {}
+$('cVent').onchange = () => { try { localStorage.setItem('rejeu.vent', $('cVent').checked ? '1' : '0'); } catch {} dessinerFrise(); };
 $('cVit').onchange = () => { try { localStorage.setItem('rejeu.vitesse', $('cVit').checked ? '1' : '0'); } catch {} dessinerFrise(); };
 $('zMoins').onclick = () => vueZoom(1.6); $('zPlus').onclick = () => vueZoom(0.6); $('zTout').onclick = () => { vueTout(); recadrerCarte(); };
 addEventListener('resize', () => { dessinerFrise(); resizeRadar(); map.invalidateSize(); dessinerMed(); });
@@ -937,6 +987,7 @@ function rendre(sonner = false) {
   if (playing && relais.actif && +$('speed').value === 1) relaisPas(cur, analysis, fix.course, armed, tt => hauteurAt({ lon: fix.lon, t: tt }));
   $('sH').textContent = W.toFixed(1); { const vv = Seances.vit(fix.speed, 0); $('sV').textContent = vv.n; $('sVu').textContent = vv.u; } $('sCap').textContent = Math.round(fix.course) + '°';
   $('clock').textContent = `${heure(cur)}  (+${fmtDuree(cur - pts[0].t)})`;
+  majPastilleVent();
   boat.setLatLng([fix.lat, fix.lon]);
   if ($('follow').checked && !map.getBounds().pad(-0.2).contains(boat.getLatLng())) map.panTo(boat.getLatLng(), { animate: false });
   drawRadar($('radar'), analysis, fix);
@@ -1028,6 +1079,7 @@ async function ouvrirContenus(contenus, nom) {
   preparerSauts();
   majResume();
   await calculer();
+  chargerVent();
 }
 $('vSupp').onchange = () => dernierGPX && ouvrirContenus(...dernierGPX);
 async function ouvrirSeance(id) {
@@ -1131,12 +1183,13 @@ function couleurRampe(r, x) { // x de 0 à 1
 function echelleTrace() {
   if (modeTrace === 'vitesse') { const tri = pts.map(p => Math.min(p.v, 30)).sort((a, b) => a - b), vm = Math.max(3, tri[Math.floor(tri.length * 0.98)] || 0); return { max: vm, f: p => Math.min(p.v, 30) / vm, lib: [Seances.vit(0, 0).n, Seances.vit(vm / 2, 0).n, Seances.vit(vm, 0).n + ' ' + Seances.vit(0).u] }; }
   if (modeTrace === 'profondeur') return { max: 10, f: p => p.prof == null ? null : p.prof === Infinity ? 1 : p.prof / 10, lib: ['0', '5', '10 m et +'] };
+  if (modeTrace === 'allure' && analyseVent) { const tw = analyseVent.twa; return { categ: true, f: p => p.v < 2.5 || p._i == null ? null : Vent.allure(tw[p._i]) }; }
   return null;
 }
 function majLegendeC() {
   document.querySelectorAll('#legendeC .modes button').forEach(b => b.classList.toggle('sel', b.dataset.v === modeTrace));
-  const e = echelleTrace(); $('legendeGrad').hidden = !e;
-  if (e) { $('gradC').style.background = `linear-gradient(90deg,${RAMPE[modeTrace].join(',')})`; [$('gradMin').textContent, $('gradMil').textContent, $('gradMax').textContent] = e.lib; }
+  const e = echelleTrace(); $('legendeGrad').hidden = !e || e.categ; $('legendeAll').hidden = !(e && e.categ);
+  if (e && !e.categ) { $('gradC').style.background = `linear-gradient(90deg,${RAMPE[modeTrace].join(',')})`; [$('gradMin').textContent, $('gradMil').textContent, $('gradMax').textContent] = e.lib; }
 }
 document.querySelectorAll('#legendeC .modes button').forEach(b => b.onclick = () => { modeTrace = b.dataset.v; Seances.setPref('fiche.couleur', modeTrace); if (pts.length) dessinerTrace(); majLegendeC(); });
 
@@ -1153,7 +1206,10 @@ function chiffresFenetre() {
 function majResume() {
   const { c, ev, zoom } = chiffresFenetre(); if (!c) return;
   const v = Seances.vit(c.v2s), d = Seances.dist(c.dist);
-  $('resume').innerHTML = `<span><b>${Seances.duree(c.duree)}</b><small>${zoom ? 'portion' : 'durée'}</small></span><span><b>${d.n}</b><small>${d.u}</small></span><span><b>${v.n}</b><small>${v.u} max</small></span><span><b id="resAl">${ev.length}</b><small>alerte${ev.length > 1 ? 's' : ''}</small></span>`;
+  const A = analyseFenetre(), vg = A && A.bestUp ? Seances.vit(A.bestUp) : null;
+  $('resume').style.gridTemplateColumns = `repeat(${vg ? 5 : 4}, 1fr)`;
+  $('resume').innerHTML = `<span><b>${Seances.duree(c.duree)}</b><small>${zoom ? 'portion' : 'durée'}</small></span><span><b>${d.n}</b><small>${d.u}</small></span><span><b>${v.n}</b><small>${v.u} max</small></span>` +
+    (vg ? `<span><b>${vg.n}</b><small>VMG près</small></span>` : '') + `<span><b id="resAl">${ev.length}</b><small>alerte${ev.length > 1 ? 's' : ''}</small></span>`;
   $('resume').classList.toggle('zoom', zoom);
 }
 function ouvrirResume() {
@@ -1213,6 +1269,7 @@ $('bMenu').onclick = () => {
   const fichiers = contenusCourants.filter(c => c.src && c.src.startsWith('f:') && !/^\s*\{/.test(typeof c.contenu === 'string' ? c.contenu : ''));
   for (const c of fichiers) l.append(menuAction('⇩', "Exporter le fichier d'origine", c.nom, () => Seances.exporter(c.nom, c.contenu).catch(e => alert(e.message))));
   if (sauts.length) l.append(menuAction('⤴', 'Bilan des sauts', `${sauts.length} saut${sauts.length > 1 ? 's' : ''}`, () => ouvrirSauts()));
+  if (pts.length) l.append(menuAction('🌬', 'Vent', ventCourant ? (ventCourant.source === 'saisi' ? 'valeurs saisies : modifier' : 'prévision AROME : détail, saisir des relevés') : 'saisir des relevés (prévision indisponible)', () => ventCourant ? ouvrirVent() : ouvrirVentModif()));
   l.append(menuAction('⚙', 'Réglages du rejeu', 'marée, eau minimale, angles, sons, montre', () => { $('fReglages').hidden = false; }));
   l.append(menuAction('📂', 'Ouvrir un fichier', 'FIT, GPX ou journal : ajouté aux séances', () => $('gpxFile').click()));
   if (s && s.groupe) l.append(menuAction('⇹', 'Séparer', `${s.sources.length} journaux regroupés`, async () => { Seances.separer(s.id); location.href = 'seances.html'; }));
@@ -1244,6 +1301,147 @@ $('mOk').onclick = () => {
   Object.assign(s, { sport: sportChoisi, commentaire: $('mComm').value.trim(), lieu: $('mLieu').value.trim() });
   $('fModif').hidden = true; majTitre();
 };
+// =====================================================================
+// Vent : prévision AROME HD (vent.js) ou valeurs saisies ; pastille, allures, VMG
+// =====================================================================
+let idVent = null, ventCourant = null, analyseVent = null, analyseCle = '', analyseCache = null;
+const fmtVit = v => { const x = Seances.vit(v); return `${x.n} ${x.u}`; };
+async function chargerVent() {
+  idVent = seanceCourante ? seanceCourante.id : (contenusCourants.length === 1 ? contenusCourants[0].src : null);
+  ventCourant = idVent ? Vent.courant(idVent) : null; majVent();
+  if (!idVent || !pts.length) return;
+  let la = 0, lo = 0; for (const p of pts) { la += p.lat; lo += p.lon; } la /= pts.length; lo /= pts.length;
+  try { await Vent.arome(idVent, la, lo, pts[0].t, pts[pts.length - 1].t); ventCourant = Vent.courant(idVent); majVent(); }
+  catch (e) { if (!ventCourant) $('ventP').hidden = true; }
+}
+// après chaque changement de vent : allures de chaque point, pastille, trace, résumé
+function majVent() {
+  pts.forEach((p, i) => { p._i = i; });
+  analyseVent = ventCourant ? Vent.analyse(pts, ventCourant) : null; analyseCle = '';
+  $('modeAllure').hidden = !ventCourant; $('cVentL').hidden = !ventCourant;
+  if (!ventCourant && modeTrace === 'allure') modeTrace = 'vitesse';
+  majPastilleVent(); if (pts.length && pts[0].W != null) dessinerTrace(); majLegendeC(); majResume(); dessinerFrise();
+}
+const roseSVG = (deg, taille = 38) => `<svg viewBox="0 0 38 38" width="${taille}" height="${taille}"><circle cx="19" cy="19" r="17" fill="#0b2024" stroke="#1f5a57"/><text x="19" y="8" fill="#7fb8b2" font-size="6" text-anchor="middle">N</text>
+  <g transform="rotate(${deg} 19 19)"><line x1="19" y1="8" x2="19" y2="30" stroke="#5ee6d6" stroke-width="2.4"/><path d="M19 31 L14 23 L24 23Z" fill="#5ee6d6"/></g></svg>`; // flèche : où va le vent
+function majPastilleVent() {
+  const el = $('ventP');
+  if (!ventCourant || !pts.length) { el.hidden = true; return; }
+  const w = Vent.a(ventCourant, cur);
+  el.hidden = false;
+  el.innerHTML = roseSVG(w.dir) + `<div><b>${fmtVit(w.v)}</b><small>${Vent.cardinal(w.dir)} ${Math.round(w.dir)}° <span class="srcV${ventCourant.source === 'saisi' ? ' saisi' : ''}">${ventCourant.source === 'saisi' ? 'Saisi' : 'AROME'}</span></small>` +
+    (w.raf ? `<small>rafales ${fmtVit(w.raf)}</small>` : '') + `</div>`;
+}
+$('ventP').onclick = () => ouvrirVent();
+// analyse sur la portion de frise affichée (toute la séance sans zoom)
+function analyseFenetre() {
+  if (!ventCourant) return null;
+  if (!estZoome()) return analyseVent;
+  const k = fenetre().join('/'); if (k === analyseCle) return analyseCache;
+  const [a, b] = fenetre(); analyseCle = k; analyseCache = Vent.analyse(pts.filter(p => p.t >= a && p.t <= b), ventCourant);
+  return analyseCache;
+}
+function ouvrirVent() {
+  if (!ventCourant) return ouvrirVentModif();
+  const [a, b] = fenetre(), r = Vent.resume(ventCourant, a, b), A = analyseFenetre() || {};
+  $('vSrc').textContent = ventCourant.source === 'saisi' ? 'Saisi' : 'AROME HD · prévision'; $('vSrc').className = 'srcV' + (ventCourant.source === 'saisi' ? ' saisi' : '');
+  $('vPortion').textContent = estZoome() ? `Portion ${heure(a).slice(0, 5)} – ${heure(b).slice(0, 5)} (zoom de la frise)` : '';
+  const V = x => { const v = Seances.vit(x); return `${v.n}<u>${v.u}</u>`; }, deg = d => `${Vent.cardinal(d)} <u>${Math.round(d)}°</u>`;
+  $('vGrille').innerHTML = [[V(r.v), 'vent moyen'], [`${Seances.vit(r.deb.v).n} → ${Seances.vit(r.fin.v).n}`, `début → fin (${Seances.vit(0).u})`],
+    [`${Vent.cardinal(r.deb.dir)} → ${Vent.cardinal(r.fin.dir)}`, `${Math.round(r.deb.dir)}° → ${Math.round(r.fin.dir)}°`]].map(([x, l]) => `<div><b>${x}</b><small>${l}</small></div>`).join('');
+  const ang = x => x == null ? '–' : Math.round(x) + '°';
+  $('vVmg').innerHTML = [[A.bestUp ? V(A.bestUp) : '–', 'meilleure VMG au près (10 s)'], [A.bestDown ? V(A.bestDown) : '–', 'meilleure VMG au portant (10 s)'], [A.vmgPres ? V(A.vmgPres) : '–', 'VMG moyenne au près'],
+    [ang(A.angTribord), 'angle au vent au près, tribord amures'], [ang(A.angBabord), 'angle au vent au près, bâbord amures'], [`${A.virements ?? 0} / ${A.empannages ?? 0}`, 'virements / empannages']]
+    .map(([x, l]) => `<div><b>${x}</b><small>${l}</small></div>`).join('');
+  $('vVmgNote').textContent = ventCourant.source === 'saisi' ? '' : "· d'après la prévision";
+  const al = A.allures || [0, 0, 0], C = ['#ff7ab6', '#9be15d', '#5ac8fa'];
+  $('vBarre').innerHTML = al.map((x, i) => `<i style="width:${x * 100}%;background:${C[i]}"></i>`).join('');
+  $('vK').innerHTML = al.map((x, i) => `<span><i style="background:${C[i]}"></i>${Vent.NOMS[i]} ${Math.round(x * 100)} %</span>`).join('');
+  $('vArome').hidden = ventCourant.source !== 'saisi' || !Vent.lire(idVent).arome;
+  $('vNote').textContent = ventCourant.source === 'saisi'
+    ? 'Valeurs saisies à la main' + (ventCourant.src ? ' (' + ventCourant.src + ')' : '') + '. Allures : près sous 70° du vent, travers de 70 à 110°, portant au-delà.'
+    : 'Prévision du modèle AROME HD (Météo-France, via Open-Meteo) au milieu de la trace : vent moyen à 2–3 nd près, direction à une trentaine de degrés près. Pour une VMG fiable, saisis les relevés d’un anémomètre (Holfuy, WindsUp…). Allures : près sous 70° du vent, travers de 70 à 110°, portant au-delà.';
+  $('fVent').hidden = false;
+}
+$('vModif').onclick = () => { $('fVent').hidden = true; ouvrirVentModif(); };
+$('vArome').onclick = () => { Vent.revenirArome(idVent); ventCourant = Vent.courant(idVent); majVent(); $('fVent').hidden = true; };
+// Saisie : valeur unique ou heure par heure (heures locales couvrant la séance), pré-remplie avec le vent actuel
+let vmType = 'heures', vmLigne = 0;
+const facteurVit = () => ({ kmh: 1 / 3.6, ms: 1, nd: 1 / 1.94384 })[Seances.unites().v];
+function heuresSeance() { const l = [], d = new Date(pts[0].t); d.setMinutes(0, 0, 0); for (let t = +d; t <= pts[pts.length - 1].t; t += 3600e3) l.push(t); return l; }
+function ouvrirVentModif() {
+  if (!pts.length || !idVent) return;
+  const o = Vent.lire(idVent), W = ventCourant;
+  vmType = o.saisi && o.saisi.type ? o.saisi.type : heuresSeance().length > 1 ? 'heures' : 'unique';
+  const u = Seances.vit(0).u, f = x => x == null ? '' : Seances.vit(x).n;
+  const lignes = vmType === 'unique' ? [pts[0].t] : heuresSeance();
+  const val = t => { // valeur de départ : saisie existante, sinon vent courant à la mi-heure
+    if (o.saisi && o.saisi.type === vmType) { const q = o.saisi.pts.find(x => Math.abs(x[0] - (vmType === 'unique' ? t : t + 1800e3)) < 120e3); if (q) return { v: q[1], raf: q[2], dir: q[3] }; }
+    if (!W) return { v: null, raf: null, dir: null };
+    return vmType === 'unique' ? (() => { const r = Vent.resume(W, pts[0].t, pts[pts.length - 1].t); return { v: r.v, raf: r.raf, dir: r.dir }; })() : Vent.a(W, Math.min(t + 1800e3, pts[pts.length - 1].t));
+  };
+  $('vmType').innerHTML = '';
+  for (const [k, lib] of [['unique', 'Valeur unique'], ['heures', 'Heure par heure']]) {
+    const b = document.createElement('button'); b.textContent = lib; b.style.cssText = 'border:0;padding:5px 10px;border-radius:8px;font-size:13px;' + (k === vmType ? 'background:var(--p2);color:var(--accent)' : 'background:none;color:var(--muted)');
+    b.onclick = () => { const anc = o.saisi; o.saisi = anc && anc.type === k ? anc : null; vmTypeForce = k; ouvrirVentModifType(k); };
+    $('vmType').append(b);
+  }
+  remplirTable(lignes, val, u, f);
+  $('vmSource').value = (o.saisi && o.saisi.source) || '';
+  $('fVentModif').hidden = false;
+}
+let vmTypeForce = null;
+function ouvrirVentModifType(k) { const o = Vent.lire(idVent); const s0 = o.saisi; if (!(s0 && s0.type === k)) { o.saisi = null; } vmType = k; // réaffiche avec ce type
+  const W = ventCourant, u = Seances.vit(0).u, f = x => x == null ? '' : Seances.vit(x).n, lignes = k === 'unique' ? [pts[0].t] : heuresSeance();
+  const val = t => { if (s0 && s0.type === k) { const q = s0.pts.find(x => Math.abs(x[0] - (vmType === 'unique' ? t : t + 1800e3)) < 120e3); if (q) return { v: q[1], raf: q[2], dir: q[3] }; }
+    if (!W) return { v: null, raf: null, dir: null };
+    if (k === 'unique') { const r = Vent.resume(W, pts[0].t, pts[pts.length - 1].t); return { v: r.v, raf: r.raf, dir: r.dir }; }
+    return Vent.a(W, Math.min(t + 1800e3, pts[pts.length - 1].t)); };
+  [...$('vmType').children].forEach((b, i) => { const on = (i === 0) === (k === 'unique'); b.style.background = on ? 'var(--p2)' : 'none'; b.style.color = on ? 'var(--accent)' : 'var(--muted)'; });
+  remplirTable(lignes, val, u, f);
+}
+function remplirTable(lignes, val, u, f) {
+  const t = $('vmTable');
+  t.innerHTML = `<tr><th>${vmType === 'unique' ? '' : 'heure'}</th><th>vent (${u})</th><th>rafales</th><th>direction</th></tr>`;
+  lignes.forEach((h, i) => {
+    const v = val(h), tr = document.createElement('tr'); tr.dataset.t = h;
+    tr.innerHTML = `<td>${vmType === 'unique' ? 'séance' : new Date(h).getHours() + 'h'}</td><td><input inputmode="decimal" class="v"></td><td><input inputmode="decimal" class="r"></td><td><input class="d"></td>`;
+    tr.querySelector('.v').value = f(v.v); tr.querySelector('.r').value = f(v.raf); tr.querySelector('.d').value = v.dir == null ? '' : `${Vent.cardinal(v.dir)} ${Math.round(v.dir)}`.split(' ')[1];
+    tr.addEventListener('focusin', () => { vmLigne = i; majRose(); });
+    tr.querySelector('.d').addEventListener('input', majRose);
+    t.append(tr);
+  });
+  vmLigne = 0; majRose();
+}
+function majRose() {
+  const tr = $('vmTable').querySelectorAll('tr[data-t]')[vmLigne];
+  $('vmTable').querySelectorAll('tr[data-t]').forEach((x, i) => x.classList.toggle('sel', i === vmLigne));
+  const d = tr ? Vent.lireDir(tr.querySelector('.d').value) : null;
+  let h = '<circle cx="85" cy="85" r="76" fill="#0b2024" stroke="#1f5a57"/>';
+  for (const [l, a] of [['N', 0], ['E', 90], ['S', 180], ['O', 270]]) h += `<text x="${85 + 64 * Math.sin(a * Math.PI / 180)}" y="${89 - 64 * Math.cos(a * Math.PI / 180)}" fill="#7fb8b2" font-size="12" text-anchor="middle">${l}</text>`;
+  if (d != null) { const x = 85 + 54 * Math.sin(d * Math.PI / 180), y = 85 - 54 * Math.cos(d * Math.PI / 180);
+    h += `<line x1="85" y1="85" x2="${x}" y2="${y}" stroke="#5ee6d6" stroke-width="3"/><circle cx="${x}" cy="${y}" r="7" fill="#5ee6d6"/><circle cx="85" cy="85" r="4" fill="#5ee6d6"/><text x="85" y="112" fill="#d6f3f1" font-size="13" text-anchor="middle">${Vent.cardinal(d)} · ${Math.round(d)}°</text>`; }
+  $('roseV').innerHTML = h;
+}
+$('roseV').addEventListener('pointerdown', e => {
+  const r = $('roseV').getBoundingClientRect(), dx = e.clientX - r.left - r.width / 2, dy = e.clientY - r.top - r.height / 2;
+  const d = Math.round((Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360 / 5) * 5;
+  const tr = $('vmTable').querySelectorAll('tr[data-t]')[vmLigne]; if (!tr) return;
+  tr.querySelector('.d').value = String(d); majRose();
+});
+$('vmAnnul').onclick = () => { $('fVentModif').hidden = true; };
+$('vmOk').onclick = () => {
+  const k = facteurVit(), num = s => { const x = parseFloat(String(s).replace(',', '.')); return isFinite(x) ? x : null; }, l = [];
+  for (const tr of $('vmTable').querySelectorAll('tr[data-t]')) {
+    const v = num(tr.querySelector('.v').value), r = num(tr.querySelector('.r').value), d = Vent.lireDir(tr.querySelector('.d').value);
+    if (v == null || d == null) continue;
+    l.push([vmType === 'unique' ? pts[0].t : +tr.dataset.t + 1800e3, v * k, r == null ? null : r * k, d]); // valeur horaire placée à la mi-heure
+  }
+  if (!l.length) { alert('Saisis au moins un vent et une direction.'); return; }
+  Vent.saisir(idVent, vmType, l, $('vmSource').value.trim());
+  ventCourant = Vent.courant(idVent); majVent(); $('fVentModif').hidden = true;
+};
+
 $('bSauts').onclick = () => $('sautsPan').hidden ? ouvrirSauts() : ($('sautsPan').hidden = true);
 majLegendeC();
 // démarrage (à la fin : toutes les variables ci-dessus sont déclarées)

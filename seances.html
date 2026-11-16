@@ -30,6 +30,8 @@
   .chiffres { display: flex; gap: 14px; font-variant-numeric: tabular-nums; }
   .chiffres b { font-size: 16px; display: block; line-height: 1.1; } .chiffres small { font-size: 10px; color: var(--mu); }
   .carteS input[type=checkbox] { flex: none; }
+  .ventMini { color: var(--tx); font-weight: 500; } .srcV { font-size: 9px; border-radius: 6px; padding: 0 4px; border: 1px solid var(--ln); color: var(--mu); margin-left: 3px; }
+  .srcV.saisi { color: var(--ac); border-color: var(--ac); }
   .barreSel { position: fixed; left: 0; right: 0; bottom: 0; z-index: 45; background: var(--p1); border-top: 1px solid var(--ln2); padding: 10px 12px 14px; display: flex; gap: 8px; }
   html.appli .barreSel { bottom: 62px; }
   .barreSel button { flex: 1; justify-content: center; }
@@ -147,6 +149,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="traces.js"></script>
 <script src="seances.js"></script>
+<script src="vent.js"></script>
 <script src="fonds.js"></script>
 <script>
 'use strict';
@@ -185,6 +188,7 @@ function carteSeance(s, petite = false) {
     `<div class="info"><div class="t"><span class="nomS"></span><small>${quand}</small></div><div class="c"></div>
      <div class="chiffres"><span><b>${S.duree(s.duree)}</b><small>durée</small></span><span><b>${di.n}</b><small>${di.u}</small></span><span><b>${v.n}</b><small>${v.u} max</small></span>${s.nSauts ? `<span><b>${s.nSauts}</b><small>saut${s.nSauts > 1 ? 's' : ''}</small></span>` : ''}</div></div>`;
   el.querySelector('.nomS').textContent = S.titre(s); el.querySelector('.c').textContent = c || ' ';
+  el.dataset.id = s.id; ventCarte(el, s);
   // appui long (0,5 s) : passe en sélection avec cette séance ; ensuite, un appui coche ou décoche
   let minuteur = null, long = false, x0 = 0, y0 = 0;
   el.addEventListener('pointerdown', e => { long = false; x0 = e.clientX; y0 = e.clientY; clearTimeout(minuteur);
@@ -200,6 +204,30 @@ function carteSeance(s, petite = false) {
     majBarreSel();
   };
   return el;
+}
+
+// ---------- vent sous le titre : prévision AROME (récupérée en arrière-plan) ou valeurs saisies ----------
+function ventCarte(el, s) {
+  const W = Vent.courant(s.id), c = el.querySelector('.c'); if (!W || !c) return;
+  const r = Vent.resume(W, s.t0, s.t1), v = S.vit(r.v, 0), fl = '↑↗→↘↓↙←↖'[Math.round(((r.dir + 180) % 360) / 45) % 8];
+  const sp = document.createElement('span'); sp.className = 'ventV';
+  sp.innerHTML = ` · <span class="ventMini">${fl} ${v.n} ${v.u} ${Vent.cardinal(r.dir)}</span><span class="srcV${W.source === 'saisi' ? ' saisi' : ''}">${W.source === 'saisi' ? 'Saisi' : 'AROME'}</span>`;
+  const anc = c.querySelector('.ventV'); if (anc) anc.remove();
+  if (c.textContent.trim() === '') c.textContent = '';
+  c.append(sp);
+}
+let ventEnCours = false;
+async function ventsManquants() {
+  if (ventEnCours || !navigator.onLine) return; ventEnCours = true;
+  try {
+    for (const s of toutes) {
+      if (Vent.courant(s.id) || !s.trace || !s.trace.length) continue;
+      const la = s.trace.reduce((a, p) => a + p[0], 0) / s.trace.length, lo = s.trace.reduce((a, p) => a + p[1], 0) / s.trace.length;
+      try { await Vent.arome(s.id, la, lo, s.t0, s.t1); } catch { continue; }
+      document.querySelectorAll(`.carteS[data-id="${CSS.escape(s.id)}"]`).forEach(el => ventCarte(el, s));
+      await new Promise(r => setTimeout(r, 300));
+    }
+  } finally { ventEnCours = false; }
 }
 
 // ---------- liste ----------
@@ -417,6 +445,7 @@ async function charger() {
   catch (e) { $('chargement').textContent = 'Lecture impossible : ' + e.message; return; }
   $('chargement').hidden = true;
   changerVue(vue);
+  ventsManquants();
 }
 if ('serviceWorker' in navigator && !S.APPLI) navigator.serviceWorker.register('sw.js').catch(() => {});
 charger();
