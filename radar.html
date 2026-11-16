@@ -43,8 +43,8 @@
   .guideAccueil .accepter input { width: 24px; height: 24px; flex: none; margin-top: 1px; accent-color: var(--ac); }
   #courbe { width: 100%; height: 54px; margin-top: 8px; display: block; }
   .verifs { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 6px; }
-  .demarrer { display: flex; align-items: center; justify-content: center; width: 168px; height: 168px; margin: 14px auto 10px; border-radius: 50%;
-    border: 2px solid var(--ac); outline: 12px solid var(--p1); background: var(--p2); color: var(--ac); font-size: 23px; font-weight: 650; }
+  .demarrer { display: flex; align-items: center; justify-content: center; width: 100%; height: 64px; margin: 8px 0 8px; border-radius: 16px;
+    border: 2px solid var(--ac); background: var(--p2); color: var(--ac); font-size: 22px; font-weight: 650; letter-spacing: .02em; }
   .demarrer:disabled { opacity: .45; }
   .ligne input[type=number] { width: 78px; text-align: right; }
   .unite { color: var(--mu); font-size: 13px; margin-left: 4px; }
@@ -127,9 +127,9 @@
 
   <h2>Sons</h2>
   <div class="carte">
-    <div class="ligne" id="volAlertesLigne"><span>Volume des alertes<small>dans l'appli, en plus du volume « alarme » du téléphone (les boutons de volume règlent un autre volume, celui des médias)</small></span><span style="display:flex;align-items:center;gap:8px"><input type="range" id="volAlertes" min="10" max="100" step="10" value="100" style="width:110px"><b id="volAlertesTxt">100 %</b></span></div>
-    <label class="ligne" id="volMaxLigne"><span>Alertes au volume maximum<small>volume « alarme » du téléphone poussé au maximum pendant le radar, rétabli à l'arrêt</small></span><input type="checkbox" id="volMax" checked></label>
-    <label class="ligne" id="sonsMediaLigne"><span>Sons en média<small>bips et voix sur le volume « média » du téléphone au lieu du volume « alarme » ; désactivé à chaque démarrage de l'appli</small></span><input type="checkbox" id="sonsMedia"></label>
+    <div class="ligne" id="volAlertesLigne"><span>Volume des alertes<small>dans l'appli, en plus du volume « média » du téléphone (boutons de volume) ; la pastille de l'accueil montre ce volume média</small></span><span style="display:flex;align-items:center;gap:8px"><input type="range" id="volAlertes" min="10" max="100" step="10" value="100" style="width:110px"><b id="volAlertesTxt">100 %</b></span></div>
+    <label class="ligne" id="volMaxLigne" hidden><span>Alertes au volume maximum<small>volume « alarme » du téléphone poussé au maximum pendant le radar, rétabli à l'arrêt</small></span><input type="checkbox" id="volMax" checked></label>
+    <label class="ligne" id="sonsMediaLigne" hidden><span>Sons en média<small>bips et voix sur le volume « média » du téléphone au lieu du volume « alarme » ; désactivé à chaque démarrage de l'appli</small></span><input type="checkbox" id="sonsMedia"></label>
     <label class="ligne" id="sautsLigne"><span>Sauts (essai)<small>détection par l'accéléromètre du téléphone porté sur le tronc ; la voix annonce hauteur et temps de vol à la réception</small></span><input type="checkbox" id="sauts"></label>
     <button id="testSound">Écouter les sons</button>
     <div class="mu" style="margin-top:8px">Tintement doux descendant = pré-alerte · 1 bip = devant · 2 bips montants = tribord · 2 bips descendants = bâbord · les bips accélèrent en approchant · son continu = moins de 10 m · 3 bips très graves = GPS perdu.</div>
@@ -354,8 +354,9 @@ function feuilleSons() {
 $('testSound').onclick = feuilleSons;
 $('demoSonsBtn').onclick = feuilleSons;
 if (!APPLI) { $('volMaxLigne').hidden = true; $('volAlertesLigne').hidden = true; $('sautsLigne').hidden = true; $('sonsMediaLigne').hidden = true; }
-// Sons en média : bips et voix sur le canal « média » d'Android (le seul que l'enregistreur d'écran capte) au lieu
-// d'« alarme ». Désactivé à chaque lancement de l'appli : sur l'eau, les alertes restent sur le canal alarme.
+// Sons sur le canal « média » d'Android (16/11/2026, à la demande du user) : l'appli ne touche plus au volume « alarme »,
+// qui restait parfois au maximum après une séance et déréglait le réveil. Le volume média est montré par une pastille de
+// l'accueil (rouge < 50 %, orange 50-75 %, vert > 75 %). Les cases « Sons en média » et « volume maximum » sont masquées.
 const appliquerCanal = () => { if (APPLI) Natif.son.canal({ media: $('sonsMedia').checked }).catch(() => {}); };
 $('sonsMedia').addEventListener('change', appliquerCanal);
 const appliquerVolume = () => { $('volAlertesTxt').textContent = $('volAlertes').value + ' %'; if (APPLI) Natif.son.gain({ v: $('volAlertes').value / 100 }).catch(() => {}); };
@@ -828,6 +829,7 @@ function majVerifs() {
     { ok: '✓ Marée recalée', hors: '✓ Recalage récent', ko: '! Prédiction seule', off: '! Prédiction seule', attente: '… Marée' }[etatRecal]);
   ch($('testMode').checked ? 'dan' : 'ok', $('testMode').checked ? '⚠ Mode test actif' : '✓ Mode test coupé');
   if (batterie) { const pc = Math.round(batterie.level * 100); ch(pc > 30 || batterie.charging ? 'ok' : 'ko', (pc > 30 ? '✓' : '!') + ' Batterie ' + pc + ' %'); }
+  if (volumeMedia != null) ch(volumeMedia > 75 ? 'ok' : volumeMedia >= 50 ? 'ko' : 'dan', (volumeMedia > 75 ? '✓' : '!') + ' Volume ' + volumeMedia + ' %');
   // relief de la zone non téléchargé : le radar ne verrait pas les roches sans réseau
   if (APPLI && zone && ['absente', 'maj'].includes(ZonesLocales.statut(zone)))
     v.push(`<a class="chip dan" href="carte.html#zones">⚠ Relief ${zone.nom} ${ZonesLocales.statut(zone) === 'maj' ? 'à mettre à jour' : 'non téléchargé'} : toucher</a>`);
@@ -836,6 +838,14 @@ function majVerifs() {
   $('verifs').innerHTML = v.join('');
   if ($('corrigerBatterie')) $('corrigerBatterie').onclick = () => Natif.journal.demanderBatterie().catch(() => {});
 }
+// volume média du téléphone (boutons de volume), en % du maximum, relu toutes les 2 s sur l'accueil
+var volumeMedia = null; // var : majVerifs peut être appelée avant cette ligne
+async function lireVolume() {
+  if (!APPLI) return;
+  try { const e = await Natif.son.etat(); if (e && e.mediaMax) { const v = Math.round(100 * e.media / e.mediaMax); if (v !== volumeMedia) { volumeMedia = v; if (!running) majVerifs(); } } } catch {}
+}
+setInterval(() => { if (!running && !document.hidden) lireVolume(); }, 2000);
+lireVolume();
 setInterval(() => { if (!running) { majVerifs(); majChipZone(); } }, 5000);
 
 // ---------- Profils de navigation ----------
@@ -1046,7 +1056,8 @@ function guideAccueil(apres) {
   // Seulement au lancement : pas en passant d'un onglet à l'autre (la page radar se recharge, les réglages doivent tenir).
   let premiereOuverture = true;
   try { premiereOuverture = !sessionStorage.getItem('radar.lance'); sessionStorage.setItem('radar.lance', '1'); } catch {}
-  if (premiereOuverture) { $('testMode').checked = false; $('simMode').checked = false; $('sonsMedia').checked = false; saveSettings(); }
+  if (premiereOuverture) { $('testMode').checked = false; $('simMode').checked = false; saveSettings(); }
+  $('sonsMedia').checked = true; $('volMax').checked = false;   // sortie média, volume alarme jamais modifié
   appliquerCanal();
   styleMontre = $('styleMontre').value; $('testH').oninput(); $('simMode').onchange(); showGeoInfo();
   initProfils(); route(); demarrerGpsAccueil(); majVerifs();

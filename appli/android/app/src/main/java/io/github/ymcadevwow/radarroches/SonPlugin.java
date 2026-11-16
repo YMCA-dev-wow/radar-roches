@@ -21,7 +21,7 @@ import java.util.Locale;
 
 /**
  * Sons et voix du radar, joués par Android et non par la page web : ils continuent écran éteint, même si le navigateur
- * intégré ralentit la page. Canal « alarme » : plus fort que le canal média, réglable à part, joué en mode silencieux.
+ * intégré ralentit la page. Canal « média » par défaut (boutons de volume) ; « alarme » reste possible par canal(media=false).
  *  - jouer(notes)            : notes ponctuelles (pré-alerte, veille, GPS perdu…)
  *  - cadence(notes, periode, duree) : motif répété toutes les « periode » s pendant « duree » s (bips d'alerte) ;
  *                              la page le renouvelle à chaque position : si elle se tait, les bips s'arrêtent seuls.
@@ -41,7 +41,7 @@ public class SonPlugin extends Plugin {
     private static final AudioAttributes MEDIA = new AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_MEDIA)
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build();
-    private volatile AudioAttributes attr = ALARME;   // canal des bips et de la voix (alarme par défaut)
+    private volatile AudioAttributes attr = MEDIA;    // canal des bips et de la voix (média depuis le 16/11/2026 : le volume alarme n'est plus touché)
     private int flux() { return attr == MEDIA ? AudioManager.STREAM_MUSIC : AudioManager.STREAM_ALARM; }
 
     private static class Note { long debut, fin; double f0, f1, v; boolean triangle; double phase; }

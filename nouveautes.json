@@ -2,6 +2,16 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 49,
+      "date": "2026-11-16",
+      "titre": "Sons sur le volume média",
+      "points": [
+        "Les bips et la voix du radar passent maintenant par le volume « média » (boutons de volume du téléphone). L'appli ne touche plus au volume « alarme » : ton réveil reste comme tu l'as réglé.",
+        "Nouvelle pastille Volume sur l'accueil du radar : verte au-dessus de 75 %, orange de 50 à 75 %, rouge en dessous. Monte le volume avant de partir.",
+        "Bouton Démarrer rectangulaire : l'accueil tient sur un écran, sans défiler. Le rejeu joue aussi ses sons sur le volume média."
+      ]
+    },
+    {
       "id": 48,
       "date": "2026-11-16",
       "titre": "Essai : Health Connect",
