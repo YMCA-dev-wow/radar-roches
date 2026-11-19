@@ -2,6 +2,15 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 53,
+      "date": "2026-11-19",
+      "titre": "Données brutes des capteurs (essai)",
+      "points": [
+        "Nouvelle option sous « Sauts (essai) » (Plus → Réglages avancés → Sons) : accéléromètre et gyroscope du téléphone enregistrés pendant toute la séance, pour mettre au point la hauteur des sauts de kite.",
+        "Le fichier (10 à 15 Mo par heure) part avec le journal quand on l'envoie ; sa taille est indiquée dans la liste des journaux."
+      ]
+    },
+    {
       "id": 52,
       "date": "2026-11-19",
       "titre": "Relevés Holfuy collés",

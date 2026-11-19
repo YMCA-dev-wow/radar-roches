@@ -131,6 +131,7 @@
     <label class="ligne" id="volMaxLigne" hidden><span>Alertes au volume maximum<small>volume « alarme » du téléphone poussé au maximum pendant le radar, rétabli à l'arrêt</small></span><input type="checkbox" id="volMax" checked></label>
     <label class="ligne" id="sonsMediaLigne" hidden><span>Sons en média<small>bips et voix sur le volume « média » du téléphone au lieu du volume « alarme » ; désactivé à chaque démarrage de l'appli</small></span><input type="checkbox" id="sonsMedia"></label>
     <label class="ligne" id="sautsLigne"><span>Sauts (essai)<small>détection par l'accéléromètre du téléphone porté sur le tronc ; la voix annonce hauteur et temps de vol à la réception</small></span><input type="checkbox" id="sauts"></label>
+    <label class="ligne" id="brutLigne"><span>Données brutes des capteurs (essai)<small>avec « Sauts (essai) » : accéléromètre et gyroscope enregistrés pendant toute la séance (10 à 15 Mo par heure), envoyés avec le journal ; sert à mettre au point la hauteur des sauts de kite</small></span><input type="checkbox" id="brut"></label>
     <button id="testSound">Écouter les sons</button>
     <div class="mu" style="margin-top:8px">Tintement doux descendant = pré-alerte · 1 bip = devant · 2 bips montants = tribord · 2 bips descendants = bâbord · les bips accélèrent en approchant · son continu = moins de 10 m · 3 bips très graves = GPS perdu.</div>
   </div>
@@ -353,7 +354,7 @@ function feuilleSons() {
 }
 $('testSound').onclick = feuilleSons;
 $('demoSonsBtn').onclick = feuilleSons;
-if (!APPLI) { $('volMaxLigne').hidden = true; $('volAlertesLigne').hidden = true; $('sautsLigne').hidden = true; $('sonsMediaLigne').hidden = true; }
+if (!APPLI) { $('volMaxLigne').hidden = true; $('volAlertesLigne').hidden = true; $('sautsLigne').hidden = true; $('brutLigne').hidden = true; $('sonsMediaLigne').hidden = true; }
 // Sons sur le canal « média » d'Android (16/11/2026, à la demande du user) : l'appli ne touche plus au volume « alarme »,
 // qui restait parfois au maximum après une séance et déréglait le réveil. Le volume média est montré par une pastille de
 // l'accueil (rouge < 50 %, orange 50-75 %, vert > 75 %). Les cases « Sons en média » et « volume maximum » sont masquées.
@@ -623,7 +624,7 @@ $('start').onclick = async () => {
   saveSettings();
   if (!SON_NATIF) audio(); // le navigateur n'autorise l'audio qu'après un appui
   arreterGpsAccueil(); majTest();
-  if (APPLI) { appliquerVolume(); demarrerJournal(); demarrerSauts(); const t = horlogeSon() + 0.15; tone(880, 880, t, 0.12, 0.8, 'triangle'); tone(1320, 1320, t + 0.16, 0.2, 0.8, 'triangle'); } // carillon : le son marche
+  if (APPLI) { appliquerVolume(); demarrerJournal().catch(() => {}).then(demarrerSauts); const t = horlogeSon() + 0.15; tone(880, 880, t, 0.12, 0.8, 'triangle'); tone(1320, 1320, t + 0.16, 0.2, 0.8, 'triangle'); } // carillon : le son marche
   $('setup').hidden = true; $('avance').hidden = true; $('fProfils').classList.remove('on');
   document.body.classList.add('navigation'); $('run').hidden = false; resize();
   fix = null; lastFixes = []; analysis = null; last = null; running = true; window.radarEnCours = true; dernierPrechargement = null; debutSeance = Date.now();
@@ -654,7 +655,9 @@ const fr1v = v => String(v).replace('.', ',');
 async function demarrerSauts() {
   if (!$('sauts').checked || ecouteSauts) return;
   try {
-    const r = await Natif.saut.demarrer();
+    // données brutes : fichier nommé d'après le journal de la séance (envoyé et supprimé avec lui)
+    const brut = $('brut').checked && JournalSession.nom ? JournalSession.nom.replace(/\.jsonl$/, '') : null;
+    const r = await Natif.saut.demarrer(brut ? { brut } : {});
     ecouteSauts = await Natif.saut.addListener('saut', s => {
       const v = fix ? fix.speed * 3.6 : 0;
       s.v = Math.round(v);
@@ -667,7 +670,7 @@ async function demarrerSauts() {
     });
     // chocs sans phase allégée (candidats sauts de kite) : seulement notés au journal, au-dessus de 12 km/h, pour l'analyse
     ecouteChocs = await Natif.saut.addListener('choc', c => { const v = fix ? fix.speed * 3.6 : 0; if (v >= 12) JournalSession.ev('choc', { ...c, v: Math.round(v) }); });
-    JournalSession.ev('sauts', { actif: true, barometre: r.barometre, gravite: r.gravite, hz: r.hz });
+    JournalSession.ev('sauts', { actif: true, barometre: r.barometre, gravite: r.gravite, hz: r.hz, brut: r.brut || null, ...(r.erreurBrut ? { erreurBrut: r.erreurBrut } : {}) });
   } catch (e) { JournalSession.ev('sauts', { actif: false, erreur: e.message }); }
 }
 
@@ -688,7 +691,7 @@ async function demarrerJournal() {
 
 // ---------- Réglages persistants ----------
 const veilleEtat = {};
-const SETTINGS = ['veille', 'bips', 'voix', 'volMax', 'volAlertes', 'sonsMedia', 'sauts', 'relais', 'notifDiscretes', 'styleMontre', 'seuil', 'vmin', 'antic', 'preAlerte', 'smooth', 'live', 'testMode', 'testH', 'testNoL3d', 'simMode', 'simStart'];
+const SETTINGS = ['veille', 'bips', 'voix', 'volMax', 'volAlertes', 'sonsMedia', 'sauts', 'brut', 'relais', 'notifDiscretes', 'styleMontre', 'seuil', 'vmin', 'antic', 'preAlerte', 'smooth', 'live', 'testMode', 'testH', 'testNoL3d', 'simMode', 'simStart'];
 function saveSettings() { SETTINGS.forEach(k => store.set(k, $(k).type === 'checkbox' ? $(k).checked : $(k).value)); }
 // tout réglage modifié est enregistré aussitôt (sinon il revenait à sa valeur précédente au retour sur la page : « Sauts »)
 SETTINGS.forEach(k => $(k).addEventListener('change', () => saveSettings()));

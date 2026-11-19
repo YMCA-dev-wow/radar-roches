@@ -2,5 +2,6 @@
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <external-path name="my_images" path="." />
     <files-path name="journaux" path="journaux/" />
+    <files-path name="bruts" path="bruts/" />
     <cache-path name="my_cache_images" path="." />
 </paths>

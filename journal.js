@@ -85,7 +85,7 @@ async function afficherJournaux(conteneur) {
     const txt = document.createElement('div');
     txt.innerHTML = '<b></b><small></small>';
     txt.querySelector('b').textContent = new Date(j.date).toLocaleString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-    txt.querySelector('small').textContent = ` · ${Math.max(1, Math.round(j.taille / 1024))} Ko`;
+    txt.querySelector('small').textContent = ` · ${Math.max(1, Math.round(j.taille / 1024))} Ko` + (j.brut ? ` + données brutes ${(j.brut / 1048576).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} Mo` : '');
     txt.onclick = () => { c.checked = !c.checked; c.onchange(); };
     const env = document.createElement('button'); env.className = 'btn prim'; env.textContent = 'Envoyer';
     env.onclick = () => NJ().partager({ nom: j.nom }).catch(e => alert(e.message));

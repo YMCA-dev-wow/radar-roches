@@ -48,6 +48,8 @@ public class JournalPlugin extends Plugin {
     };
 
     private File dossier() { File d = new File(getContext().getFilesDir(), "journaux"); d.mkdirs(); return d; }
+    // données brutes des capteurs de la séance (SautPlugin, option), partagées et supprimées avec leur journal
+    private File brutDe(String nomJournal) { return new File(new File(getContext().getFilesDir(), "bruts"), nomJournal.replaceAll("\\.jsonl$", "").replaceAll("[^A-Za-z0-9._-]", "_") + "_brut.csv.gz"); }
 
     private synchronized void ecrireLigne(String ligne) {
         if (sortie == null) return;
@@ -118,7 +120,11 @@ public class JournalPlugin extends Plugin {
         JSArray a = new JSArray();
         if (l != null) {
             Arrays.sort(l, (x, y) -> Long.compare(y.lastModified(), x.lastModified()));
-            for (File f : l) { JSObject o = new JSObject(); o.put("nom", f.getName()); o.put("taille", f.length()); o.put("date", f.lastModified()); a.put(o); }
+            for (File f : l) {
+                JSObject o = new JSObject(); o.put("nom", f.getName()); o.put("taille", f.length()); o.put("date", f.lastModified());
+                File b = brutDe(f.getName()); if (b.exists()) o.put("brut", b.length());
+                a.put(o);
+            }
         }
         JSObject r = new JSObject(); r.put("journaux", a); call.resolve(r);
     }
@@ -128,9 +134,14 @@ public class JournalPlugin extends Plugin {
         File f = new File(dossier(), call.getString("nom", ""));
         if (!f.exists()) { call.reject("journal introuvable"); return; }
         Uri u = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", f);
-        Intent i = new Intent(Intent.ACTION_SEND);
+        File b = brutDe(f.getName());
+        Intent i;
+        if (b.exists()) {   // journal + données brutes : envoi des deux fichiers
+            java.util.ArrayList<Uri> uris = new java.util.ArrayList<>();
+            uris.add(u); uris.add(FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", b));
+            i = new Intent(Intent.ACTION_SEND_MULTIPLE); i.putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris);
+        } else { i = new Intent(Intent.ACTION_SEND); i.putExtra(Intent.EXTRA_STREAM, u); }
         i.setType("application/octet-stream");
-        i.putExtra(Intent.EXTRA_STREAM, u);
         i.putExtra(Intent.EXTRA_SUBJECT, "Radar roches : journal " + f.getName());
         i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         Intent choix = Intent.createChooser(i, "Envoyer le journal");
@@ -147,6 +158,8 @@ public class JournalPlugin extends Plugin {
         if (noms != null) for (int k = 0; k < noms.length(); k++) {
             File f = new File(dossier(), noms.optString(k));
             if (f.exists()) uris.add(FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", f));
+            File b = brutDe(noms.optString(k));
+            if (f.exists() && b.exists()) uris.add(FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", b));
         }
         if (uris.isEmpty()) { call.reject("aucun journal"); return; }
         Intent i = new Intent(Intent.ACTION_SEND_MULTIPLE);
@@ -195,7 +208,7 @@ public class JournalPlugin extends Plugin {
     @PluginMethod
     public void supprimer(PluginCall call) {
         String n = call.getString("nom", "");
-        if (!n.equals(nom)) new File(dossier(), n).delete();
+        if (!n.equals(nom)) { new File(dossier(), n).delete(); brutDe(n).delete(); }
         call.resolve();
     }
 

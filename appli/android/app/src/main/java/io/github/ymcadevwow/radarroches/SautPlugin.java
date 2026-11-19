@@ -7,12 +7,22 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.SystemClock;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.zip.GZIPOutputStream;
 
 /**
  * Détection des sauts (version d'essai), téléphone porté sur le tronc (pochette sous le gilet).
@@ -30,6 +40,11 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  *    altitude baromètre point par point ;
  *  - « chocs » : pic au-dessus de 3 g sans phase allégée (réception d'un saut de kite, où l'aile porte et l'accélération
  *    ne tombe pas vers 0), envoyés avec 4 s de courbes avant et 1 s après, pour mettre au point une détection kite.
+ * 19/11/2026 : données brutes en option (« brut » = nom du journal de la séance) : accéléromètre 3 axes et gyroscope à 100 Hz,
+ *  gravité d'Android et orientation fusionnée (vecteur de rotation « jeu », sans boussole) à 50 Hz, pression à 25 Hz, dans
+ *  bruts/<journal>_brut.csv.gz, partagé avec le journal. But : trajectoire réelle des sauts de kite (verticale en repère
+ *  terrestre par le gyroscope, double intégration), la gravité estimée par Android s'alignant sur la traction de l'aile.
+ *  Format (une ligne par mesure) : lettre, µs depuis la ligne « debut », valeurs (a, G : m/s² ; g : rad/s ; r : x, y, z, w ; p : hPa).
  */
 @CapacitorPlugin(name = "Saut")
 public class SautPlugin extends Plugin implements SensorEventListener {
@@ -42,27 +57,43 @@ public class SautPlugin extends Plugin implements SensorEventListener {
     private final float[] alt = new float[N]; private final long[] tAlt = new long[N]; private int nAlt = 0;
     private long debutBas = -1, finBas = -1, dernierSaut = 0;
     private int nSauts = 0;
+    private static final int GARDER_BRUTS = 10;          // ~10-15 Mo par heure : on ne garde que les derniers
+    private final Object verrou = new Object();
+    private Writer brut = null; private String nomBrut = null; private long t0Brut = 0, dernierFlush = 0, nBrut = 0;
 
     @PluginMethod
     public void demarrer(PluginCall call) {
         sm = (SensorManager) getContext().getSystemService(Context.SENSOR_SERVICE);
         Sensor a = sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), p = sm.getDefaultSensor(Sensor.TYPE_PRESSURE), gr = sm.getDefaultSensor(Sensor.TYPE_GRAVITY);
         if (a == null) { call.reject("pas d'accéléromètre"); return; }
+        String erreurBrut = null;
         if (!actif) {
+            String nb = call.getString("brut", null);
+            if (nb != null && !nb.isEmpty()) erreurBrut = ouvrirBrut(nb, a, gr, p);
             fil = new HandlerThread("radar-sauts"); fil.start();
             Handler h = new Handler(fil.getLooper()); hFil = h;
             sm.registerListener(this, a, 1000000 / HZ, 0, h);
             if (gr != null) sm.registerListener(this, gr, 1000000 / HZ, 0, h);
             if (p != null) sm.registerListener(this, p, 40000, 0, h);
+            if (brut != null) {
+                Sensor gy = sm.getDefaultSensor(Sensor.TYPE_GYROSCOPE), rv = sm.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR);
+                if (gy != null) sm.registerListener(this, gy, 1000000 / HZ, 0, h);
+                if (rv != null) sm.registerListener(this, rv, 20000, 0, h);
+            }
             actif = true; gravite = gr != null; nAcc = 0; nAlt = 0; debutBas = -1; finBas = -1; nSauts = 0; dernierChoc = 0;
         }
-        JSObject r = new JSObject(); r.put("barometre", p != null); r.put("gravite", gr != null); r.put("hz", HZ); call.resolve(r);
+        JSObject r = new JSObject(); r.put("barometre", p != null); r.put("gravite", gr != null); r.put("hz", HZ);
+        if (nomBrut != null) r.put("brut", nomBrut);
+        if (erreurBrut != null) r.put("erreurBrut", erreurBrut);
+        call.resolve(r);
     }
 
     @PluginMethod
     public void arreter(PluginCall call) {
+        long n = nBrut;
         if (actif) { sm.unregisterListener(this); fil.quitSafely(); actif = false; }
-        JSObject r = new JSObject(); r.put("sauts", nSauts); call.resolve(r);
+        fermerBrut();
+        JSObject r = new JSObject(); r.put("sauts", nSauts); r.put("mesuresBrutes", n); call.resolve(r);
     }
 
     @Override public void onAccuracyChanged(Sensor s, int a) {}
@@ -70,7 +101,10 @@ public class SautPlugin extends Plugin implements SensorEventListener {
     @Override
     public void onSensorChanged(SensorEvent e) {
         long t = System.currentTimeMillis();
-        if (e.sensor.getType() == Sensor.TYPE_PRESSURE) {
+        int ty = e.sensor.getType();
+        if (brut != null) ecrireBrut(e, ty);
+        if (ty == Sensor.TYPE_GYROSCOPE || ty == Sensor.TYPE_GAME_ROTATION_VECTOR) return;   // seulement pour les données brutes
+        if (ty == Sensor.TYPE_PRESSURE) {
             int k = nAlt++ % N; tAlt[k] = t; alt[k] = SensorManager.getAltitude(SensorManager.PRESSURE_STANDARD_ATMOSPHERE, e.values[0]);
             return;
         }
@@ -184,6 +218,66 @@ public class SautPlugin extends Plugin implements SensorEventListener {
         return h;
     }
 
+    // ---------- Données brutes ----------
+    private File dossierBruts() { File d = new File(getContext().getFilesDir(), "bruts"); d.mkdirs(); return d; }
+
+    private String ouvrirBrut(String nomJournal, Sensor a, Sensor gr, Sensor p) {
+        try {
+            File d = dossierBruts();
+            File[] l = d.listFiles();
+            if (l != null && l.length >= GARDER_BRUTS) {
+                Arrays.sort(l, (x, y) -> Long.compare(x.lastModified(), y.lastModified()));
+                for (int i = 0; i <= l.length - GARDER_BRUTS; i++) l[i].delete();
+            }
+            String n = nomJournal.replaceAll("[^A-Za-z0-9._-]", "_") + "_brut.csv.gz";
+            Writer w = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(new File(d, n)), 65536, true), StandardCharsets.UTF_8), 65536);
+            long ns = SystemClock.elapsedRealtimeNanos(), ms = System.currentTimeMillis();
+            w.write("# Radar roches, données brutes des capteurs du téléphone. Une ligne par mesure : lettre, µs depuis « debut », valeurs.\n");
+            w.write("# a = accéléromètre x,y,z (m/s², gravité comprise) ; g = gyroscope x,y,z (rad/s) ; G = gravité estimée par Android x,y,z (m/s²) ;\n");
+            w.write("# r = orientation fusionnée sans boussole (GAME_ROTATION_VECTOR) x,y,z,w ; p = pression (hPa). Repère du téléphone.\n");
+            w.write("debut,0," + ms + "\n");    // instant 0 = ms depuis 1970 (horloge du journal)
+            w.write("appareil," + android.os.Build.MANUFACTURER.replace(',', ' ') + "," + android.os.Build.MODEL.replace(',', ' ') + "\n");
+            Sensor gy = sm.getDefaultSensor(Sensor.TYPE_GYROSCOPE), rv = sm.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR);
+            Sensor[] cs = { a, gy, gr, rv, p }; String[] ls = { "a", "g", "G", "r", "p" };
+            for (int i = 0; i < cs.length; i++) if (cs[i] != null)   // plage max : un pic de réception au-delà est écrêté
+                w.write("capteur," + ls[i] + "," + cs[i].getName().replace(',', ' ') + "," + cs[i].getVendor().replace(',', ' ') + ",max=" + cs[i].getMaximumRange() + ",resolution=" + cs[i].getResolution() + "\n");
+            synchronized (verrou) { brut = w; nomBrut = n; t0Brut = ns; dernierFlush = ns; nBrut = 0; }
+            return null;
+        } catch (Exception ex) { synchronized (verrou) { brut = null; nomBrut = null; } return ex.getMessage(); }
+    }
+
+    private static String f4(float v) { return Float.toString(Math.round(v * 10000f) / 10000f); }
+
+    private void ecrireBrut(SensorEvent e, int ty) {
+        String l;
+        switch (ty) {
+            case Sensor.TYPE_ACCELEROMETER: l = "a"; break;
+            case Sensor.TYPE_GYROSCOPE: l = "g"; break;
+            case Sensor.TYPE_GRAVITY: l = "G"; break;
+            case Sensor.TYPE_GAME_ROTATION_VECTOR: l = "r"; break;
+            case Sensor.TYPE_PRESSURE: l = "p"; break;
+            default: return;
+        }
+        int nv = ty == Sensor.TYPE_PRESSURE ? 1 : ty == Sensor.TYPE_GAME_ROTATION_VECTOR ? Math.min(4, e.values.length) : 3;
+        StringBuilder b = new StringBuilder(48).append(l).append(',').append((e.timestamp - t0Brut) / 1000);
+        for (int i = 0; i < nv; i++) b.append(',').append(f4(e.values[i]));
+        b.append('\n');
+        synchronized (verrou) {
+            if (brut == null) return;
+            try {
+                brut.write(b.toString()); nBrut++;
+                if (e.timestamp - dernierFlush > 5_000_000_000L) { brut.flush(); dernierFlush = e.timestamp; }   // lisible même si l'appli est tuée
+            } catch (IOException ex) { try { brut.close(); } catch (IOException x) { /* rien */ } brut = null; }
+        }
+    }
+
+    private void fermerBrut() {
+        synchronized (verrou) {
+            if (brut != null) { try { brut.close(); } catch (IOException e) { /* rien */ } }
+            brut = null; nomBrut = null;
+        }
+    }
+
     @Override
-    protected void handleOnDestroy() { if (actif) { sm.unregisterListener(this); fil.quitSafely(); actif = false; } }
+    protected void handleOnDestroy() { if (actif) { sm.unregisterListener(this); fil.quitSafely(); actif = false; } fermerBrut(); }
 }
