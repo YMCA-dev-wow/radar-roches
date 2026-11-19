@@ -2,6 +2,14 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 52,
+      "date": "2026-11-19",
+      "titre": "Relevés Holfuy collés",
+      "points": [
+        "Le tableau des relevés copié sur une page Holfuy (heures en colonnes, libellés sur leur propre ligne, heures notées « 04h ») est maintenant reconnu : vent moyen, rafales et direction ; minimum et température ignorés."
+      ]
+    },
+    {
       "id": 51,
       "date": "2026-11-19",
       "titre": "Relevés de vent collés ou importés",

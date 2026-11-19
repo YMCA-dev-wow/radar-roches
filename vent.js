@@ -129,11 +129,11 @@ const Vent = (() => {
   // (sur chaque ligne mini ≤ moyen ≤ rafale) ; température, pression, humidité écartées (unités ou plages).
   // Les en-têtes (CSV, ou libellés de lignes d'un tableau en colonnes comme Holfuy) priment sur ces déductions.
   const UNITES = { nd: 1 / 1.94384, kmh: 1 / 3.6, ms: 1 };
-  const uniteDe = s => /(^|[^a-z])(nds?|n[oœ]euds?|kts?|knots?)([^a-z]|$)/i.test(s) ? 'nd' : /km\s?\/\s?h|\bkmh\b/i.test(s) ? 'kmh' : /\bm\s?\/\s?s\b/i.test(s) ? 'ms' : null;
+  const uniteDe = s => /(^|[^a-z])(nds?|n(?:oe|œ)uds?|kts?|knots?)([^a-z]|$)/i.test(s) ? 'nd' : /km\s?\/\s?h|\bkmh\b/i.test(s) ? 'kmh' : /\bm\s?\/\s?s\b/i.test(s) ? 'ms' : null;
   function mot(x) {
     const s = String(x).replace(/^[(\[]+|[)\],.:]+$/g, '');
-    let m = /^(\d{1,2})[:hH](\d{2})(?::\d{2})?$/.exec(s);
-    if (m && +m[1] < 24 && +m[2] < 60) return { k: 't', h: +m[1], mi: +m[2] };
+    let m = /^(\d{1,2})(?::(\d{2})(?::\d{2})?|[hH](\d{2})?)$/.exec(s); // 14:15, 14h15, 14h
+    if (m && +m[1] < 24 && +(m[2] || m[3] || 0) < 60) return { k: 't', h: +m[1], mi: +(m[2] || m[3] || 0) };
     if ((m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s))) return { k: 'd', a: +m[1], mo: +m[2], j: +m[3] };
     if ((m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(s))) return { k: 'd', a: +m[3] < 100 ? 2000 + +m[3] : +m[3], mo: +m[2], j: +m[1] };
     if ((m = /^(-?\d+(?:[.,]\d+)?)(°c|°|nds?|kts?|km\/h|kmh|m\/s|%|hpa|mb)?$/i.exec(s))) return { k: 'n', v: parseFloat(m[1].replace(',', '.')), u: (m[2] || '').toLowerCase() };
@@ -228,13 +228,17 @@ const Vent = (() => {
       const parLigne = lignes.map(l => l.split(/[\s;|]+/).filter(Boolean).map(mot));
       const jT = parLigne.findIndex(l => l.filter(x => x.k === 't').length >= 3);
       if (jT >= 0) {
-        // ---- tableau en colonnes (Holfuy) : une ligne d'heures, puis une ligne par mesure (libellé + autant de valeurs)
+        // ---- tableau en colonnes (Holfuy) : une ligne d'heures, puis une ligne par mesure (autant de valeurs que d'heures),
+        // son libellé (« Vitesse », « Rafales (nœud) », « Temp. (°C) »…) sur la même ligne ou sur la ligne d'avant
         const T = parLigne[jT].filter(x => x.k === 't'), d = parLigne.slice(0, jT + 1).flat().find(x => x.k === 'd'), rangs = [];
+        const lib = l => l.filter(x => x.k === 'w' || x.k === 'u').map(x => x.k === 'u' ? x.u : x.s).join(' ');
+        let attente = '';
         for (const l of parLigne.slice(jT + 1)) {
           const v = l.filter(valeur);
-          if (v.length === T.length && v.every(x => x.k === v[0].k)) {
-            rangs.push(v); libs.push(l.filter(x => x.k === 'w').map(x => x.s).join(' ') + ' ' + ((l.find(x => x.k === 'u') || {}).u || ''));
-          } else if (l.filter(x => x.k === 't').length >= 3) break;
+          if (l.filter(x => x.k === 't').length >= 3) break;
+          if (v.length === T.length && v.every(x => x.k === v[0].k)) { rangs.push(v); libs.push((attente + ' ' + lib(l)).trim()); attente = ''; }
+          else if (!v.length) attente += ' ' + lib(l);
+          else attente = '';
         }
         if (!rangs.length) return { pts: [], erreur: 'Aucune ligne de valeurs sous les heures.' };
         T.forEach((h, i) => recs.push({ t: instant(h.h, h.mi, d, t0, t1), vals: rangs.map(r => r[i]) }));
