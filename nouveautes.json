@@ -2,6 +2,16 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 51,
+      "date": "2026-11-19",
+      "titre": "Relevés de vent collés ou importés",
+      "points": [
+        "Modifier le vent : nouveau mode « Relevés », une ligne par relevé à l'heure de ton choix (+ Ligne, ✕ pour retirer).",
+        "Copie le tableau des relevés sur la page Holfuy ou WindsUp, puis « Coller des relevés » : l'appli reconnaît le vent moyen, les rafales et la direction, et ignore le reste de la page.",
+        "Ou ouvre le fichier CSV exporté (WindsUp). L'appli montre ce qu'elle a compris (colonnes, unité, nombre de relevés) avant d'enregistrer."
+      ]
+    },
+    {
       "id": 50,
       "date": "2026-11-16",
       "titre": "Vent et VMG dans les séances",

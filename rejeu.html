@@ -77,6 +77,12 @@
   .ligneK { display: flex; gap: 12px; font-size: 11px; color: var(--muted); } .ligneK i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
   table.vh { width: 100%; border-collapse: collapse; font-size: 13px; } table.vh th { color: var(--muted); font-weight: 500; font-size: 11px; text-align: left; padding: 3px 2px; }
   table.vh td { padding: 3px 2px; } table.vh input { width: 100%; padding: 5px 6px; } table.vh tr.sel td:first-child { color: var(--accent); font-weight: 600; }
+  .outilsR { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; } .outilsR button { font-size: 13px; padding: 6px 10px; }
+  #vmTexte { width: 100%; font-size: 13px; } #vmBilan { margin: 6px 0; line-height: 1.6; } #vmBilan .err { color: #ff8a80; }
+  .uChip { border: 1px solid var(--line); background: none; color: var(--muted); border-radius: 8px; padding: 1px 8px; font-size: 12px; margin-right: 4px; }
+  .uChip.on { border-color: var(--accent); color: var(--accent); }
+  #vmDefil.long { max-height: 42vh; overflow: auto; } table.vh input.h { padding: 5px 2px; min-width: 64px; }
+  .supL { border: 0; background: none; color: var(--muted); padding: 4px 6px; font-size: 14px; }
   #roseV { display: block; margin: 8px auto; width: 170px; height: 170px; touch-action: none; cursor: pointer; }
   #legendeC .grad { height: 7px; border-radius: 4px; margin: 5px 0 2px; }
   #legendeC .ech { display: flex; justify-content: space-between; }
@@ -240,8 +246,13 @@
 <!-- feuille : saisie du vent -->
 <div class="feuilleR" id="fVentModif" hidden><div class="in"><div class="poignee"></div><h2>Modifier le vent</h2>
   <div class="r" style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><span id="vmType" style="display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:2px"></span></div>
-  <table class="vh" id="vmTable"></table>
-  <div class="sub" style="margin:6px 0">Direction : d'où vient le vent, en degrés (225) ou en points (SO, OSO…). Rafales facultatives. Ou touche la rose pour la ligne choisie.</div>
+  <div id="vmOutils" class="outilsR" hidden><button id="vmPlus">+ Ligne</button><button id="vmColle">📋 Coller des relevés</button><button id="vmFichierB">📄 Fichier CSV</button>
+    <input type="file" id="vmFichier" accept=".csv,.txt,text/csv,text/plain" hidden></div>
+  <div id="vmColler" hidden><textarea id="vmTexte" rows="5" placeholder="Colle ici le tableau copié sur la page de l'anémomètre (Holfuy, WindsUp…) : heures, vent, rafales, direction. Le reste du texte est ignoré."></textarea>
+    <div style="display:flex;gap:8px;margin-top:6px"><button id="vmFermer" style="flex:1">Annuler</button><button class="primary" id="vmLire" style="flex:2">Lire les relevés</button></div></div>
+  <div class="sub" id="vmBilan"></div>
+  <div id="vmDefil"><table class="vh" id="vmTable"></table></div>
+  <div class="sub" style="margin:6px 0">Direction : d'où vient le vent, en degrés (225) ou en points (SO, OSO…). Rafales facultatives. Ou touche la rose pour la ligne choisie. En mode Relevés, chaque ligne a son heure.</div>
   <svg id="roseV" viewBox="0 0 170 170"></svg>
   <h2>Source (facultatif)</h2><input id="vmSource" placeholder="Holfuy Lancieux, WindsUp, anémo perso…" style="width:100%">
   <div style="display:flex;gap:8px;margin-top:14px"><button id="vmAnnul" style="flex:1">Annuler</button><button class="primary" id="vmOk" style="flex:1">Enregistrer</button></div>
@@ -1365,57 +1376,115 @@ function ouvrirVent() {
 }
 $('vModif').onclick = () => { $('fVent').hidden = true; ouvrirVentModif(); };
 $('vArome').onclick = () => { Vent.revenirArome(idVent); ventCourant = Vent.courant(idVent); majVent(); $('fVent').hidden = true; };
-// Saisie : valeur unique ou heure par heure (heures locales couvrant la séance), pré-remplie avec le vent actuel
-let vmType = 'heures', vmLigne = 0;
+// Saisie : valeur unique, heure par heure (heures locales couvrant la séance) ou relevés (heure de chaque ligne au choix :
+// à la main, collés depuis une page Holfuy, WindsUp… ou lus dans un fichier CSV), pré-remplie avec le vent actuel
+let vmType = 'heures', vmLigne = 0, vmSaisi = null, vmLu = null; // vmLu : dernier texte lu { s, nom }
 const facteurVit = () => ({ kmh: 1 / 3.6, ms: 1, nd: 1 / 1.94384 })[Seances.unites().v];
+const vmF = x => x == null ? '' : Seances.vit(x).n;
+const hmVm = t => { const d = new Date(t); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+const lignesT = () => [...$('vmTable').querySelectorAll('tr[data-t]')];
 function heuresSeance() { const l = [], d = new Date(pts[0].t); d.setMinutes(0, 0, 0); for (let t = +d; t <= pts[pts.length - 1].t; t += 3600e3) l.push(t); return l; }
 function ouvrirVentModif() {
   if (!pts.length || !idVent) return;
-  const o = Vent.lire(idVent), W = ventCourant;
-  vmType = o.saisi && o.saisi.type ? o.saisi.type : heuresSeance().length > 1 ? 'heures' : 'unique';
-  const u = Seances.vit(0).u, f = x => x == null ? '' : Seances.vit(x).n;
-  const lignes = vmType === 'unique' ? [pts[0].t] : heuresSeance();
-  const val = t => { // valeur de départ : saisie existante, sinon vent courant à la mi-heure
-    if (o.saisi && o.saisi.type === vmType) { const q = o.saisi.pts.find(x => Math.abs(x[0] - (vmType === 'unique' ? t : t + 1800e3)) < 120e3); if (q) return { v: q[1], raf: q[2], dir: q[3] }; }
-    if (!W) return { v: null, raf: null, dir: null };
-    return vmType === 'unique' ? (() => { const r = Vent.resume(W, pts[0].t, pts[pts.length - 1].t); return { v: r.v, raf: r.raf, dir: r.dir }; })() : Vent.a(W, Math.min(t + 1800e3, pts[pts.length - 1].t));
-  };
+  vmSaisi = Vent.lire(idVent).saisi || null;
   $('vmType').innerHTML = '';
-  for (const [k, lib] of [['unique', 'Valeur unique'], ['heures', 'Heure par heure']]) {
-    const b = document.createElement('button'); b.textContent = lib; b.style.cssText = 'border:0;padding:5px 10px;border-radius:8px;font-size:13px;' + (k === vmType ? 'background:var(--p2);color:var(--accent)' : 'background:none;color:var(--muted)');
-    b.onclick = () => { const anc = o.saisi; o.saisi = anc && anc.type === k ? anc : null; vmTypeForce = k; ouvrirVentModifType(k); };
-    $('vmType').append(b);
+  for (const [k, lib] of [['unique', 'Valeur unique'], ['heures', 'Heure par heure'], ['releves', 'Relevés']]) {
+    const b = document.createElement('button'); b.textContent = lib; b.dataset.k = k; b.style.cssText = 'border:0;padding:5px 9px;border-radius:8px;font-size:13px';
+    b.onclick = () => afficherType(k); $('vmType').append(b);
   }
-  remplirTable(lignes, val, u, f);
-  $('vmSource').value = (o.saisi && o.saisi.source) || '';
+  $('vmSource').value = (vmSaisi && vmSaisi.source) || '';
+  $('vmColler').hidden = true; $('vmBilan').innerHTML = '';
+  afficherType(vmSaisi && vmSaisi.type ? vmSaisi.type : heuresSeance().length > 1 ? 'heures' : 'unique');
   $('fVentModif').hidden = false;
 }
-let vmTypeForce = null;
-function ouvrirVentModifType(k) { const o = Vent.lire(idVent); const s0 = o.saisi; if (!(s0 && s0.type === k)) { o.saisi = null; } vmType = k; // réaffiche avec ce type
-  const W = ventCourant, u = Seances.vit(0).u, f = x => x == null ? '' : Seances.vit(x).n, lignes = k === 'unique' ? [pts[0].t] : heuresSeance();
-  const val = t => { if (s0 && s0.type === k) { const q = s0.pts.find(x => Math.abs(x[0] - (vmType === 'unique' ? t : t + 1800e3)) < 120e3); if (q) return { v: q[1], raf: q[2], dir: q[3] }; }
-    if (!W) return { v: null, raf: null, dir: null };
-    if (k === 'unique') { const r = Vent.resume(W, pts[0].t, pts[pts.length - 1].t); return { v: r.v, raf: r.raf, dir: r.dir }; }
-    return Vent.a(W, Math.min(t + 1800e3, pts[pts.length - 1].t)); };
-  [...$('vmType').children].forEach((b, i) => { const on = (i === 0) === (k === 'unique'); b.style.background = on ? 'var(--p2)' : 'none'; b.style.color = on ? 'var(--accent)' : 'var(--muted)'; });
-  remplirTable(lignes, val, u, f);
-}
-function remplirTable(lignes, val, u, f) {
-  const t = $('vmTable');
-  t.innerHTML = `<tr><th>${vmType === 'unique' ? '' : 'heure'}</th><th>vent (${u})</th><th>rafales</th><th>direction</th></tr>`;
-  lignes.forEach((h, i) => {
-    const v = val(h), tr = document.createElement('tr'); tr.dataset.t = h;
-    tr.innerHTML = `<td>${vmType === 'unique' ? 'séance' : new Date(h).getHours() + 'h'}</td><td><input inputmode="decimal" class="v"></td><td><input inputmode="decimal" class="r"></td><td><input class="d"></td>`;
-    tr.querySelector('.v').value = f(v.v); tr.querySelector('.r').value = f(v.raf); tr.querySelector('.d').value = v.dir == null ? '' : `${Vent.cardinal(v.dir)} ${Math.round(v.dir)}`.split(' ')[1];
-    tr.addEventListener('focusin', () => { vmLigne = i; majRose(); });
-    tr.querySelector('.d').addEventListener('input', majRose);
-    t.append(tr);
-  });
+function afficherType(k, lignes) {
+  vmType = k; const W = ventCourant, t0 = pts[0].t, t1 = pts[pts.length - 1].t;
+  [...$('vmType').children].forEach(b => { const on = b.dataset.k === k; b.style.background = on ? 'var(--p2)' : 'none'; b.style.color = on ? 'var(--accent)' : 'var(--muted)'; });
+  $('vmOutils').hidden = k !== 'releves';
+  if (k !== 'releves') { $('vmColler').hidden = true; $('vmBilan').innerHTML = ''; }
+  const de = q => ({ v: q[1], raf: q[2], dir: q[3] });
+  if (lignes) {} // relevés lus
+  else if (k === 'unique') {
+    const q = vmSaisi && vmSaisi.type === 'unique' ? vmSaisi.pts[0] : null, r = q ? de(q) : W ? Vent.resume(W, t0, t1) : {};
+    lignes = [{ t: t0, v: r.v, raf: r.raf, dir: r.dir }];
+  } else if (k === 'heures') {
+    lignes = heuresSeance().map(h => {
+      const q = vmSaisi && vmSaisi.type === 'heures' ? vmSaisi.pts.find(x => Math.abs(x[0] - (h + 1800e3)) < 120e3) : null; // valeur horaire placée à la mi-heure
+      return { t: h, ...(q ? de(q) : W ? Vent.a(W, Math.min(h + 1800e3, t1)) : {}) };
+    });
+  } else { // relevés : ceux déjà saisis (relevés ou heures), sinon le vent actuel à chaque mi-heure
+    lignes = vmSaisi && vmSaisi.type !== 'unique' && vmSaisi.pts.length ? vmSaisi.pts.map(q => ({ t: q[0], ...de(q) }))
+      : heuresSeance().map(h => Math.min(h + 1800e3, t1)).map(t => ({ t, ...(W ? Vent.a(W, t) : {}) }));
+  }
+  const u = Seances.vit(0).u, R = k === 'releves';
+  $('vmTable').innerHTML = `<tr><th>${k === 'unique' ? '' : 'heure'}</th><th>vent (${u})</th><th>rafales</th><th>direction</th>${R ? '<th></th>' : ''}</tr>`;
+  lignes.forEach(l => ajouterLigne(l));
+  $('vmDefil').classList.toggle('long', R);
   vmLigne = 0; majRose();
 }
+function ajouterLigne(l, apres) {
+  const R = vmType === 'releves', tr = document.createElement('tr'); tr.dataset.t = l.t;
+  tr.innerHTML = `<td>${R ? `<input type="time" class="h" value="${hmVm(l.t)}">` : vmType === 'unique' ? 'séance' : new Date(l.t).getHours() + 'h'}</td>` +
+    `<td><input inputmode="decimal" class="v"></td><td><input inputmode="decimal" class="r"></td><td><input class="d"></td>` +
+    (R ? '<td><button class="supL" aria-label="Supprimer la ligne">✕</button></td>' : '');
+  tr.querySelector('.v').value = vmF(l.v); tr.querySelector('.r').value = vmF(l.raf); tr.querySelector('.d').value = l.dir == null ? '' : String(Math.round(l.dir));
+  tr.addEventListener('focusin', () => { vmLigne = lignesT().indexOf(tr); majRose(); });
+  tr.querySelector('.d').addEventListener('input', majRose);
+  if (R) tr.querySelector('.supL').onclick = () => { tr.remove(); vmLigne = Math.max(0, Math.min(vmLigne, lignesT().length - 1)); majRose(); };
+  if (apres) apres.after(tr); else $('vmTable').append(tr);
+  return tr;
+}
+// instant d'une ligne : heure saisie, au jour de la ligne (une séance peut passer minuit)
+function tempsLigne(tr) {
+  if (vmType === 'unique') return pts[0].t;
+  if (vmType === 'heures') return +tr.dataset.t + 1800e3;
+  const m = /^(\d{1,2}):(\d{2})/.exec(tr.querySelector('.h').value); if (!m) return null;
+  const d = new Date(+tr.dataset.t); d.setHours(+m[1], +m[2], 0, 0); return +d;
+}
+$('vmPlus').onclick = () => {
+  const l = lignesT(), cur = l[vmLigne] || l[l.length - 1], t = cur ? (tempsLigne(cur) ?? pts[0].t) + 900e3 : pts[0].t;
+  const tr = ajouterLigne({ t }, cur); vmLigne = lignesT().indexOf(tr); majRose(); tr.querySelector('.v').focus();
+};
+$('vmColle').onclick = async () => {
+  $('vmColler').hidden = false; $('vmTexte').value = '';
+  try { const s = await navigator.clipboard.readText(); if (s && s.trim()) $('vmTexte').value = s; } catch {}
+  $('vmTexte').focus();
+};
+$('vmLire').onclick = () => lireTexte($('vmTexte').value, '');
+$('vmFermer').onclick = () => { $('vmColler').hidden = true; };
+$('vmFichierB').onclick = () => $('vmFichier').click();
+$('vmFichier').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if (f) lireTexte(await f.text(), f.name); };
+// lecture du texte collé ou du fichier ; unité : lue dans le texte, sinon déduite de la prévision AROME (la plus proche), sinon nœuds
+function lireTexte(s, nom, unite) {
+  vmLu = { s, nom };
+  const t0 = pts[0].t, t1 = pts[pts.length - 1].t;
+  let R = Vent.lireReleves(s, t0, t1, { nom, unite }), deduite = false;
+  const ar = Vent.lire(idVent).arome;
+  if (!unite && R.pts.length && !R.uniteLue && ar && ar.pts && ar.pts.length) {
+    const ref = Vent.resume({ pts: ar.pts }, t0, t1).v, brut = R.pts.reduce((a, p) => a + p[1], 0) / R.pts.length / Vent.UNITES[R.unite];
+    const u = Object.keys(Vent.UNITES).sort((a, b) => Math.abs(Math.log(brut * Vent.UNITES[a] / ref)) - Math.abs(Math.log(brut * Vent.UNITES[b] / ref)))[0];
+    if (u !== R.unite) R = Vent.lireReleves(s, t0, t1, { nom, unite: u }); deduite = true;
+  }
+  if (!R.pts.length) {
+    $('vmBilan').innerHTML = `<span class="err">${R.erreur || 'Aucun relevé reconnu.'}</span>` + (R.colonnes ? `<br>Colonnes vues : ${R.colonnes.join(', ')}` : '') +
+      '<br>Copie le tableau des relevés (heures et valeurs), ou ouvre le fichier CSV exporté.';
+    return;
+  }
+  $('vmColler').hidden = true;
+  afficherType('releves', R.pts.map(p => ({ t: p[0], v: p[1], raf: p[2], dir: p[3] })));
+  if (!$('vmSource').value.trim() && R.source) $('vmSource').value = R.source;
+  const U = { nd: 'nd', kmh: 'km/h', ms: 'm/s' };
+  $('vmBilan').innerHTML = `<b>${R.pts.length} relevés</b> lus, de ${hmVm(R.pts[0][0])} à ${hmVm(R.pts[R.pts.length - 1][0])}` +
+    (R.hors ? ` (${R.hors} hors séance laissés de côté)` : '') + (R.ecartees ? ` · ${R.ecartees} ligne${R.ecartees > 1 ? 's' : ''} écartée${R.ecartees > 1 ? 's' : ''}` : '') +
+    `<br>Colonnes : ${R.colonnes.join(', ')}<br>Unité du texte : ` +
+    Object.keys(U).map(u => `<button class="uChip${u === R.unite ? ' on' : ''}" data-u="${u}">${U[u]}</button>`).join('') +
+    (R.uniteLue ? '' : deduite ? ' <i>déduite de la prévision, à vérifier</i>' : ' <i>supposée, à vérifier</i>') +
+    '<br>Vérifie le tableau, puis Enregistrer.';
+  $('vmBilan').querySelectorAll('.uChip').forEach(b => b.onclick = () => lireTexte(vmLu.s, vmLu.nom, b.dataset.u));
+}
 function majRose() {
-  const tr = $('vmTable').querySelectorAll('tr[data-t]')[vmLigne];
-  $('vmTable').querySelectorAll('tr[data-t]').forEach((x, i) => x.classList.toggle('sel', i === vmLigne));
+  const tr = lignesT()[vmLigne];
+  lignesT().forEach((x, i) => x.classList.toggle('sel', i === vmLigne));
   const d = tr ? Vent.lireDir(tr.querySelector('.d').value) : null;
   let h = '<circle cx="85" cy="85" r="76" fill="#0b2024" stroke="#1f5a57"/>';
   for (const [l, a] of [['N', 0], ['E', 90], ['S', 180], ['O', 270]]) h += `<text x="${85 + 64 * Math.sin(a * Math.PI / 180)}" y="${89 - 64 * Math.cos(a * Math.PI / 180)}" fill="#7fb8b2" font-size="12" text-anchor="middle">${l}</text>`;
@@ -1426,18 +1495,19 @@ function majRose() {
 $('roseV').addEventListener('pointerdown', e => {
   const r = $('roseV').getBoundingClientRect(), dx = e.clientX - r.left - r.width / 2, dy = e.clientY - r.top - r.height / 2;
   const d = Math.round((Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360 / 5) * 5;
-  const tr = $('vmTable').querySelectorAll('tr[data-t]')[vmLigne]; if (!tr) return;
+  const tr = lignesT()[vmLigne]; if (!tr) return;
   tr.querySelector('.d').value = String(d); majRose();
 });
 $('vmAnnul').onclick = () => { $('fVentModif').hidden = true; };
 $('vmOk').onclick = () => {
   const k = facteurVit(), num = s => { const x = parseFloat(String(s).replace(',', '.')); return isFinite(x) ? x : null; }, l = [];
-  for (const tr of $('vmTable').querySelectorAll('tr[data-t]')) {
-    const v = num(tr.querySelector('.v').value), r = num(tr.querySelector('.r').value), d = Vent.lireDir(tr.querySelector('.d').value);
-    if (v == null || d == null) continue;
-    l.push([vmType === 'unique' ? pts[0].t : +tr.dataset.t + 1800e3, v * k, r == null ? null : r * k, d]); // valeur horaire placée à la mi-heure
+  for (const tr of lignesT()) {
+    const v = num(tr.querySelector('.v').value), r = num(tr.querySelector('.r').value), d = Vent.lireDir(tr.querySelector('.d').value), t = tempsLigne(tr);
+    if (v == null || d == null || t == null) continue;
+    l.push([t, v * k, r == null ? null : r * k, d]);
   }
   if (!l.length) { alert('Saisis au moins un vent et une direction.'); return; }
+  l.sort((a, b) => a[0] - b[0]);
   Vent.saisir(idVent, vmType, l, $('vmSource').value.trim());
   ventCourant = Vent.courant(idVent); majVent(); $('fVentModif').hidden = true;
 };
