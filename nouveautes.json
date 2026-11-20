@@ -2,6 +2,14 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 54,
+      "date": "2026-11-20",
+      "titre": "Sauts : données brutes toujours enregistrées",
+      "points": [
+        "Avec « Sauts (essai) » coché, les données brutes des capteurs sont maintenant toujours enregistrées : plus de case séparée à cocher, aucune séance d'essai perdue."
+      ]
+    },
+    {
       "id": 53,
       "date": "2026-11-19",
       "titre": "Données brutes des capteurs (essai)",
