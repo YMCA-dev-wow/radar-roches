@@ -120,7 +120,7 @@ public class SautPlugin extends Plugin implements SensorEventListener {
         m /= n;
         if (m < BAS) { if (debutBas < 0) debutBas = t - 100; finBas = t; }
         else if (debutBas >= 0 && t - finBas > 400) debutBas = -1; // la phase allégée s'est terminée sans réception
-        if (g > PIC && debutBas >= 0 && finBas - debutBas >= 300 && t - finBas < 400 && t - dernierSaut > 2000) {
+        if (g > PIC && debutBas >= 0 && finBas - debutBas >= 300 && t - finBas < 400 && t - dernierSaut > 3000) {   // 3 s au moins entre deux sauts
             final double vol = (t - debutBas) / 1000.0; final long t0 = debutBas, t1 = t;
             if (vol < 4) { final boolean vrai = enVol(t0, t1); hFil.postDelayed(() -> signaler(t0, t1, vol, vrai), 1000); } // les rejetés partent aussi au journal (réglage)
             debutBas = -1; dernierSaut = t;

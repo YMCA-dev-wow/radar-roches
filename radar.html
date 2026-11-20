@@ -130,7 +130,6 @@
     <div class="ligne" id="volAlertesLigne"><span>Volume des alertes<small>dans l'appli, en plus du volume « média » du téléphone (boutons de volume) ; la pastille de l'accueil montre ce volume média</small></span><span style="display:flex;align-items:center;gap:8px"><input type="range" id="volAlertes" min="10" max="100" step="10" value="100" style="width:110px"><b id="volAlertesTxt">100 %</b></span></div>
     <label class="ligne" id="volMaxLigne" hidden><span>Alertes au volume maximum<small>volume « alarme » du téléphone poussé au maximum pendant le radar, rétabli à l'arrêt</small></span><input type="checkbox" id="volMax" checked></label>
     <label class="ligne" id="sonsMediaLigne" hidden><span>Sons en média<small>bips et voix sur le volume « média » du téléphone au lieu du volume « alarme » ; désactivé à chaque démarrage de l'appli</small></span><input type="checkbox" id="sonsMedia"></label>
-    <label class="ligne" id="sautsLigne"><span>Sauts (essai)<small>détection par l'accéléromètre du téléphone porté sur le tronc ; la voix annonce hauteur et temps de vol à la réception. Enregistre aussi les données brutes des capteurs (accéléromètre, gyroscope, baromètre : 10 à 15 Mo par heure), envoyées avec le journal, pour mettre au point les calculs</small></span><input type="checkbox" id="sauts"></label>
     <button id="testSound">Écouter les sons</button>
     <div class="mu" style="margin-top:8px">Tintement doux descendant = pré-alerte · 1 bip = devant · 2 bips montants = tribord · 2 bips descendants = bâbord · les bips accélèrent en approchant · son continu = moins de 10 m · 3 bips très graves = GPS perdu.</div>
   </div>
@@ -188,6 +187,8 @@
     <label class="ligne"><span>Bips d'alerte</span><input type="checkbox" id="bips" checked></label>
     <label class="ligne"><span>Annonces vocales<small>pré-alerte et première alerte, puis les bips</small></span><input type="checkbox" id="voix" checked></label>
     <label class="ligne"><span>Fonds lisses aussi<small>sable et vase peu profonds</small></span><input type="checkbox" id="smooth"></label>
+    <label class="ligne" id="sautsLigne"><span>Détection des sauts (essai)<small>détection par l'accéléromètre du téléphone porté sur le tronc ; la voix annonce hauteur et temps de vol à la réception. Enregistre aussi les données brutes des capteurs (accéléromètre, gyroscope, baromètre : 10 à 15 Mo par heure), envoyées avec le journal, pour mettre au point les calculs</small></span><input type="checkbox" id="sauts"></label>
+    <div class="ligne" id="sautMinLigne"><span>Annoncer les sauts à partir de<small>hauteur estimée ; les sauts plus bas sont seulement notés dans le journal</small></span><span><input type="number" id="sautMin" step="0.5" min="0" value="1"><span class="unite">m</span></span></div>
     <div class="row" style="margin-top:14px"><button id="dupliquerProfil">Dupliquer</button><button id="supprimerProfil" class="danger">Supprimer</button></div>
   </div>
   <button class="prim" id="fermerProfils" style="width:100%;margin-top:16px">OK</button>
@@ -353,7 +354,7 @@ function feuilleSons() {
 }
 $('testSound').onclick = feuilleSons;
 $('demoSonsBtn').onclick = feuilleSons;
-if (!APPLI) { $('volMaxLigne').hidden = true; $('volAlertesLigne').hidden = true; $('sautsLigne').hidden = true; $('sonsMediaLigne').hidden = true; }
+if (!APPLI) { $('volMaxLigne').hidden = true; $('volAlertesLigne').hidden = true; $('sautsLigne').hidden = true; $('sautMinLigne').hidden = true; $('sonsMediaLigne').hidden = true; }
 // Sons sur le canal « média » d'Android (16/11/2026, à la demande du user) : l'appli ne touche plus au volume « alarme »,
 // qui restait parfois au maximum après une séance et déréglait le réveil. Le volume média est montré par une pastille de
 // l'accueil (rouge < 50 %, orange 50-75 %, vert > 75 %). Les cases « Sons en média » et « volume maximum » sont masquées.
@@ -649,7 +650,7 @@ document.addEventListener('visibilitychange', async () => {
 window.journalTuile = (k, msg) => JournalSession.ev('tuile', { k, erreur: msg });
 // Sauts (version d'essai) : détectés par Android (SautPlugin), notés dans le journal avec la courbe d'accélération,
 // annoncés à la voix : « Saut, 1,2 mètre, 1 seconde ». La hauteur balistique g·t²/8 est surestimée quand l'aile porte.
-let ecouteSauts = null, ecouteChocs = null;
+let ecouteSauts = null, ecouteChocs = null, dernierSautAnnonce = 0;
 const fr1v = v => String(v).replace('.', ',');
 async function demarrerSauts() {
   if (!$('sauts').checked || ecouteSauts) return;
@@ -664,6 +665,9 @@ async function demarrerSauts() {
       if (!s.vrai) { JournalSession.ev('saut', { ...s, ecarte: 'pompage' }); return; } // accélération pas allégée tout du long
       if (v < 12) { JournalSession.ev('saut', { ...s, ecarte: 'vitesse' }); return; } // pompage dans les molles, chute, marche
       JournalSession.ev('saut', s);
+      // annonce seulement au-dessus du seuil du profil, et jamais deux sauts à moins de 3 s (fausses détections en rafale)
+      if (s.h < +$('sautMin').value || Date.now() - dernierSautAnnonce < 3000) return;
+      dernierSautAnnonce = Date.now();
       // les alertes passent avant : pas d'annonce de saut pendant une alerte, une pré-alerte ou une veille
       const danger = analysis && (analysis.best || analysis.pre || analysis.lat);
       if (voixActive && !muted && !danger && !voixEnCours()) parler(`Saut, ${fr1v(s.h)} mètre${s.h >= 2 ? 's' : ''}, ${fr1v(Math.round(s.vol * 10) / 10)} seconde${s.vol >= 2 ? 's' : ''}`);
@@ -682,7 +686,7 @@ async function demarrerJournal() {
   let versionNom = null; try { versionNom = (await (await fetch('version.json', { cache: 'no-store' })).json()).version; } catch {}
   await JournalSession.ouvrir({
     version, versionNom, appareil: await ok(Natif.journal.appareil()), son, zone: zone && zone.id,
-    profil: profils[profilActif] && profils[profilActif].nom,
+    profil: profils[profilActif] && profils[profilActif].nom, sauts: { actif: $('sauts').checked, annonceDes: +$('sautMin').value },
     reglages: Object.fromEntries(SETTINGS.map(k => [k, $(k).type === 'checkbox' ? $(k).checked : $(k).value])),
     maree: { recalage: etatRecal, info: $('liveInfo').textContent }, ecran: !document.hidden,
   });
@@ -691,7 +695,7 @@ async function demarrerJournal() {
 
 // ---------- Réglages persistants ----------
 const veilleEtat = {};
-const SETTINGS = ['veille', 'bips', 'voix', 'volMax', 'volAlertes', 'sonsMedia', 'sauts', 'relais', 'notifDiscretes', 'styleMontre', 'seuil', 'vmin', 'antic', 'preAlerte', 'smooth', 'live', 'testMode', 'testH', 'testNoL3d', 'simMode', 'simStart'];
+const SETTINGS = ['veille', 'bips', 'voix', 'volMax', 'volAlertes', 'sonsMedia', 'relais', 'notifDiscretes', 'styleMontre', 'seuil', 'vmin', 'antic', 'preAlerte', 'smooth', 'live', 'testMode', 'testH', 'testNoL3d', 'simMode', 'simStart'];
 function saveSettings() { SETTINGS.forEach(k => store.set(k, $(k).type === 'checkbox' ? $(k).checked : $(k).value)); }
 // tout réglage modifié est enregistré aussitôt (sinon il revenait à sa valeur précédente au retour sur la page : « Sauts »)
 SETTINGS.forEach(k => $(k).addEventListener('change', () => saveSettings()));
@@ -854,7 +858,8 @@ setInterval(() => { if (!running) { majVerifs(); majChipZone(); } }, 5000);
 // ---------- Profils de navigation ----------
 // Un profil regroupe les réglages d'alerte ; on en change d'un toucher, chacun reste modifiable, on peut en créer.
 // Les champs du profil actif sont les champs du radar eux-mêmes (seuil, antic, vmin…) : le calcul n'a pas changé.
-const CHAMPS = ['seuil', 'antic', 'vmin', 'coneAlerte', 'preAlerte', 'conePre', 'veille', 'coneVeille', 'bips', 'voix', 'smooth'];
+const CHAMPS = ['seuil', 'antic', 'vmin', 'coneAlerte', 'preAlerte', 'conePre', 'veille', 'coneVeille', 'bips', 'voix', 'smooth', 'sauts', 'sautMin'];
+const CHAMPS_PERSO = ['sauts', 'sautMin'];   // sauts : choix de chacun, hors comparaison avec les profils livrés
 const ANGLES_DEFAUT = { coneAlerte: 50, conePre: 10, coneVeille: 110 }; // profils créés avant les angles réglables
 // ref : profil fourni par l'appli ; tant que l'utilisateur ne l'a pas modifié (modifie absent), une mise à jour de
 // l'appli peut en changer les valeurs. Un profil modifié, dupliqué ou créé n'est jamais touché.
@@ -866,7 +871,7 @@ const PROFILS_DEFAUT = [
 ];
 // valeurs livrées par les versions précédentes (pour reconnaître un profil jamais modifié, enregistré avant le champ ref)
 const PROFILS_ANCIENS = { Planche: { voix: false } };
-const egalProfil = (p, d) => CHAMPS.every(k => (k in ANGLES_DEFAUT ? (p[k] ?? ANGLES_DEFAUT[k]) == (d[k] ?? ANGLES_DEFAUT[k]) : typeof d[k] === 'boolean' ? !!p[k] === !!d[k] : +p[k] === +d[k]));
+const egalProfil = (p, d) => CHAMPS.filter(k => !CHAMPS_PERSO.includes(k)).every(k => (k in ANGLES_DEFAUT ? (p[k] ?? ANGLES_DEFAUT[k]) == (d[k] ?? ANGLES_DEFAUT[k]) : typeof d[k] === 'boolean' ? !!p[k] === !!d[k] : +p[k] === +d[k]));
 function mettreAJourProfils() {
   let change = false;
   for (const p of profils) {
@@ -892,18 +897,25 @@ function initProfils() {
     store.set('profils', profils);
   }
   mettreAJourProfils();
+  // 20/11/2026 : détection des sauts passée des réglages généraux au profil (reprise du réglage en place pour tous les profils)
+  if (store.get('sautsProfil', null) == null) {
+    const g = !!store.get('sauts', false);
+    profils.forEach(p => { if (p.sauts == null) p.sauts = g; if (p.sautMin == null) p.sautMin = 1; });
+    store.set('profils', profils); store.set('sautsProfil', 1);
+  }
   profilActif = Math.min(store.get('profilActif', 0), profils.length - 1);
   appliquerProfil(profilActif);
 }
 function appliquerProfil(i) {
   profilActif = i; const p = profils[i];
   Object.keys(ANGLES_DEFAUT).forEach(k => { if (p[k] == null) p[k] = ANGLES_DEFAUT[k]; });
+  if (p.sauts == null) p.sauts = false; if (p.sautMin == null) p.sautMin = 1;
   CHAMPS.forEach(k => { if ($(k).type === 'checkbox') $(k).checked = !!p[k]; else $(k).value = p[k]; });
   store.set('profilActif', i); saveSettings(); majProfil();
 }
 function resumeProfil(p) {
   const angles = (p.coneAlerte || 50) != 50 || (p.conePre || 10) != 10 || (p.coneVeille || 110) != 110 ? ` · angles ${p.coneAlerte || 50}/${p.conePre || 10}/${p.coneVeille || 110}°` : '';
-  return `${fr(+p.seuil)} m d'eau · ${p.antic} s · dès ${p.vmin} km/h${angles} · ` + [p.bips && 'bips', p.voix && 'voix', p.veille && 'veille', p.preAlerte && 'pré-alerte', p.smooth && 'fonds lisses'].filter(Boolean).join(', ');
+  return `${fr(+p.seuil)} m d'eau · ${p.antic} s · dès ${p.vmin} km/h${angles} · ` + [p.bips && 'bips', p.voix && 'voix', p.veille && 'veille', p.preAlerte && 'pré-alerte', p.smooth && 'fonds lisses', APPLI && p.sauts && 'sauts dès ' + fr(+p.sautMin) + ' m'].filter(Boolean).join(', ');
 }
 // accueil : une ligne par réglage, quelques mots par valeur (le détail des réglages est dans Premiers pas et la notice)
 function lignesProfil(p) {
@@ -917,6 +929,7 @@ function lignesProfil(p) {
     ['Veille sur les côtés', oui(p.veille, '±' + (p.coneVeille || 110) + '°')],
     ['Sons', [p.bips && 'bips', p.voix && 'voix'].filter(Boolean).join(' + ') || 'aucun'],
     ['Fonds lisses (sable, vase)', oui(p.smooth)],
+    ...(APPLI ? [['Sauts (essai)', p.sauts ? 'annoncés dès ' + fr(+p.sautMin) + ' m' : 'non']] : []),
   ];
 }
 function majProfil() {
@@ -940,8 +953,11 @@ function editerProfil(i) {
 }
 function enregistrerProfil() {
   if (profilEdite == null) return;
-  const p = profils[profilEdite]; p.modifie = true;
+  const p = profils[profilEdite], avant = p.modifie;
   CHAMPS.forEach(k => p[k] = valeur(k)); p.nom = $('pNom').value.trim() || 'Sans nom';
+  // un profil livré dont seuls les réglages de sauts changent reste livré (il suit les mises à jour de l'appli)
+  const d = p.ref && PROFILS_DEFAUT.find(x => x.ref === p.ref);
+  p.modifie = !!avant || !d || p.nom !== d.nom || !egalProfil(p, d);
   store.set('profils', profils); saveSettings(); majProfil(); rendreProfils();
 }
 [...CHAMPS, 'pNom'].forEach(id => $(id).addEventListener('change', enregistrerProfil));

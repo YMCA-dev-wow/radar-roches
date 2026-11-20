@@ -2,6 +2,15 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 55,
+      "date": "2026-11-20",
+      "titre": "Sauts réglés dans le profil",
+      "points": [
+        "La détection des sauts (essai) se règle maintenant dans chaque profil (accueil → profil → ✎), avec la hauteur à partir de laquelle un saut est annoncé à la voix.",
+        "Jamais deux sauts annoncés à moins de 3 secondes d'écart."
+      ]
+    },
+    {
       "id": 54,
       "date": "2026-11-20",
       "titre": "Sauts : données brutes toujours enregistrées",
