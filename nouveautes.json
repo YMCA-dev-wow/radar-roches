@@ -2,6 +2,17 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 57,
+      "date": "2026-11-23",
+      "titre": "Rejeu : bandeau du bas à deux pages",
+      "points": [
+        "Le bandeau du bas s'ouvre en glissant vers le haut et se ferme en glissant vers le bas (ou en touchant à côté).",
+        "Deux pages côte à côte : tous les chiffres de la séance, puis le vent et la VMG ; glisser à gauche ou à droite pour passer de l'une à l'autre. La pastille du vent ouvre directement la page du vent.",
+        "Frise : boutons −, + et Tout retirés (pincer la frise pour zoomer).",
+        "Sauts : toucher une courbe affiche ses chiffres ; pointillés et silhouette retirés."
+      ]
+    },
+    {
       "id": 56,
       "date": "2026-11-23",
       "titre": "Sauts mieux détectés quand l'aile porte",

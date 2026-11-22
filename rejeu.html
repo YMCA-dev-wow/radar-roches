@@ -124,6 +124,14 @@
   .menuF button small { display: block; color: var(--muted); font-size: 12px; }
   .menuF button .ic { width: 22px; text-align: center; color: var(--accent); font-size: 17px; }
   .menuF button.danger, .menuF button.danger .ic { color: var(--a2); }
+  /* bandeau du bas ouvert : deux pages côte à côte (chiffres, vent et VMG), glissement latéral, points de page */
+  #fResume > .in { overflow: hidden; display: flex; flex-direction: column; }
+  #rPages { overflow: hidden; transition: height .25s ease-out; }
+  #rPiste { display: flex; align-items: flex-start; transition: transform .25s ease-out; }
+  #rPiste > .page { flex: 0 0 100%; min-width: 0; overflow-y: auto; max-height: calc(86vh - 60px); padding: 0 2px 4px; box-sizing: border-box; }
+  #rPoints { display: flex; gap: 8px; justify-content: center; padding: 10px 0 2px; }
+  #rPoints i { width: 8px; height: 8px; border-radius: 50%; background: #4a6168; cursor: pointer; }
+  #rPoints i.on { background: #fff; }
   .grilleR { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
   .grilleR b { overflow-wrap: anywhere; }
   .grilleR div { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; }
@@ -207,7 +215,7 @@
     <select id="speed" title="Vitesse de lecture"><option selected>1</option><option>2</option><option>5</option><option>10</option><option>30</option><option>60</option></select>
     <span id="clock">–</span>
     <label class="suivre"><input type="checkbox" id="follow"> Suivre</label>
-    <span class="zoom"><button id="zMoins" title="Zoom arrière">−</button><button id="zPlus" title="Zoom avant (ou pincer la frise)">+</button><button id="zTout">Tout</button><button id="zHaut" title="Hauteur de la frise">↕</button></span>
+    <span class="zoom"><button id="zHaut" title="Hauteur de la frise">↕</button></span>
   </div>
   <div id="lecture">
     <span class="val"><i class="jauge" id="jFond" style="--c:#c2a46b"></i><b id="lFond">–</b><small>fond sous le rider</small></span>
@@ -224,15 +232,16 @@
 
 <!-- feuille : menu ⋮ -->
 <div class="feuilleR" id="fMenu" hidden><div class="in"><div class="poignee"></div><div class="menuF" id="menuListe"></div></div></div>
-<!-- feuille : tous les chiffres -->
+<!-- bandeau du bas ouvert : page 1 tous les chiffres, page 2 vent et VMG (glisser à gauche / à droite) -->
 <div class="feuilleR" id="fResume" hidden><div class="in"><div class="poignee"></div>
+<div id="rPages"><div id="rPiste">
+<section class="page" id="pChiffres">
   <div style="display:flex;align-items:center;gap:8px;margin:6px 0 2px"><i class="dot" id="rSportDot"></i><b id="rSport" style="flex:1;font-size:15px"></b></div>
   <div class="sub" id="rComm" style="margin-bottom:8px"></div>
   <div class="grilleR" id="rGrille"></div>
   <div class="sub" id="info" style="margin-top:10px">Charge une séance pour rejouer les alertes du radar.</div>
-</div></div>
-<!-- feuille : vent et VMG -->
-<div class="feuilleR" id="fVent" hidden><div class="in"><div class="poignee"></div>
+</section>
+<section class="page" id="pVent">
   <h2 style="display:flex;align-items:center;gap:6px">Vent pendant la séance <span class="srcV" id="vSrc" style="margin-left:auto"></span></h2>
   <div class="sub" id="vPortion"></div>
   <div class="grilleR" id="vGrille"></div>
@@ -242,6 +251,9 @@
   <div class="barreAll" id="vBarre"></div><div class="ligneK" id="vK"></div>
   <div style="display:flex;gap:8px;margin-top:14px"><button class="primary" id="vModif" style="flex:1">✎ Modifier le vent</button><button id="vArome">Revenir à AROME</button></div>
   <div class="sub" id="vNote" style="margin-top:10px"></div>
+</section>
+</div></div>
+<div id="rPoints"><i class="on" data-p="0"></i><i data-p="1"></i></div>
 </div></div>
 <!-- feuille : saisie du vent -->
 <div class="feuilleR" id="fVentModif" hidden><div class="in"><div class="poignee"></div><h2>Modifier le vent</h2>
@@ -305,7 +317,7 @@
   <h3>Classement</h3>
   <ol id="sautsListe"></ol>
   <button class="plus" id="sautsTous" hidden></button>
-  <p class="note">Hauteur corrigée de la portance de l'aile quand l'accélération en vol est connue : double intégration de l'accélération mesurée (téléphone, montre avec données brutes), sinon accélération moyenne en vol (montre). Sans ces données : chute libre g·t²/8, surestimée quand l'aile porte (pointillé sur le saut choisi). Distance = vitesse au décollage × temps de vol. Calcul en cours de calage, à comparer avec des vidéos.</p>
+  <p class="note">Hauteur corrigée de la portance de l'aile quand l'accélération en vol est connue : double intégration de l'accélération mesurée (téléphone, montre avec données brutes), sinon accélération moyenne en vol (montre). Sans ces données : chute libre g·t²/8, surestimée quand l'aile porte. Distance = vitesse au décollage × temps de vol. Calcul en cours de calage, à comparer avec des vidéos.</p>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -657,7 +669,7 @@ function dessinerFrise() {
   $('lFen').textContent = (zoom ? 'Zoom ' : 'Session ') + heure(t0) + ' – ' + heure(t1) + ' · ' + fmtDuree(t1 - t0);
   surFenetre();
 }
-const fr1 = v => v.toFixed(1).replace('.', ',');
+const fr1 = v => Number.isFinite(v) ? v.toFixed(1).replace('.', ',') : '–';   // marée pas encore calculée au premier tracé
 const FOND = { roche: '#6e6a66', lisse: '#c2a46b', terre: '#4f7a3a' }; // nature du fond (relief Litto3D)
 // Gestes sur la frise :
 //  - session entière affichée : glisser = déplacer le curseur ;
@@ -715,7 +727,7 @@ $('follow').onchange = () => { try { localStorage.setItem('rejeu.suivre', $('fol
 try { $('cVit').checked = localStorage.getItem('rejeu.vitesse') === '1'; $('cVent').checked = localStorage.getItem('rejeu.vent') === '1'; } catch {}
 $('cVent').onchange = () => { try { localStorage.setItem('rejeu.vent', $('cVent').checked ? '1' : '0'); } catch {} dessinerFrise(); };
 $('cVit').onchange = () => { try { localStorage.setItem('rejeu.vitesse', $('cVit').checked ? '1' : '0'); } catch {} dessinerFrise(); };
-$('zMoins').onclick = () => vueZoom(1.6); $('zPlus').onclick = () => vueZoom(0.6); $('zTout').onclick = () => { vueTout(); recadrerCarte(); };
+// zoom de la frise : pincer ou molette (boutons −, + et Tout retirés le 23/11/2026)
 addEventListener('resize', () => { dessinerFrise(); resizeRadar(); map.invalidateSize(); dessinerMed(); });
 
 // =====================================================================
@@ -820,17 +832,15 @@ function dessinerSauts() {
 }
 
 // Trajectoires superposées : chaque saut dessiné comme sa parabole depuis le même point de décollage ;
-// le saut choisi en blanc, les autres en turquoise d'autant plus opaque qu'ils sont hauts ; silhouette de 1,80 m pour l'échelle
-let geoTraj = null;
+// le saut choisi en blanc, les autres en turquoise d'autant plus opaque qu'ils sont hauts . Toucher une courbe la choisit.
 function dessinerTraj(c = $('cTraj')) {
   const { g, k, W, H } = toile(c);
   if (!W || !H) return;
   const petit = W < 260 * k, txt = petit ? () => {} : g.fillText.bind(g); // médaillon : courbes seules, sans textes
-  const dmax = Math.max(4, ...sauts.map(s => s.d)) * 1.08, hmax = Math.max(2, ...sauts.map(s => s.hc), sautSel ? sautSel.hLibre : 0) * 1.18;
-  const L0 = (petit ? 8 : 34) * k, B0 = H - (petit ? 10 : 24) * k, T0 = 10 * k, u = 1.8 / hmax * (B0 - T0) / 7.5; // u : module de la silhouette
-  const R0 = W - 3.4 * u - 10 * k;
+  const dmax = Math.max(4, ...sauts.map(s => s.d)) * 1.08, hmax = Math.max(2, ...sauts.map(s => s.hc)) * 1.18;
+  const L0 = (petit ? 8 : 34) * k, B0 = H - (petit ? 10 : 24) * k, T0 = 10 * k, R0 = W - (petit ? 8 : 16) * k;
   const X = d => L0 + d / dmax * (R0 - L0), Y = h => B0 - h / hmax * (B0 - T0);
-  if (c.id === 'cTraj') geoTraj = { X, Y };
+  c._geo = { X, Y, petit };
   // graduations
   const pasH = hmax > 6 ? 2 : hmax > 3 ? 1 : 0.5;
   g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = k; g.fillStyle = '#5d7a80'; g.textAlign = 'right';
@@ -845,13 +855,6 @@ function dessinerTraj(c = $('cTraj')) {
   g.strokeStyle = '#5ac8fa'; g.lineWidth = 1.5 * k; g.beginPath();
   for (let x = 0; x <= W; x += 4 * k) x ? g.lineTo(x, B0 + 2 * k + Math.sin(x / (9 * k)) * 2 * k) : g.moveTo(x, B0 + 2 * k);
   g.stroke();
-  // silhouette de 1,80 m à droite (échelle)
-  const xs = R0 + 1.7 * u + 4 * k, yP = Y(0), yT = Y(1.8);
-  g.strokeStyle = '#7fb8b2'; g.fillStyle = '#7fb8b2'; g.lineWidth = 1.6 * k; g.lineCap = 'round';
-  g.beginPath(); g.arc(xs, yT + u, u, 0, 7); g.fill();
-  g.beginPath(); g.moveTo(xs, yT + 2 * u); g.lineTo(xs, yT + 4.6 * u); g.moveTo(xs, yT + 4.6 * u); g.lineTo(xs - 1.3 * u, yP); g.moveTo(xs, yT + 4.6 * u); g.lineTo(xs + 1.3 * u, yP);
-  g.moveTo(xs - 1.6 * u, yT + 3.6 * u); g.lineTo(xs, yT + 2.6 * u); g.lineTo(xs + 1.6 * u, yT + 3.6 * u); g.stroke();
-  g.textAlign = 'center'; txt('1,80 m', xs, T0 + 2 * k); g.lineCap = 'butt';
   // trajectoires : les autres d'abord, le choisi par-dessus
   const arc = (s, couleur, ep, libre) => { // profil intégré si connu, sinon parabole de la hauteur retenue (ou de chute libre)
     g.strokeStyle = couleur; g.lineWidth = ep; g.beginPath();
@@ -862,7 +865,6 @@ function dessinerTraj(c = $('cTraj')) {
   const hm = Math.max(...sauts.map(s => s.hc), 0.1);
   for (const s of sauts) if (s !== sautSel) arc(s, `rgba(94,230,214,${0.25 + 0.55 * s.hc / hm})`, 1.5 * k);
   if (sautSel) {
-    if (sautSel.hLibre - sautSel.hc > 0.05) { g.setLineDash([4 * k, 4 * k]); arc(sautSel, 'rgba(255,255,255,.55)', 1.3 * k, true); g.setLineDash([]); } // chute libre, pour comparer
     // ombre de 2 px couleur fond pour détacher la courbe choisie des autres
     arc(sautSel, '#0b1a1f', 5 * k); arc(sautSel, '#ffffff', 2.5 * k);
     const pr = sautSel.profil, im = pr ? pr.indexOf(Math.max(...pr)) / (pr.length - 1) : 0.5;
@@ -873,13 +875,24 @@ function dessinerTraj(c = $('cTraj')) {
   }
   g.textAlign = 'left';
 }
-$('cTraj').onclick = e => { // choisit la trajectoire passant le plus près du point touché
-  if (!geoTraj) return;
-  const r = $('cTraj').getBoundingClientRect(), k = devicePixelRatio || 1, px = (e.clientX - r.left) * k, py = (e.clientY - r.top) * k;
+// trajectoire passant le plus près du point touché (à 30 px près), sur le profil intégré si connu
+function sautTouche(c, e) {
+  const G = c._geo; if (!G) return null;
+  const r = c.getBoundingClientRect(), k = devicePixelRatio || 1, px = (e.clientX - r.left) * k, py = (e.clientY - r.top) * k;
   let mieux = null, dm = Infinity;
-  for (const s of sauts) for (let i = 0; i <= 20; i++) { const f = i / 20, d = Math.hypot(geoTraj.X(f * s.d) - px, geoTraj.Y(4 * s.hc * f * (1 - f)) - py); if (d < dm) { dm = d; mieux = s; } }
-  if (mieux && dm < 30 * k) { sautSel = mieux; dessinerSauts(); }
-};
+  for (const s of sauts) {
+    const pr = s.profil, n = pr ? pr.length - 1 : 20;
+    for (let i = 0; i <= n; i++) { const f = i / n, d = Math.hypot(G.X(f * s.d) - px, G.Y(pr ? Math.max(0, pr[i]) : 4 * s.hc * f * (1 - f)) - py); if (d < dm) { dm = d; mieux = s; } }
+  }
+  return mieux && dm < 30 * k ? mieux : null;
+}
+$('cTraj').onclick = e => { const s = sautTouche($('cTraj'), e); if (s) { sautSel = s; dessinerSauts(); } };
+// vue « sauts » en grand : toucher une courbe affiche ses chiffres (en médaillon, le toucher garde son rôle)
+$('cMed').addEventListener('click', e => {
+  if (!$('cMed')._geo || $('cMed')._geo.petit) return;
+  const s = sautTouche($('cMed'), e); if (!s) return;
+  e.stopPropagation(); sautSel = s; dessinerMed();
+});
 
 // Détail du saut choisi (+ courbe d'accélération pour le téléphone)
 function detailSaut() {
@@ -1172,7 +1185,7 @@ $('medAfficher').onclick = () => { medVisible = true; placerVues(); };
 function dessinerMed() {
   if (!sauts.length || $('boxSauts').parentNode === $('reserve')) return;
   dessinerTraj($('cMed'));
-  $('medSautTxt').textContent = sautSel ? `Saut ${sautSel.n} · ${fr(sautSel.hc)} m · ${fr(sautSel.vol, 2)} s · ${heure(sautSel.t0)}` : '';
+  $('medSautTxt').textContent = sautSel ? `Saut ${sautSel.n} · ${fr(sautSel.hc)} m · ${fr(sautSel.vol, 2)} s · ${Math.round(sautSel.d)} m · ${fr(sautSel.v * 1.944, 0)} nd · ${heure(sautSel.t0)}` : '';
 }
 $('medBilan').onclick = () => ouvrirSauts();
 // pastille d'un saut touchée sur la carte : curseur au décollage, saut affiché dans le médaillon
@@ -1225,7 +1238,7 @@ function majResume() {
     (vg ? `<span><b>${vg.n}</b><small>VMG près</small></span>` : '') + `<span><b id="resAl">${ev.length}</b><small>alerte${ev.length > 1 ? 's' : ''}</small></span>`;
   $('resume').classList.toggle('zoom', zoom);
 }
-function ouvrirResume() {
+function ouvrirResume(page = 0) {
   const F = chiffresFenetre(), c = F.c; if (!c) return;
   const events = F.ev, sauts = F.sa;
   const s = seanceCourante, sp = s && Seances.sport(s.sport);
@@ -1237,21 +1250,61 @@ function ouvrirResume() {
     [V(c.v100), 'max sur 100 m'], [V(c.v250), 'max sur 250 m'], [V(c.v500), 'max sur 500 m'], [c.v1852 ? V(c.v1852) : '–', 'max sur 1 mille'],
     [events.length, events.length > 1 ? 'alertes' : 'alerte'], [sauts.length, sauts.length > 1 ? 'sauts' : 'saut'], [sauts.length ? fr(hm) + '<u>m</u>' : '–', 'plus haut saut']];
   $('rGrille').innerHTML = cases.map(([b, l]) => `<div><b>${b}</b><small>${l}</small></div>`).join('');
+  const avecVent = !!ventCourant; if (avecVent) remplirVent();
+  $('pVent').hidden = !avecVent; $('rPoints').hidden = !avecVent;
   $('fResume').hidden = false;
+  allerPage(avecVent ? page : 0, false);
 }
-$('resume').onclick = ouvrirResume; $('poignee').onclick = ouvrirResume;
+// pages du bandeau : piste translatée (page n à -n × 100 %), glissement latéral au doigt (voir les feuilles plus bas)
+let pageR = 0;
+const nPagesR = () => $('pVent').hidden ? 1 : 2;
+function allerPage(n, doux = true) {
+  pageR = Math.max(0, Math.min(nPagesR() - 1, n));
+  const P = $('rPiste'); P.style.transition = doux ? '' : 'none'; P.style.transform = `translateX(${-pageR * 100}%)`;
+  // hauteur du bandeau = celle de la page affichée (sinon la plus courte hérite de la place de la plus longue)
+  const C = $('rPages'); C.style.transition = doux ? '' : 'none'; C.style.height = P.children[pageR].offsetHeight + 'px';
+  majPoints(pageR);
+}
+function majPoints(n) { [...$('rPoints').children].forEach((d, i) => d.classList.toggle('on', i === n)); }
+[...$('rPoints').children].forEach(d => d.onclick = () => allerPage(+d.dataset.p));
+$('resume').onclick = () => ouvrirResume(); $('poignee').onclick = () => ouvrirResume();
 // balayage vers le haut sur le résumé (ou sa poignée) : tous les chiffres
 for (const el of [$('resume'), $('poignee')]) {
   let y0 = null;
   el.addEventListener('pointerdown', e => { y0 = e.clientY; });
   el.addEventListener('pointermove', e => { if (y0 != null && y0 - e.clientY > 25) { y0 = null; ouvrirResume(); } });
+  // doigt : événements tactiles (les événements « pointer » sont annulés dès que le navigateur prend la main)
+  let ty = null;
+  el.addEventListener('touchstart', e => { ty = e.touches[0].clientY; }, { passive: true });
+  el.addEventListener('touchmove', e => { if (ty != null && ty - e.touches[0].clientY > 25) { ty = null; ouvrirResume(); } }, { passive: true });
+  el.addEventListener('touchend', () => { ty = null; }, { passive: true });
   ['pointerup', 'pointercancel'].forEach(t => el.addEventListener(t, () => { y0 = null; }));
 }
 document.querySelectorAll('.feuilleR').forEach(f => {
   f.addEventListener('click', e => { if (e.target === f) f.hidden = true; });
   // glisser vers le bas (depuis le haut de la feuille) : la feuille suit le doigt et se ferme au-delà de 80 px
   const inn = f.querySelector('.in'); let y0 = null, dy = 0;
-  inn.addEventListener('pointerdown', e => { if (inn.scrollTop <= 0 && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) { y0 = e.clientY; dy = 0; } });
+  inn.addEventListener('pointerdown', e => { if (e.pointerType !== 'touch' && inn.scrollTop <= 0 && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) { y0 = e.clientY; dy = 0; } });
+  let tx0 = null, ty0 = null, axe = null, tdy = 0, tdx = 0, defile = null;
+  inn.addEventListener('touchstart', e => {
+    if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+    tx0 = e.touches[0].clientX; ty0 = e.touches[0].clientY; axe = null; tdy = 0;
+    defile = e.target.closest('.page') || inn;   // zone qui défile verticalement sous le doigt
+  }, { passive: true });
+  inn.addEventListener('touchmove', e => {
+    if (ty0 == null) return;
+    const dx = e.touches[0].clientX - tx0, d = e.touches[0].clientY - ty0;
+    if (!axe && Math.hypot(dx, d) > 8) axe = Math.abs(d) > Math.abs(dx) ? (d > 0 && defile.scrollTop <= 0 ? 'bas' : 'autre') : (f.id === 'fResume' && nPagesR() > 1 ? 'lat' : 'autre');
+    if (axe === 'lat') { e.preventDefault(); tdx = dx; const P = $('rPiste'); P.style.transition = 'none'; P.style.transform = `translateX(calc(${-pageR * 100}% + ${dx}px))`; return; }
+    if (axe !== 'bas') return;
+    e.preventDefault(); tdy = Math.max(0, d); inn.style.transform = `translateY(${tdy}px)`;
+  }, { passive: false });
+  const finT = () => {
+    if (axe === 'bas') { inn.style.transform = ''; if (tdy > 80) f.hidden = true; }
+    if (axe === 'lat') allerPage(pageR + (tdx < -50 ? 1 : tdx > 50 ? -1 : 0));
+    ty0 = null; axe = null; tdx = 0;
+  };
+  inn.addEventListener('touchend', finT); inn.addEventListener('touchcancel', finT);
   inn.addEventListener('pointermove', e => { if (y0 == null) return; dy = e.clientY - y0; if (dy > 0) inn.style.transform = `translateY(${dy}px)`; });
   const fin = () => { if (y0 == null) return; y0 = null; inn.style.transform = ''; if (dy > 80) f.hidden = true; };
   inn.addEventListener('pointerup', fin); inn.addEventListener('pointercancel', fin);
@@ -1356,6 +1409,9 @@ function analyseFenetre() {
 }
 function ouvrirVent() {
   if (!ventCourant) return ouvrirVentModif();
+  ouvrirResume(1);
+}
+function remplirVent() {
   const [a, b] = fenetre(), r = Vent.resume(ventCourant, a, b), A = analyseFenetre() || {};
   $('vSrc').textContent = ventCourant.source === 'saisi' ? 'Saisi' : 'AROME HD · prévision'; $('vSrc').className = 'srcV' + (ventCourant.source === 'saisi' ? ' saisi' : '');
   $('vPortion').textContent = estZoome() ? `Portion ${heure(a).slice(0, 5)} – ${heure(b).slice(0, 5)} (zoom de la frise)` : '';
@@ -1374,10 +1430,9 @@ function ouvrirVent() {
   $('vNote').textContent = ventCourant.source === 'saisi'
     ? 'Valeurs saisies à la main' + (ventCourant.src ? ' (' + ventCourant.src + ')' : '') + '. Allures : près sous 70° du vent, travers de 70 à 110°, portant au-delà.'
     : 'Prévision du modèle AROME HD (Météo-France, via Open-Meteo) au milieu de la trace : vent moyen à 2–3 nd près, direction à une trentaine de degrés près. Pour une VMG fiable, saisis les relevés d’un anémomètre (Holfuy, WindsUp…). Allures : près sous 70° du vent, travers de 70 à 110°, portant au-delà.';
-  $('fVent').hidden = false;
 }
-$('vModif').onclick = () => { $('fVent').hidden = true; ouvrirVentModif(); };
-$('vArome').onclick = () => { Vent.revenirArome(idVent); ventCourant = Vent.courant(idVent); majVent(); $('fVent').hidden = true; };
+$('vModif').onclick = () => { $('fResume').hidden = true; ouvrirVentModif(); };
+$('vArome').onclick = () => { Vent.revenirArome(idVent); ventCourant = Vent.courant(idVent); majVent(); remplirVent(); };
 // Saisie : valeur unique, heure par heure (heures locales couvrant la séance) ou relevés (heure de chaque ligne au choix :
 // à la main, collés depuis une page Holfuy, WindsUp… ou lus dans un fichier CSV), pré-remplie avec le vent actuel
 let vmType = 'heures', vmLigne = 0, vmSaisi = null, vmLu = null; // vmLu : dernier texte lu { s, nom }
