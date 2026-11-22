@@ -2,6 +2,16 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 58,
+      "date": "2026-11-23",
+      "titre": "Rejeu : sauts dans le bandeau du bas",
+      "points": [
+        "Le bilan des sauts devient la 3e page du bandeau du bas (après les chiffres et le vent) ; il défile, et le bandeau se ferme en glissant vers le bas depuis le haut de la page.",
+        "Fiche d'un saut : glisser à gauche ou à droite pour passer au saut suivant ou précédent ; une seule hauteur affichée.",
+        "« Revoir » : le saut apparaît grisé, puis se trace au rythme de la trace GPS. En lecture, chaque saut traversé se trace de la même façon."
+      ]
+    },
+    {
       "id": 57,
       "date": "2026-11-23",
       "titre": "Rejeu : bandeau du bas à deux pages",

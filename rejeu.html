@@ -252,8 +252,9 @@
   <div style="display:flex;gap:8px;margin-top:14px"><button class="primary" id="vModif" style="flex:1">✎ Modifier le vent</button><button id="vArome">Revenir à AROME</button></div>
   <div class="sub" id="vNote" style="margin-top:10px"></div>
 </section>
+<section class="page" id="pSauts" hidden><h2>Sauts</h2></section>
 </div></div>
-<div id="rPoints"><i class="on" data-p="0"></i><i data-p="1"></i></div>
+<div id="rPoints"></div>
 </div></div>
 <!-- feuille : saisie du vent -->
 <div class="feuilleR" id="fVentModif" hidden><div class="in"><div class="poignee"></div><h2>Modifier le vent</h2>
@@ -306,6 +307,7 @@
 <div id="busy" hidden></div>
 <div id="sautsPan" hidden>
   <div class="fTete"><h2>Sauts</h2><span class="sub" id="sautsSous"></span><button class="x" id="sautsX" title="Fermer">✕</button></div>
+  <div id="sautsCorps">
   <div class="tuiles" id="sautsTuiles"></div>
   <h3>Trajectoires superposées</h3>
   <canvas id="cTraj" title="Touche une trajectoire pour la choisir"></canvas>
@@ -317,7 +319,8 @@
   <h3>Classement</h3>
   <ol id="sautsListe"></ol>
   <button class="plus" id="sautsTous" hidden></button>
-  <p class="note">Hauteur corrigée de la portance de l'aile quand l'accélération en vol est connue : double intégration de l'accélération mesurée (téléphone, montre avec données brutes), sinon accélération moyenne en vol (montre). Sans ces données : chute libre g·t²/8, surestimée quand l'aile porte. Distance = vitesse au décollage × temps de vol. Calcul en cours de calage, à comparer avec des vidéos.</p>
+  <p class="note">Hauteur : tient compte de la portance de l'aile quand l'accélération en vol est connue : double intégration de l'accélération mesurée (téléphone, montre avec données brutes), sinon accélération moyenne en vol (montre). Sans ces données : chute libre g·t²/8, surestimée quand l'aile porte. Distance = vitesse au décollage × temps de vol. Calcul en cours de calage, à comparer avec des vidéos.</p>
+  </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -767,7 +770,7 @@ function preparerSauts() {
   }
   sautSel = sauts.reduce((a, b) => b.hc > a.hc ? b : a);
   placerVues();
-  if (!$('sautsPan').hidden) dessinerSauts();
+  if (bilanVisible()) dessinerSauts();
 }
 // Courbes de la montre reconstituées depuis les accélérations brutes du FIT (25 mesures par enregistrement d'une seconde) :
 // la réception est le pic le plus fort de la seconde du saut ; la verticale est estimée par l'accélération moyenne
@@ -810,10 +813,12 @@ function hauteurCorrigee(s) {
   }
   if (s.moy != null && s.moy >= 0 && s.moy < 1) { s.hc = Math.round((1 - s.moy) * 9.81 * s.vol * s.vol / 8 * 10) / 10; s.calc = 'portance moyenne'; }
 }
-function ouvrirSauts(s) { if (s) sautSel = s; $('sautsPan').hidden = false; dessinerSauts(); }
+function ouvrirSauts(s) { if (s) sautSel = s; $('sautsPan').append($('sautsCorps')); $('sautsPan').hidden = false; dessinerSauts(); }
+// bilan visible : panneau latéral, ou 3e page du bandeau ouvert
+const bilanVisible = () => !$('sautsPan').hidden || (!$('fResume').hidden && $('sautsCorps').parentNode === $('pSauts'));
 $('sautsX').onclick = () => { $('sautsPan').hidden = true; };
 $('sautsTous').onclick = () => { sautsTous = !sautsTous; dessinerSauts(); };
-addEventListener('resize', () => { if (!$('sautsPan').hidden) dessinerSauts(); });
+addEventListener('resize', () => { if (bilanVisible()) dessinerSauts(); });
 const toile = c => { const k = devicePixelRatio || 1, r = c.getBoundingClientRect(); c.width = r.width * k; c.height = r.height * k; const g = c.getContext('2d'); g.font = `${11 * k}px system-ui`; return { g, k, W: c.width, H: c.height }; };
 
 function dessinerSauts() {
@@ -829,6 +834,20 @@ function dessinerSauts() {
     + tuile(Math.round(best('d').d), 'm', 'plus loin') + tuile(fr(tAir, 0), 's', 'en l\'air au total')
     + tuile(serie, '', serie > 1 ? `en 10 min dès ${new Date(sT).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : 'meilleure série');
   dessinerTraj(); detailSaut(); dessinerFil(); repartition(); classement(); dessinerMed();
+}
+
+// Lecture d'un saut : null hors du saut, 0 dans les 6 s avant le décollage, 0→1 en l'air (part du vol écoulée)
+function phaseSaut(s) {
+  if (!pts.length || cur < s.t0 - 6000 || cur > s.t) return null;
+  return Math.max(0, (cur - s.t0) / Math.max(1, s.t - s.t0));
+}
+let sautLu = null;   // saut traversé par le curseur (médaillon redessiné tant qu'on y est, puis une fois en sortant)
+function suivreSaut() {
+  if (!sauts.length) return;
+  const s = sauts.find(x => cur >= x.t0 - 6000 && cur <= x.t) || null;
+  if (s && s !== sautSel && cur >= s.t0) { sautSel = s; }
+  if (s || sautLu) dessinerMed();
+  sautLu = s;
 }
 
 // Trajectoires superposées : chaque saut dessiné comme sa parabole depuis le même point de décollage ;
@@ -864,6 +883,17 @@ function dessinerTraj(c = $('cTraj')) {
   };
   const hm = Math.max(...sauts.map(s => s.hc), 0.1);
   for (const s of sauts) if (s !== sautSel) arc(s, `rgba(94,230,214,${0.25 + 0.55 * s.hc / hm})`, 1.5 * k);
+  // lecture : avant le décollage, le saut choisi est grisé ; en l'air, il se trace en blanc au rythme de la trace GPS
+  const ph = sautSel ? phaseSaut(sautSel) : null;
+  if (sautSel && ph != null && ph < 1) {
+    arc(sautSel, '#0b1a1f', 5 * k); arc(sautSel, 'rgba(255,255,255,.28)', 2.5 * k);
+    if (ph > 0) {
+      g.save(); g.beginPath(); g.rect(0, 0, X(ph * sautSel.d), H); g.clip(); arc(sautSel, '#ffffff', 2.5 * k); g.restore();
+      const pr = sautSel.profil, n = pr ? pr.length - 1 : 0, hh = pr ? Math.max(0, pr[Math.round(ph * n)]) : 4 * sautSel.hc * ph * (1 - ph);
+      g.fillStyle = '#fff'; g.beginPath(); g.arc(X(ph * sautSel.d), Y(hh), 4.5 * k, 0, 7); g.fill();
+    }
+    g.textAlign = 'left'; return;
+  }
   if (sautSel) {
     // ombre de 2 px couleur fond pour détacher la courbe choisie des autres
     arc(sautSel, '#0b1a1f', 5 * k); arc(sautSel, '#ffffff', 2.5 * k);
@@ -900,16 +930,40 @@ function detailSaut() {
   el.hidden = false;
   const rang = [...sauts].sort((a, b) => b.hc - a.hc).indexOf(s) + 1;
   el.innerHTML = `<div class="titre"><b>Saut ${s.n}</b><span class="sub">${heure(s.t0)} · ${rang === 1 ? 'le plus haut' : rang + 'e plus haut'}</span><button id="sautVoir">▶ Revoir</button></div>
-    <div class="vals"><span><b>${fr(s.hc)} m</b><small>hauteur ${s.calc === 'chute libre' ? '(chute libre)' : 'corrigée'}</small></span>${s.calc !== 'chute libre' ? `<span><b>${fr(s.hLibre)} m</b><small>en chute libre</small></span>` : ''}<span><b>${fr(s.vol, 2)} s</b><small>en l'air</small></span><span><b>${Math.round(s.d)} m</b><small>distance</small></span>
-    <span><b>${fr(s.v * 1.944)} nd</b><small>${Math.round(s.v * 3.6)} km/h au décollage</small></span>${s.hBaro != null ? `<span><b>${fr(s.hBaro)} m</b><small>baromètre</small></span>` : ''}${s.rot ? `<span><b>${s.rot}</b><small>rotation(s)</small></span>` : ''}</div>
-    <div class="sub">Calcul : ${s.calc}${s.hInt != null ? ` · téléphone : ${fr(s.hInt)} m` : ''}</div>
+    <div class="vals"><span><b>${fr(s.hc)} m</b><small>hauteur</small></span><span><b>${fr(s.vol, 2)} s</b><small>en l'air</small></span><span><b>${Math.round(s.d)} m</b><small>distance</small></span>
+    <span><b>${fr(s.v * 1.944)} nd</b><small>${Math.round(s.v * 3.6)} km/h au décollage</small></span>${s.rot ? `<span><b>${s.rot}</b><small>rotation(s)</small></span>` : ''}</div>
     ${s.courbe ? `<canvas id="cAcc"></canvas><div class="sub">Accélération ressentie par ${s.montre ? 'la montre' : 'le téléphone'} (g) : blanc = norme${s.courbeV ? ', turquoise = verticale' + (s.vertical === 'estimée' ? ' (estimée)' : '') : ''}. En l'air, elle tombe vers 0 si rien ne porte ; ce qui reste au-dessus de 0 est la portance de l'aile. Pic à la réception.</div>` : ''}`;
   $('sautVoir').onclick = () => {
-    $('sautsPan').hidden = innerWidth < 800; // sur téléphone on referme pour voir la carte
+    if ($('sautsCorps').parentNode === $('sautsPan')) $('sautsPan').hidden = innerWidth < 800; // sur téléphone on referme pour voir la carte
+    if (innerWidth < 800) $('fResume').hidden = true;
+    if (vuePrinc === 'carte') { medVisible = true; vueMed = 'sauts'; } else vuePrinc = 'sauts';
+    placerVues();
     seek(s.t0 - 5000); map.setView([s.lat, s.lon], Math.max(map.getZoom(), 17));
     if (!playing) { $('speed').value = '1'; togglePlay(true); }
   };
   if (s.courbe) dessinerAcc(s);
+}
+// fiche du saut : glisser à gauche = saut suivant, à droite = précédent (dans l'ordre de la séance)
+{
+  const el = $('sautDetail'); let x0 = null, y0 = null, axe = null, dx = 0;
+  el.style.touchAction = 'pan-y';
+  el.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; axe = null; dx = 0; }, { passive: true });
+  el.addEventListener('touchmove', e => {
+    if (x0 == null) return;
+    const ddx = e.touches[0].clientX - x0, ddy = e.touches[0].clientY - y0;
+    if (!axe && Math.hypot(ddx, ddy) > 8) axe = Math.abs(ddx) > Math.abs(ddy) && sauts.length > 1 ? 'lat' : 'autre';
+    if (axe !== 'lat') return;
+    e.preventDefault(); dx = ddx; el.style.transition = 'none'; el.style.transform = `translateX(${dx}px)`; el.style.opacity = 1 - Math.min(0.6, Math.abs(dx) / 400);
+  }, { passive: false });
+  const fin = () => {
+    if (axe === 'lat') {
+      const i = sauts.indexOf(sautSel), j = i + (dx < -50 ? 1 : dx > 50 ? -1 : 0);
+      el.style.transition = 'transform .2s, opacity .2s'; el.style.transform = ''; el.style.opacity = '';
+      if (j !== i && j >= 0 && j < sauts.length) { sautSel = sauts[j]; dessinerSauts(); }
+    }
+    x0 = null; axe = null;
+  };
+  el.addEventListener('touchend', fin); el.addEventListener('touchcancel', fin);
 }
 function dessinerAcc(s) {
   const { g, k, W, H } = toile($('cAcc')), c = s.courbe, dt = 1 / (s.hz || 25), av = s.avant ?? 2; // depuis « avant » s avant le décollage
@@ -1018,6 +1072,7 @@ function rendre(sonner = false) {
   if ($('follow').checked && !map.getBounds().pad(-0.2).contains(boat.getLatLng())) map.panTo(boat.getLatLng(), { animate: false });
   drawRadar($('radar'), analysis, fix);
   dessinerFrise();
+  suivreSaut();
 }
 const fmtDuree = ms => { const s = Math.round(ms / 1000); return `${Math.floor(s / 3600)}h${String(Math.floor(s / 60) % 60).padStart(2, '0')}m${String(s % 60).padStart(2, '0')}s`; };
 function tickLecture() {
@@ -1193,7 +1248,7 @@ function choisirSaut(s) {
   sautSel = s; seek(s.t0 - 2000);
   if (vuePrinc === 'carte') { medVisible = true; vueMed = 'sauts'; } else vuePrinc = 'sauts';
   placerVues();
-  if (!$('sautsPan').hidden) dessinerSauts();
+  if (bilanVisible()) dessinerSauts();
 }
 
 // =====================================================================
@@ -1251,22 +1306,28 @@ function ouvrirResume(page = 0) {
     [events.length, events.length > 1 ? 'alertes' : 'alerte'], [sauts.length, sauts.length > 1 ? 'sauts' : 'saut'], [sauts.length ? fr(hm) + '<u>m</u>' : '–', 'plus haut saut']];
   $('rGrille').innerHTML = cases.map(([b, l]) => `<div><b>${b}</b><small>${l}</small></div>`).join('');
   const avecVent = !!ventCourant; if (avecVent) remplirVent();
-  $('pVent').hidden = !avecVent; $('rPoints').hidden = !avecVent;
+  $('pVent').hidden = !avecVent;
+  const avecSauts = sauts.length > 0; $('pSauts').hidden = !avecSauts;
+  if (avecSauts) { $('sautsPan').hidden = true; $('pSauts').append($('sautsCorps')); }
+  const n = nPagesR(); $('rPoints').hidden = n < 2;
+  $('rPoints').innerHTML = Array.from({ length: n }, (_, i) => `<i data-p="${i}"></i>`).join('');
+  [...$('rPoints').children].forEach(d => d.onclick = () => allerPage(+d.dataset.p));
   $('fResume').hidden = false;
-  allerPage(avecVent ? page : 0, false);
+  if (avecSauts) dessinerSauts();
+  allerPage(Math.min(page, n - 1), false);
 }
 // pages du bandeau : piste translatée (page n à -n × 100 %), glissement latéral au doigt (voir les feuilles plus bas)
 let pageR = 0;
-const nPagesR = () => $('pVent').hidden ? 1 : 2;
+const nPagesR = () => [...$('rPiste').children].filter(p => !p.hidden).length;
 function allerPage(n, doux = true) {
   pageR = Math.max(0, Math.min(nPagesR() - 1, n));
   const P = $('rPiste'); P.style.transition = doux ? '' : 'none'; P.style.transform = `translateX(${-pageR * 100}%)`;
   // hauteur du bandeau = celle de la page affichée (sinon la plus courte hérite de la place de la plus longue)
-  const C = $('rPages'); C.style.transition = doux ? '' : 'none'; C.style.height = P.children[pageR].offsetHeight + 'px';
+  const vis = [...P.children].filter(p => !p.hidden);
+  const C = $('rPages'); C.style.transition = doux ? '' : 'none'; C.style.height = vis[pageR].offsetHeight + 'px';
   majPoints(pageR);
 }
 function majPoints(n) { [...$('rPoints').children].forEach((d, i) => d.classList.toggle('on', i === n)); }
-[...$('rPoints').children].forEach(d => d.onclick = () => allerPage(+d.dataset.p));
 $('resume').onclick = () => ouvrirResume(); $('poignee').onclick = () => ouvrirResume();
 // balayage vers le haut sur le résumé (ou sa poignée) : tous les chiffres
 for (const el of [$('resume'), $('poignee')]) {
@@ -1285,16 +1346,17 @@ document.querySelectorAll('.feuilleR').forEach(f => {
   // glisser vers le bas (depuis le haut de la feuille) : la feuille suit le doigt et se ferme au-delà de 80 px
   const inn = f.querySelector('.in'); let y0 = null, dy = 0;
   inn.addEventListener('pointerdown', e => { if (e.pointerType !== 'touch' && inn.scrollTop <= 0 && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) { y0 = e.clientY; dy = 0; } });
-  let tx0 = null, ty0 = null, axe = null, tdy = 0, tdx = 0, defile = null;
+  let tx0 = null, ty0 = null, axe = null, tdy = 0, tdx = 0, defile = null, surFiche = false;
   inn.addEventListener('touchstart', e => {
     if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
     tx0 = e.touches[0].clientX; ty0 = e.touches[0].clientY; axe = null; tdy = 0;
     defile = e.target.closest('.page') || inn;   // zone qui défile verticalement sous le doigt
+    surFiche = !!e.target.closest('#sautDetail');   // la fiche du saut a son propre glissement latéral
   }, { passive: true });
   inn.addEventListener('touchmove', e => {
     if (ty0 == null) return;
     const dx = e.touches[0].clientX - tx0, d = e.touches[0].clientY - ty0;
-    if (!axe && Math.hypot(dx, d) > 8) axe = Math.abs(d) > Math.abs(dx) ? (d > 0 && defile.scrollTop <= 0 ? 'bas' : 'autre') : (f.id === 'fResume' && nPagesR() > 1 ? 'lat' : 'autre');
+    if (!axe && Math.hypot(dx, d) > 8) axe = Math.abs(d) > Math.abs(dx) ? (d > 0 && defile.scrollTop <= 0 ? 'bas' : 'autre') : (f.id === 'fResume' && nPagesR() > 1 && !surFiche ? 'lat' : 'autre');
     if (axe === 'lat') { e.preventDefault(); tdx = dx; const P = $('rPiste'); P.style.transition = 'none'; P.style.transform = `translateX(calc(${-pageR * 100}% + ${dx}px))`; return; }
     if (axe !== 'bas') return;
     e.preventDefault(); tdy = Math.max(0, d); inn.style.transform = `translateY(${tdy}px)`;
