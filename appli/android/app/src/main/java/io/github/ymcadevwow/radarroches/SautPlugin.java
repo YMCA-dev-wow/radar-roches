@@ -45,10 +45,18 @@ import java.util.zip.GZIPOutputStream;
  *  bruts/<journal>_brut.csv.gz, partagé avec le journal. But : trajectoire réelle des sauts de kite (verticale en repère
  *  terrestre par le gyroscope, double intégration), la gravité estimée par Android s'alignant sur la traction de l'aile.
  *  Format (une ligne par mesure) : lettre, µs depuis la ligne « debut », valeurs (a, G : m/s² ; g : rad/s ; r : x, y, z, w ; p : hPa).
+ * 23/11/2026 (séance wing du 22/11 dans la baston, données brutes : 2 vrais sauts, 165 candidats) :
+ *  - vrai saut = hauteur intégrée hInt d'au moins 1,2 m (les faux plafonnent à 0,6 m en wing, 0,8 m en kite) ; l'ancien
+ *    critère « moyenne sous 0,35 g » rejetait les sauts où l'aile porte (0,57 g en moyenne dans la baston) ;
+ *  - décollage = fin du pop (dernière moyenne 0,1 s ≥ 1,3 g dans la seconde avant la phase allégée), pour intégrer toute la montée ;
+ *  - plus de blocage de 3 s entre candidats (0,5 s) : un accroupi avant le pop pris pour un petit saut masquait la vraie
+ *    réception 2,5 s plus tard ; l'espacement des annonces reste dans la page ;
+ *  - historique de 20 s et courbes ré-échantillonnées sur le temps (le Pixel 7 livre ~120 Hz au lieu des 100 demandés).
  */
 @CapacitorPlugin(name = "Saut")
 public class SautPlugin extends Plugin implements SensorEventListener {
-    private static final int HZ = 100, N = HZ * 10;                // 10 s d'historique
+    private static final int HZ = 100, N = HZ * 20;                // 20 s d'historique à 100 Hz (au moins 10 s si le capteur va plus vite)
+    private static final double H_VRAI = 1.2, POP = 1.3;            // m : hauteur intégrée d'un vrai saut ; g : fin du pop (décollage)
     private static final double G = 9.81, BAS = 0.6, PIC = 2.2, CHOC = 3.0;   // seuils en g
     private SensorManager sm; private HandlerThread fil; private Handler hFil; private boolean actif = false, gravite = false;
     private final float[] acc = new float[N], accV = new float[N]; private final long[] tAcc = new long[N]; private int nAcc = 0;
@@ -120,9 +128,9 @@ public class SautPlugin extends Plugin implements SensorEventListener {
         m /= n;
         if (m < BAS) { if (debutBas < 0) debutBas = t - 100; finBas = t; }
         else if (debutBas >= 0 && t - finBas > 400) debutBas = -1; // la phase allégée s'est terminée sans réception
-        if (g > PIC && debutBas >= 0 && finBas - debutBas >= 300 && t - finBas < 400 && t - dernierSaut > 3000) {   // 3 s au moins entre deux sauts
-            final double vol = (t - debutBas) / 1000.0; final long t0 = debutBas, t1 = t;
-            if (vol < 4) { final boolean vrai = enVol(t0, t1); hFil.postDelayed(() -> signaler(t0, t1, vol, vrai), 1000); } // les rejetés partent aussi au journal (réglage)
+        if (g > PIC && debutBas >= 0 && finBas - debutBas >= 300 && t - finBas < 400 && t - dernierSaut > 500) {
+            final long t0 = decollage(debutBas), t1 = t; final double vol = (t1 - t0) / 1000.0;
+            if (vol < 4) hFil.postDelayed(() -> signaler(t0, t1, vol), 1000); // les rejetés partent aussi au journal
             debutBas = -1; dernierSaut = t;
         } else if (g > CHOC && t - dernierChoc > 3000 && t - dernierSaut > 2000) { // choc sans phase allégée : candidat saut de kite
             dernierChoc = t; final long tc = t; final float pic = g;
@@ -130,19 +138,22 @@ public class SautPlugin extends Plugin implements SensorEventListener {
         }
     }
 
-    // Vrai vol : allégé tout du long (moyenne sous 0,35 g, au moins 70 % des mesures sous 0,6 g, au moins 0,45 s). Le pompage dans les molles
-    // (séance du 26/10, 418 faux sauts) oscille autour de 1 g en moyenne : rejeté.
-    private boolean enVol(long t0, long t1) {
-        double s = 0; int n = 0, bas = 0;
-        for (int i = 0; i < Math.min(nAcc, N); i++) {
-            int k = (nAcc - 1 - i) % N;
-            if (tAcc[k] < t0 || tAcc[k] >= t1 - 60) continue;   // sans le pic de réception
-            s += acc[k]; n++; if (acc[k] < BAS) bas++;
+    // Décollage : fin du pop, dernière moyenne sur 0,1 s d'au moins POP g dans la seconde avant la phase allégée
+    // (l'aile porte encore au début du vol, |a| y reste parfois au-dessus de BAS) ; à défaut, début de la phase allégée
+    private long decollage(long debut) {
+        int n0 = Math.min(nAcc, N), w = HZ / 10;
+        for (int i = 0; i + w <= n0; i++) {
+            int k = (nAcc - 1 - i) % N; long tk = tAcc[k];
+            if (tk > debut) continue;
+            if (tk < debut - 1000) break;
+            double m = 0; for (int j = 0; j < w; j++) m += acc[(nAcc - 1 - i - j) % N];
+            if (m / w >= POP) return tk;
         }
-        return n >= 0.4 * HZ && s / n < 0.35 && bas >= 0.7 * n;   // 26/10 : les 418 faux sauts avaient tous une moyenne ≥ 0,37 g
+        return debut;
     }
 
-    private void signaler(long t0, long t1, double vol, boolean vrai) {
+    private void signaler(long t0, long t1, double vol) {
+        double hi = hauteurIntegree(t0, t1); boolean vrai = hi >= H_VRAI;
         if (vrai) nSauts++;
         JSObject o = new JSObject();
         o.put("vrai", vrai);
@@ -156,7 +167,7 @@ public class SautPlugin extends Plugin implements SensorEventListener {
             if (tt >= t0 && tt <= t1 && alt[k] > haut) haut = alt[k];
         }
         if (nb > 0 && haut > -1e8) o.put("hBaro", Math.round((haut - base / nb) * 10) / 10.0);
-        o.put("hInt", Math.round(hauteurIntegree(t0, t1) * 10) / 10.0);
+        o.put("hInt", Math.round(hi * 10) / 10.0);
         ajouterCourbes(o, t0 - 2000, t1 + 1000, 2);
         o.put("avant", 2.0); o.put("hz", HZ / 2); o.put("vertical", gravite);
         ajouterBaro(o, t0, t0 - 2000, t1 + 1000);
@@ -173,13 +184,14 @@ public class SautPlugin extends Plugin implements SensorEventListener {
         notifyListeners("choc", o);
     }
 
-    // Courbes |a| (« courbe ») et a_vert (« courbeV »), en g, de ta à tb, un point sur « pas »
+    // Courbes |a| (« courbe ») et a_vert (« courbeV »), en g, de ta à tb, à HZ/pas points par seconde (sur le temps :
+    // la fréquence réelle du capteur dépasse souvent celle demandée)
     private void ajouterCourbes(JSObject o, long ta, long tb, int pas) {
-        JSArray c = new JSArray(), cv = new JSArray(); int j = 0;
+        JSArray c = new JSArray(), cv = new JSArray(); double suivant = ta, dt = 1000.0 * pas / HZ;
         for (int i = Math.min(nAcc, N) - 1; i >= 0; i--) {
             int k = (nAcc - 1 - i) % N;
-            if (tAcc[k] < ta || tAcc[k] > tb) continue;
-            if (j++ % pas != 0) continue;
+            if (tAcc[k] < suivant || tAcc[k] > tb) continue;
+            suivant += dt; if (tAcc[k] > suivant) suivant = tAcc[k] + dt;
             c.put((Object) Double.valueOf(Math.round(acc[k] * 100) / 100.0)); // put(Object) : pas d exception
             cv.put((Object) Double.valueOf(Math.round(accV[k] * 100) / 100.0));
         }

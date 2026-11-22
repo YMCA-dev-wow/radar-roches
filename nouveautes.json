@@ -2,6 +2,17 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 56,
+      "date": "2026-11-23",
+      "titre": "Sauts mieux détectés quand l'aile porte",
+      "points": [
+        "Un saut est retenu d'après sa hauteur calculée (1,2 m au moins), et non plus d'après la chute de l'accélération : les sauts de wing dans la brise, où l'aile porte encore, ne sont plus écartés.",
+        "La voix annonce cette hauteur calculée, qui tient compte de la portance de l'aile.",
+        "Un faux départ juste avant un saut ne masque plus le vrai saut.",
+        "Dans le rejeu, les séances depuis le 13/11 sont relues avec cette règle : des sauts écartés à tort peuvent y apparaître."
+      ]
+    },
+    {
       "id": 55,
       "date": "2026-11-20",
       "titre": "Sauts réglés dans le profil",

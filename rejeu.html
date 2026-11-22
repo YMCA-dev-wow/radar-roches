@@ -784,7 +784,9 @@ function hauteurCorrigee(s) {
   s.hLibre = s.h; s.hc = s.h; s.calc = 'chute libre';
   const c = s.courbeV || s.courbe;
   if (c && c.length > 10) {
-    const hz = s.hz || 25, i0 = Math.round((s.avant ?? 2) * hz), i1 = Math.min(c.length - 1, i0 + Math.round(s.vol * hz)), dt = 1 / hz;
+    // fréquence réelle des courbes : avant le 23/11, le plugin prenait un point sur deux en supposant 100 Hz (Pixel 7 : ~120 Hz)
+    const hzR = c.length / ((s.avant ?? 2) + s.vol + 1), hz = s.hz === 50 && Math.abs(hzR / 50 - 1) > 0.1 ? hzR : (s.hz || 25), i0 = Math.round((s.avant ?? 2) * hz), i1 = Math.min(c.length - 1, i0 + Math.round(s.vol * hz)), dt = 1 / hz;
+    s.hz = hz;   // pour le tracé de la courbe
     if (i1 - i0 >= 5) {
       const z = [0]; let vz = 0, zz = 0;
       for (let i = i0 + 1; i <= i1; i++) { vz += 9.81 * (c[i] - 1) * dt; zz += vz * dt; z.push(zz); }

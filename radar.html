@@ -373,9 +373,10 @@ const SIM_STARTS = [
   { nom: 'Saint-Briac', lat: 48.6260, lon: -2.1500, cap: 300 },
 ];
 SIM_STARTS.forEach((s, i) => $('simStart').add(new Option(s.nom, i)));
-let fix = null, lastFixes = [], watchId = null, sim = null;
+let fix = null, lastFixes = [], watchId = null, sim = null, vitesses = [];   // vitesses : km/h des 6 dernières secondes (sauts)
 function onFix(lat, lon, acc, speedGps, headingGps, t) {
   lastFixes.push({ lat, lon, t }); while (lastFixes.length > 6) lastFixes.shift();
+  vitesses.push({ t, v: (speed || 0) * 3.6 }); while (vitesses.length && t - vitesses[0].t > 6000) vitesses.shift();
   let speed = speedGps, course = headingGps;
   const a = lastFixes[0], b = lastFixes[lastFixes.length - 1];
   if (b.t - a.t > 1500) { // cap et vitesse sur les dernières secondes si le GPS ne les donne pas
@@ -627,7 +628,7 @@ $('start').onclick = async () => {
   if (APPLI) { appliquerVolume(); demarrerJournal().catch(() => {}).then(demarrerSauts); const t = horlogeSon() + 0.15; tone(880, 880, t, 0.12, 0.8, 'triangle'); tone(1320, 1320, t + 0.16, 0.2, 0.8, 'triangle'); } // carillon : le son marche
   $('setup').hidden = true; $('avance').hidden = true; $('fProfils').classList.remove('on');
   document.body.classList.add('navigation'); $('run').hidden = false; resize();
-  fix = null; lastFixes = []; analysis = null; last = null; running = true; window.radarEnCours = true; dernierPrechargement = null; debutSeance = Date.now();
+  fix = null; lastFixes = []; vitesses = []; analysis = null; last = null; running = true; window.radarEnCours = true; dernierPrechargement = null; debutSeance = Date.now();
   if ($('simMode').checked) startSim(); else startGps();
   clearInterval(tickTimer); tickTimer = setInterval(tick, 100);
   requestAnimationFrame(frame);
@@ -649,7 +650,8 @@ document.addEventListener('visibilitychange', async () => {
 
 window.journalTuile = (k, msg) => JournalSession.ev('tuile', { k, erreur: msg });
 // Sauts (version d'essai) : détectés par Android (SautPlugin), notés dans le journal avec la courbe d'accélération,
-// annoncés à la voix : « Saut, 1,2 mètre, 1 seconde ». La hauteur balistique g·t²/8 est surestimée quand l'aile porte.
+// annoncés à la voix : « Saut, 1,2 mètre, 1 seconde ». Hauteur intégrée (hInt, tient compte de la portance de l'aile) ;
+// vrai saut si hInt ≥ 1,2 m (décidé par le plugin, 23/11/2026).
 let ecouteSauts = null, ecouteChocs = null, dernierSautAnnonce = 0;
 const fr1v = v => String(v).replace('.', ',');
 async function demarrerSauts() {
@@ -660,12 +662,14 @@ async function demarrerSauts() {
     const brut = JournalSession.nom ? JournalSession.nom.replace(/\.jsonl$/, '') : null;
     const r = await Natif.saut.demarrer(brut ? { brut } : {});
     ecouteSauts = await Natif.saut.addListener('saut', s => {
-      const v = fix ? fix.speed * 3.6 : 0;
+      // vitesse d'approche : la plus forte des 6 dernières secondes (on ralentit au décollage, surtout en strapless)
+      const v = Math.max(fix ? fix.speed * 3.6 : 0, ...vitesses.map(x => x.v));
       s.v = Math.round(v);
-      if (!s.vrai) { JournalSession.ev('saut', { ...s, ecarte: 'pompage' }); return; } // accélération pas allégée tout du long
-      if (v < 12) { JournalSession.ev('saut', { ...s, ecarte: 'vitesse' }); return; } // pompage dans les molles, chute, marche
+      if (!s.vrai) { JournalSession.ev('saut', { ...s, ecarte: 'hauteur' }); return; } // hauteur intégrée sous 1,2 m : pompage, clapot
+      if (v < 12) { JournalSession.ev('saut', { ...s, ecarte: 'vitesse' }); return; } // chute, marche, manipulation
       JournalSession.ev('saut', s);
       // annonce seulement au-dessus du seuil du profil, et jamais deux sauts à moins de 3 s (fausses détections en rafale)
+      if (s.hInt != null) s.h = s.hInt;   // hauteur intégrée annoncée (la balistique g·t²/8 surestime quand l'aile porte)
       if (s.h < +$('sautMin').value || Date.now() - dernierSautAnnonce < 3000) return;
       dernierSautAnnonce = Date.now();
       // les alertes passent avant : pas d'annonce de saut pendant une alerte, une pré-alerte ou une veille

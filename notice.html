@@ -122,7 +122,7 @@ Après une séance de plus de 3 minutes, l'appli propose de la revoir dans le re
   <li>En haut : <b>eau</b> (hauteur de marée en m, « test » si forcée) et, en petit dessous, le <b>fond</b> : l'eau sous la planche (« · roche » au-dessus d'une roche),
     <b>vitesse</b> (km/h), <b>précision GPS</b> (m).</li>
   <li><b>Sauts (essai)</b> : avec le téléphone porté sur le tronc, la voix annonce à la réception la hauteur et le temps de vol (« Saut, 1,2 mètre, 1 seconde »).
-    Hauteur calculée d'après le temps de vol, surestimée quand l'aile porte ; précision d'environ ±30 %. Les sauts apparaissent dans le rejeu du journal
+    Hauteur calculée par double intégration de l'accélération verticale du décollage (fin du pop) à la réception, ce qui tient compte de la portance de l'aile ; c'est la hauteur du buste, la planche monte un peu moins. Un saut compte à partir de 1,2 m (en dessous : pompage, clapot) ; calcul en cours de calage. Les sauts apparaissent dans le rejeu du journal
     (triangles blancs sur la frise, lignes « saut » dans la liste). Réglage « Détection des sauts (essai) » dans chaque profil (accueil → profil → ✎), <b>coupé par défaut</b>, avec la hauteur
     à partir de laquelle les sauts sont annoncés (les plus bas sont seulement notés au journal) ; jamais deux sauts à moins de 3 s.
     Avec ce réglage, les données brutes des capteurs (accéléromètre, gyroscope, baromètre) sont aussi enregistrées pendant toute la séance

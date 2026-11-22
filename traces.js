@@ -122,6 +122,23 @@ const Traces = (() => {
     return !(moy < 0.35 && bas >= 0.7 * vol.length);
   }
 
+  // Règle du 23/11/2026 : vrai saut si hauteur intégrée ≥ 1,2 m. Journaux du 13 au 22/11 : les sauts écartés « pompage »
+  // (ancien critère, trop strict quand l'aile porte) sont repris s'ils passent la nouvelle règle.
+  function vraiSaut(e) {
+    if (e.hInt != null) return !e.ecarte || (e.ecarte === 'pompage' && e.hInt >= 1.2);
+    return !e.ecarte && !pompage(e);   // journaux d'avant le 13/11 (sans hauteur intégrée)
+  }
+  // Deux sauts à moins de 3 s : on garde le plus haut (même saut vu deux fois, ou faux départ avant le vrai)
+  function dedoublerSauts(l) {
+    const hs = e => e.hInt ?? e.h ?? 0, out = [];
+    for (const e of [...l].sort((a, b) => a.t - b.t)) {
+      const p = out[out.length - 1];
+      if (p && !p.montre && !e.montre && e.t - p.t < 3000) { if (hs(e) > hs(p)) out[out.length - 1] = e; }
+      else out.push(e);
+    }
+    return out;
+  }
+
   // Journal de session de l'appli (.jsonl) : positions « pos » (la, lo, v en km/h) ; « debut » : réglages et profil du radar
   function lireJournal(txt, R) {
     const out = [];
@@ -132,10 +149,11 @@ const Traces = (() => {
         R.reglages = R.reglages || e.reglages || null; R.exemple = R.exemple || e.exemple || null;
         R.profil = R.profil || e.profil || null; R.zone = R.zone || e.zone || null;
       }
-      else if (e.type === 'saut' && !e.ecarte && !pompage(e)) R.sauts.push(e); // candidats écartés (pompage, vitesse) gardés au journal
+      else if (e.type === 'saut' && vraiSaut(e)) R.sauts.push(e); // candidats écartés (hauteur, pompage, vitesse) gardés au journal
       else if (e.type === 'choc') R.chocs.push(e);
       else if (e.type === 'pos' && isFinite(e.la) && isFinite(e.lo) && !e.sim) out.push({ t: e.t, lat: e.la, lon: e.lo, vDev: e.v != null ? e.v / 3.6 : null });
     }
+    R.sauts = dedoublerSauts(R.sauts);
     return completer(out);
   }
 
