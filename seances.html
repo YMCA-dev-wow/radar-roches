@@ -30,8 +30,7 @@
   .chiffres { display: flex; gap: 14px; font-variant-numeric: tabular-nums; }
   .chiffres b { font-size: 16px; display: block; line-height: 1.1; } .chiffres small { font-size: 10px; color: var(--mu); }
   .carteS input[type=checkbox] { flex: none; }
-  .ventMini { color: var(--tx); font-weight: 500; } .srcV { font-size: 9px; border-radius: 6px; padding: 0 4px; border: 1px solid var(--ln); color: var(--mu); margin-left: 3px; }
-  .srcV.saisi { color: var(--ac); border-color: var(--ac); }
+  .ventMini { color: var(--tx); font-weight: 500; }
   .barreSel { position: fixed; left: 0; right: 0; bottom: 0; z-index: 45; background: var(--p1); border-top: 1px solid var(--ln2); padding: 10px 12px 14px; display: flex; gap: 8px; }
   html.appli .barreSel { bottom: 62px; }
   .barreSel button { flex: 1; justify-content: center; }
@@ -91,7 +90,7 @@
 <body data-onglet="seances">
 <div class="page">
   <div class="entete">
-    <h1>Séances</h1>
+    <a href="radar.html" title="Radar"><img src="logo.svg" width="30" height="30" alt="Radar"></a><h1>Séances</h1>
     <button class="ico" id="bSel" title="Sélectionner pour regrouper ou supprimer (ou appui long sur une séance)">☑</button>
     <a class="btn ico" href="plus.html#reglages" title="Réglages généraux (unités, sports)">⚙</a>
   </div>
@@ -211,7 +210,7 @@ function ventCarte(el, s) {
   const W = Vent.courant(s.id), c = el.querySelector('.c'); if (!W || !c) return;
   const r = Vent.resume(W, s.t0, s.t1), v = S.vit(r.v, 0), fl = '↑↗→↘↓↙←↖'[Math.round(((r.dir + 180) % 360) / 45) % 8];
   const sp = document.createElement('span'); sp.className = 'ventV';
-  sp.innerHTML = ` · <span class="ventMini">${fl} ${v.n} ${v.u} ${Vent.cardinal(r.dir)}</span><span class="srcV${W.source === 'saisi' ? ' saisi' : ''}">${W.source === 'saisi' ? 'Saisi' : 'AROME'}</span>`;
+  sp.innerHTML = ` · <span class="ventMini">${fl} ${v.n} ${v.u} ${Vent.cardinal(r.dir)}</span>`;
   const anc = c.querySelector('.ventV'); if (anc) anc.remove();
   if (c.textContent.trim() === '') c.textContent = '';
   c.append(sp);

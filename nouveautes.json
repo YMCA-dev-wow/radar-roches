@@ -2,6 +2,18 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 59,
+      "date": "2026-11-23",
+      "titre": "Sauts en fonction du temps, rafale max",
+      "points": [
+        "Rejeu, trajectoires des sauts : choix de l'axe horizontal, distance ou temps en l'air.",
+        "Rejeu, page vent : rafale max de la séance.",
+        "Liste des séances : la source du vent (AROME, saisi) n'est plus affichée.",
+        "Logo en haut de Séances et de Plus : retour au radar.",
+        "Canal de mise à jour : le choix « développement » est conservé même quand une version testeurs est publiée."
+      ]
+    },
+    {
       "id": 58,
       "date": "2026-11-23",
       "titre": "Rejeu : sauts dans le bandeau du bas",

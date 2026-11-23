@@ -24,6 +24,9 @@
     try {
       const v = await (await fetch('version.json', { cache: 'no-store' })).json();
       if (CANAUX[v.canal]) canal = canalInstalle = v.canal;
+      // une appli de développement installée fixe le choix « développement » : une version testeurs (publiée aussi sur le
+      // canal de développement) ne fait pas basculer sur le canal testeurs ; seul un choix dans Plus → Avancé le change
+      if (v.canal === 'dev' && !CANAUX[lire('radar.maj.canal')]) ecrire('radar.maj.canal', 'dev');
       const choisi = lire('radar.maj.canal'); if (CANAUX[choisi]) canal = choisi;
       return v.version || '';
     } catch { return ''; }

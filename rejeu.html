@@ -134,6 +134,7 @@
   #rPoints i.on { background: #fff; }
   .grilleR { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
   .grilleR b { overflow-wrap: anywhere; }
+  #vGrille { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .grilleR div { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; }
   .grilleR b { display: block; font-size: 17px; font-variant-numeric: tabular-nums; } .grilleR b u { text-decoration: none; font-size: 11px; color: var(--muted); font-weight: 400; margin-left: 2px; }
   .grilleR small { font-size: 11px; color: var(--muted); }
@@ -156,6 +157,9 @@
     overflow-y: auto; padding: 10px 14px 90px; box-shadow: -10px 0 30px #000a; }
   #sautsPan .fTete { display: flex; align-items: baseline; gap: 8px; position: sticky; top: -10px; background: var(--bg); padding: 6px 0 8px; z-index: 1; }
   #sautsPan h2 { font-size: 18px; margin: 0; } #sautsPan .fTete .x { margin-left: auto; padding: 2px 10px; }
+  #axeTraj { float: right; display: inline-flex; background: var(--p2); border-radius: 8px; padding: 2px; text-transform: none; letter-spacing: 0; margin-top: -3px; }
+  #axeTraj button { border: 0; background: none; color: var(--muted); font-size: 12px; padding: 3px 9px; border-radius: 6px; }
+  #axeTraj button.on { background: var(--bg); color: var(--accent); }
   #sautsPan h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 16px 0 6px; font-weight: 600; }
   .tuiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
   .tuiles div { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 7px 8px; }
@@ -309,7 +313,7 @@
   <div class="fTete"><h2>Sauts</h2><span class="sub" id="sautsSous"></span><button class="x" id="sautsX" title="Fermer">✕</button></div>
   <div id="sautsCorps">
   <div class="tuiles" id="sautsTuiles"></div>
-  <h3>Trajectoires superposées</h3>
+  <h3>Trajectoires superposées<span id="axeTraj"><button data-a="d">distance</button><button data-a="t">temps</button></span></h3>
   <canvas id="cTraj" title="Touche une trajectoire pour la choisir"></canvas>
   <div id="sautDetail"></div>
   <h3>Au fil de la séance</h3>
@@ -852,11 +856,17 @@ function suivreSaut() {
 
 // Trajectoires superposées : chaque saut dessiné comme sa parabole depuis le même point de décollage ;
 // le saut choisi en blanc, les autres en turquoise d'autant plus opaque qu'ils sont hauts . Toucher une courbe la choisit.
+// axe horizontal : distance parcourue (m) ou temps en l'air (s), au choix (mémorisé)
+let axeT = 'd'; try { axeT = localStorage.getItem('radar.sauts.axe') === 't' ? 't' : 'd'; } catch {}
+const ext = s => axeT === 't' ? s.vol : s.d;   // étendue horizontale d'un saut dans l'axe choisi
+function majAxeT() { [...$('axeTraj').children].forEach(b => b.classList.toggle('on', b.dataset.a === axeT)); }
+[...$('axeTraj').children].forEach(b => b.onclick = () => { axeT = b.dataset.a; try { localStorage.setItem('radar.sauts.axe', axeT); } catch {} majAxeT(); dessinerSauts(); dessinerMed(); });
+majAxeT();
 function dessinerTraj(c = $('cTraj')) {
   const { g, k, W, H } = toile(c);
   if (!W || !H) return;
   const petit = W < 260 * k, txt = petit ? () => {} : g.fillText.bind(g); // médaillon : courbes seules, sans textes
-  const dmax = Math.max(4, ...sauts.map(s => s.d)) * 1.08, hmax = Math.max(2, ...sauts.map(s => s.hc)) * 1.18;
+  const dmax = (axeT === 't' ? Math.max(1, ...sauts.map(ext)) : Math.max(4, ...sauts.map(ext))) * 1.08, hmax = Math.max(2, ...sauts.map(s => s.hc)) * 1.18;
   const L0 = (petit ? 8 : 34) * k, B0 = H - (petit ? 10 : 24) * k, T0 = 10 * k, R0 = W - (petit ? 8 : 16) * k;
   const X = d => L0 + d / dmax * (R0 - L0), Y = h => B0 - h / hmax * (B0 - T0);
   c._geo = { X, Y, petit };
@@ -865,8 +875,8 @@ function dessinerTraj(c = $('cTraj')) {
   g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = k; g.fillStyle = '#5d7a80'; g.textAlign = 'right';
   for (let h = pasH; h < hmax; h += pasH) { g.beginPath(); g.moveTo(L0, Y(h)); g.lineTo(R0, Y(h)); g.stroke(); txt(fr(h, pasH < 1 ? 1 : 0) + ' m', L0 - 4 * k, Y(h) + 4 * k); }
   g.textAlign = 'center';
-  const pasD = dmax > 30 ? 10 : dmax > 12 ? 5 : 2;
-  for (let d = pasD; d < dmax; d += pasD) txt(d + ' m', X(d), H - 6 * k);
+  const pasD = axeT === 't' ? (dmax > 3 ? 1 : dmax > 1.2 ? 0.5 : 0.2) : dmax > 30 ? 10 : dmax > 12 ? 5 : 2;
+  for (let d = pasD; d < dmax - 1e-9; d += pasD) txt(axeT === 't' ? fr(d, pasD < 1 ? 1 : 0) + ' s' : d + ' m', X(d), H - 6 * k);
   // eau : vaguelettes
   g.fillStyle = 'rgba(90,200,250,.16)'; g.beginPath(); g.moveTo(0, H);
   for (let x = 0; x <= W; x += 4 * k) g.lineTo(x, B0 + 2 * k + Math.sin(x / (9 * k)) * 2 * k);
@@ -878,7 +888,7 @@ function dessinerTraj(c = $('cTraj')) {
   const arc = (s, couleur, ep, libre) => { // profil intégré si connu, sinon parabole de la hauteur retenue (ou de chute libre)
     g.strokeStyle = couleur; g.lineWidth = ep; g.beginPath();
     const pr = !libre && s.profil, n = pr ? pr.length - 1 : 40, h = libre ? s.hLibre : s.hc;
-    for (let i = 0; i <= n; i++) { const f = i / n, x = X(f * s.d), y = Y(pr ? Math.max(0, pr[i]) : 4 * h * f * (1 - f)); i ? g.lineTo(x, y) : g.moveTo(x, y); }
+    for (let i = 0; i <= n; i++) { const f = i / n, x = X(f * ext(s)), y = Y(pr ? Math.max(0, pr[i]) : 4 * h * f * (1 - f)); i ? g.lineTo(x, y) : g.moveTo(x, y); }
     g.stroke();
   };
   const hm = Math.max(...sauts.map(s => s.hc), 0.1);
@@ -888,9 +898,9 @@ function dessinerTraj(c = $('cTraj')) {
   if (sautSel && ph != null && ph < 1) {
     arc(sautSel, '#0b1a1f', 5 * k); arc(sautSel, 'rgba(255,255,255,.28)', 2.5 * k);
     if (ph > 0) {
-      g.save(); g.beginPath(); g.rect(0, 0, X(ph * sautSel.d), H); g.clip(); arc(sautSel, '#ffffff', 2.5 * k); g.restore();
+      g.save(); g.beginPath(); g.rect(0, 0, X(ph * ext(sautSel)), H); g.clip(); arc(sautSel, '#ffffff', 2.5 * k); g.restore();
       const pr = sautSel.profil, n = pr ? pr.length - 1 : 0, hh = pr ? Math.max(0, pr[Math.round(ph * n)]) : 4 * sautSel.hc * ph * (1 - ph);
-      g.fillStyle = '#fff'; g.beginPath(); g.arc(X(ph * sautSel.d), Y(hh), 4.5 * k, 0, 7); g.fill();
+      g.fillStyle = '#fff'; g.beginPath(); g.arc(X(ph * ext(sautSel)), Y(hh), 4.5 * k, 0, 7); g.fill();
     }
     g.textAlign = 'left'; return;
   }
@@ -898,7 +908,7 @@ function dessinerTraj(c = $('cTraj')) {
     // ombre de 2 px couleur fond pour détacher la courbe choisie des autres
     arc(sautSel, '#0b1a1f', 5 * k); arc(sautSel, '#ffffff', 2.5 * k);
     const pr = sautSel.profil, im = pr ? pr.indexOf(Math.max(...pr)) / (pr.length - 1) : 0.5;
-    const xa = X(sautSel.d * im), ya = Y(sautSel.hc);
+    const xa = X(ext(sautSel) * im), ya = Y(sautSel.hc);
     g.fillStyle = '#fff'; g.beginPath(); g.arc(xa, ya, 4 * k, 0, 7); g.fill();
     g.font = `600 ${12 * k}px system-ui`; g.textAlign = xa > W * 0.6 ? 'right' : 'left';
     txt(`${fr(sautSel.hc)} m · ${fr(sautSel.vol, 2)} s · ${Math.round(sautSel.d)} m`, xa + (xa > W * 0.6 ? -8 : 8) * k, Math.max(T0 + 10 * k, ya - 6 * k));
@@ -912,7 +922,7 @@ function sautTouche(c, e) {
   let mieux = null, dm = Infinity;
   for (const s of sauts) {
     const pr = s.profil, n = pr ? pr.length - 1 : 20;
-    for (let i = 0; i <= n; i++) { const f = i / n, d = Math.hypot(G.X(f * s.d) - px, G.Y(pr ? Math.max(0, pr[i]) : 4 * s.hc * f * (1 - f)) - py); if (d < dm) { dm = d; mieux = s; } }
+    for (let i = 0; i <= n; i++) { const f = i / n, d = Math.hypot(G.X(f * ext(s)) - px, G.Y(pr ? Math.max(0, pr[i]) : 4 * s.hc * f * (1 - f)) - py); if (d < dm) { dm = d; mieux = s; } }
   }
   return mieux && dm < 30 * k ? mieux : null;
 }
@@ -1478,7 +1488,7 @@ function remplirVent() {
   $('vSrc').textContent = ventCourant.source === 'saisi' ? 'Saisi' : 'AROME HD · prévision'; $('vSrc').className = 'srcV' + (ventCourant.source === 'saisi' ? ' saisi' : '');
   $('vPortion').textContent = estZoome() ? `Portion ${heure(a).slice(0, 5)} – ${heure(b).slice(0, 5)} (zoom de la frise)` : '';
   const V = x => { const v = Seances.vit(x); return `${v.n}<u>${v.u}</u>`; }, deg = d => `${Vent.cardinal(d)} <u>${Math.round(d)}°</u>`;
-  $('vGrille').innerHTML = [[V(r.v), 'vent moyen'], [`${Seances.vit(r.deb.v).n} → ${Seances.vit(r.fin.v).n}`, `début → fin (${Seances.vit(0).u})`],
+  $('vGrille').innerHTML = [[V(r.v), 'vent moyen'], [r.raf ? V(r.raf) : '–', 'rafale max'], [`${Seances.vit(r.deb.v).n} → ${Seances.vit(r.fin.v).n}`, `début → fin (${Seances.vit(0).u})`],
     [`${Vent.cardinal(r.deb.dir)} → ${Vent.cardinal(r.fin.dir)}`, `${Math.round(r.deb.dir)}° → ${Math.round(r.fin.dir)}°`]].map(([x, l]) => `<div><b>${x}</b><small>${l}</small></div>`).join('');
   const ang = x => x == null ? '–' : Math.round(x) + '°';
   $('vVmg').innerHTML = [[A.bestUp ? V(A.bestUp) : '–', 'meilleure VMG au près (10 s)'], [A.bestDown ? V(A.bestDown) : '–', 'meilleure VMG au portant (10 s)'], [A.vmgPres ? V(A.vmgPres) : '–', 'VMG moyenne au près'],
