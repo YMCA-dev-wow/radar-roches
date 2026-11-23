@@ -660,12 +660,14 @@ async function demarrerSauts() {
     // données brutes, toujours enregistrées avec les sauts tant que les calculs sont mis au point (séances d'essai en mer rares) :
     // fichier nommé d'après le journal de la séance (envoyé et supprimé avec lui)
     const brut = JournalSession.nom ? JournalSession.nom.replace(/\.jsonl$/, '') : null;
-    const r = await Natif.saut.demarrer(brut ? { brut } : {});
+    // règles kite en plus (l'aile porte pendant le saut) avec le profil Kite ou un profil dont le nom contient « kite »
+    const pa = profils[profilActif] || {}, kite = pa.ref === 'kite' || /kite/i.test(pa.nom || '');
+    const r = await Natif.saut.demarrer(brut ? { brut, kite } : { kite });
     ecouteSauts = await Natif.saut.addListener('saut', s => {
       // vitesse d'approche : la plus forte des 6 dernières secondes (on ralentit au décollage, surtout en strapless)
       const v = Math.max(fix ? fix.speed * 3.6 : 0, ...vitesses.map(x => x.v));
       s.v = Math.round(v);
-      if (!s.vrai) { JournalSession.ev('saut', { ...s, ecarte: 'hauteur' }); return; } // hauteur intégrée sous 1,2 m : pompage, clapot
+      if (!s.vrai) { JournalSession.ev('saut', { ...s, ecarte: 'hauteur' }); return; } // hauteur intégrée sous 1,2 m (kite : 1 m) : pompage, clapot
       if (v < 12) { JournalSession.ev('saut', { ...s, ecarte: 'vitesse' }); return; } // chute, marche, manipulation
       JournalSession.ev('saut', s);
       // annonce seulement au-dessus du seuil du profil, et jamais deux sauts à moins de 3 s (fausses détections en rafale)
@@ -678,7 +680,7 @@ async function demarrerSauts() {
     });
     // chocs sans phase allégée (candidats sauts de kite) : seulement notés au journal, au-dessus de 12 km/h, pour l'analyse
     ecouteChocs = await Natif.saut.addListener('choc', c => { const v = fix ? fix.speed * 3.6 : 0; if (v >= 12) JournalSession.ev('choc', { ...c, v: Math.round(v) }); });
-    JournalSession.ev('sauts', { actif: true, barometre: r.barometre, gravite: r.gravite, hz: r.hz, brut: r.brut || null, ...(r.erreurBrut ? { erreurBrut: r.erreurBrut } : {}) });
+    JournalSession.ev('sauts', { actif: true, barometre: r.barometre, gravite: r.gravite, orientation: r.orientation, kite: r.kite, hz: r.hz, brut: r.brut || null, ...(r.erreurBrut ? { erreurBrut: r.erreurBrut } : {}) });
   } catch (e) { JournalSession.ev('sauts', { actif: false, erreur: e.message }); }
 }
 

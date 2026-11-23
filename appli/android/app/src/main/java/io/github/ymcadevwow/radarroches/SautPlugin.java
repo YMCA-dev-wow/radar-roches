@@ -52,12 +52,24 @@ import java.util.zip.GZIPOutputStream;
  *  - plus de blocage de 3 s entre candidats (0,5 s) : un accroupi avant le pop pris pour un petit saut masquait la vraie
  *    réception 2,5 s plus tard ; l'espacement des annonces reste dans la page ;
  *  - historique de 20 s et courbes ré-échantillonnées sur le temps (le Pixel 7 livre ~120 Hz au lieu des 100 demandés).
+ * 24/11/2026 (séance kite du 22/11 avec données brutes et Woo : 14 sauts de 1,1 à 2,6 m, aucun retenu par les règles wing) :
+ *  - verticale en repère terrestre par l'orientation fusionnée (GAME_ROTATION_VECTOR, gyroscope + accéléromètre) au lieu de
+ *    la gravité estimée par Android, qui s'aligne sur la traction de l'aile ; repli sur TYPE_GRAVITY sans ce capteur ;
+ *  - règles kite (option « kite » de demarrer, profil Kite) en plus des règles wing : en kite l'aile porte, |a| ne descend
+ *    pas sous 0,6 g. Phase allégée = verticale moyenne sur 0,25 s sous 0,7 g pendant au moins 0,3 s, réception au-dessus de
+ *    1,6 g moins de 0,6 s après ; décollage = traction la plus forte (moyenne 0,1 s de |a|, au moins 1,4 g) dans les 4 s
+ *    avant la phase allégée ; vrai saut si hauteur intégrée >= 1,0 m (Woo 22/11 : 9 sauts sur 14 retrouvés, 6 faux).
  */
 @CapacitorPlugin(name = "Saut")
 public class SautPlugin extends Plugin implements SensorEventListener {
     private static final int HZ = 100, N = HZ * 20;                // 20 s d'historique à 100 Hz (au moins 10 s si le capteur va plus vite)
     private static final double H_VRAI = 1.2, POP = 1.3;            // m : hauteur intégrée d'un vrai saut ; g : fin du pop (décollage)
     private static final double G = 9.81, BAS = 0.6, PIC = 2.2, CHOC = 3.0;   // seuils en g
+    private static final double K_BAS = 0.7, K_PIC = 1.6, K_POP = 1.4, H_KITE = 1.0;   // règles kite (g, g, g, m)
+    private boolean kite = false, rotation = false;
+    private float qx = 0, qy = 0, qz = 0, qw = 1;   // orientation fusionnée (vecteur de rotation « jeu »)
+    private long debK = -1, finK = -1;
+    private final float[] acc10 = new float[N];      // moyenne de |a| sur 0,1 s (traction du décollage)
     private SensorManager sm; private HandlerThread fil; private Handler hFil; private boolean actif = false, gravite = false;
     private final float[] acc = new float[N], accV = new float[N]; private final long[] tAcc = new long[N]; private int nAcc = 0;
     private float gx = 0, gy = 0, gz = 0;   // gravité estimée par Android (repère du téléphone)
@@ -83,14 +95,18 @@ public class SautPlugin extends Plugin implements SensorEventListener {
             sm.registerListener(this, a, 1000000 / HZ, 0, h);
             if (gr != null) sm.registerListener(this, gr, 1000000 / HZ, 0, h);
             if (p != null) sm.registerListener(this, p, 40000, 0, h);
+            Sensor rv = sm.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR);
+            if (rv != null) sm.registerListener(this, rv, 20000, 0, h);   // verticale en repère terrestre (50 Hz)
             if (brut != null) {
-                Sensor gy = sm.getDefaultSensor(Sensor.TYPE_GYROSCOPE), rv = sm.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR);
+                Sensor gy = sm.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
                 if (gy != null) sm.registerListener(this, gy, 1000000 / HZ, 0, h);
-                if (rv != null) sm.registerListener(this, rv, 20000, 0, h);
             }
-            actif = true; gravite = gr != null; nAcc = 0; nAlt = 0; debutBas = -1; finBas = -1; nSauts = 0; dernierChoc = 0;
+            kite = Boolean.TRUE.equals(call.getBoolean("kite", false));
+            actif = true; gravite = gr != null || rv != null; rotation = false; nAcc = 0; nAlt = 0; debutBas = -1; finBas = -1;
+            debK = -1; finK = -1; nSauts = 0; dernierChoc = 0;
         }
         JSObject r = new JSObject(); r.put("barometre", p != null); r.put("gravite", gr != null); r.put("hz", HZ);
+        r.put("orientation", sm.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR) != null); r.put("kite", kite);
         if (nomBrut != null) r.put("brut", nomBrut);
         if (erreurBrut != null) r.put("erreurBrut", erreurBrut);
         call.resolve(r);
@@ -111,7 +127,12 @@ public class SautPlugin extends Plugin implements SensorEventListener {
         long t = System.currentTimeMillis();
         int ty = e.sensor.getType();
         if (brut != null) ecrireBrut(e, ty);
-        if (ty == Sensor.TYPE_GYROSCOPE || ty == Sensor.TYPE_GAME_ROTATION_VECTOR) return;   // seulement pour les données brutes
+        if (ty == Sensor.TYPE_GYROSCOPE) return;   // seulement pour les données brutes
+        if (ty == Sensor.TYPE_GAME_ROTATION_VECTOR) {
+            qx = e.values[0]; qy = e.values[1]; qz = e.values[2];
+            qw = e.values.length > 3 ? e.values[3] : (float) Math.sqrt(Math.max(0, 1 - qx * qx - qy * qy - qz * qz));
+            rotation = true; return;
+        }
         if (ty == Sensor.TYPE_PRESSURE) {
             int k = nAlt++ % N; tAlt[k] = t; alt[k] = SensorManager.getAltitude(SensorManager.PRESSURE_STANDARD_ATMOSPHERE, e.values[0]);
             return;
@@ -119,18 +140,23 @@ public class SautPlugin extends Plugin implements SensorEventListener {
         if (e.sensor.getType() == Sensor.TYPE_GRAVITY) { gx = e.values[0]; gy = e.values[1]; gz = e.values[2]; return; }
         float g = (float) (Math.sqrt(e.values[0] * e.values[0] + e.values[1] * e.values[1] + e.values[2] * e.values[2]) / G);
         double ng = Math.sqrt(gx * gx + gy * gy + gz * gz);
-        // composante verticale (vers le haut) de l'accélération ressentie, en g : 1 au repos, 0 en chute libre, > 0 si l'aile porte
-        float v = ng > 1 ? (float) ((e.values[0] * gx + e.values[1] * gy + e.values[2] * gz) / ng / G) : g;
+        // composante verticale (vers le haut) de l'accélération ressentie, en g : 1 au repos, 0 en chute libre, > 0 si l'aile porte.
+        // Repère terrestre par l'orientation fusionnée (3e ligne de la matrice de rotation) ; à défaut gravité estimée par Android
+        float v;
+        if (rotation) v = (float) ((2 * (qx * qz - qw * qy) * e.values[0] + 2 * (qy * qz + qw * qx) * e.values[1]
+                + (1 - 2 * (qx * qx + qy * qy)) * e.values[2]) / G);
+        else v = ng > 1 ? (float) ((e.values[0] * gx + e.values[1] * gy + e.values[2] * gz) / ng / G) : g;
         int k = nAcc++ % N; tAcc[k] = t; acc[k] = g; accV[k] = v;
         // phase allégée : moyenne glissante sur 0,1 s sous BAS
         double m = 0; int n = Math.min(HZ / 10, nAcc);
         for (int i = 0; i < n; i++) m += acc[(nAcc - 1 - i) % N];
-        m /= n;
+        m /= n; acc10[k] = (float) m;
+        if (kite && detecterKite(t, g)) return;
         if (m < BAS) { if (debutBas < 0) debutBas = t - 100; finBas = t; }
         else if (debutBas >= 0 && t - finBas > 400) debutBas = -1; // la phase allégée s'est terminée sans réception
         if (g > PIC && debutBas >= 0 && finBas - debutBas >= 300 && t - finBas < 400 && t - dernierSaut > 500) {
             final long t0 = decollage(debutBas), t1 = t; final double vol = (t1 - t0) / 1000.0;
-            if (vol < 4) hFil.postDelayed(() -> signaler(t0, t1, vol), 1000); // les rejetés partent aussi au journal
+            if (vol < 4) hFil.postDelayed(() -> signaler(t0, t1, vol, false), 1000); // les rejetés partent aussi au journal
             debutBas = -1; dernierSaut = t;
         } else if (g > CHOC && t - dernierChoc > 3000 && t - dernierSaut > 2000) { // choc sans phase allégée : candidat saut de kite
             dernierChoc = t; final long tc = t; final float pic = g;
@@ -152,11 +178,36 @@ public class SautPlugin extends Plugin implements SensorEventListener {
         return debut;
     }
 
-    private void signaler(long t0, long t1, double vol) {
-        double hi = hauteurIntegree(t0, t1); boolean vrai = hi >= H_VRAI;
+    // Règles kite : phase allégée sur la verticale (l'aile porte, |a| reste vers 1 g), réception plus douce, décollage = traction
+    // la plus forte des 4 s d'avant. Renvoie vrai si un candidat vient d'être pris (les règles wing ne regardent pas ce pic).
+    private boolean detecterKite(long t, float g) {
+        double mv = 0; int n = Math.min(HZ / 4, nAcc);
+        for (int i = 0; i < n; i++) mv += accV[(nAcc - 1 - i) % N];
+        mv /= n;
+        if (mv < K_BAS) { if (debK < 0 || t - finK > 150) debK = t - 250; finK = t; }
+        if (g > K_PIC && debK >= 0 && finK - debK >= 300 && t - finK < 600 && t - dernierSaut > 1000) {
+            long tPop = -1; float pop = 0; int n0 = Math.min(nAcc, N);
+            for (int i = 0; i < n0; i++) {
+                int kk = (nAcc - 1 - i) % N; long tk = tAcc[kk];
+                if (tk >= debK) continue;
+                if (tk < t - 4000) break;
+                if (acc10[kk] > pop) { pop = acc10[kk]; tPop = tk; }
+            }
+            debK = -1; dernierSaut = t;
+            if (tPop < 0 || pop < K_POP) return false;
+            final long t0 = tPop, t1 = t; final double vol = (t1 - t0) / 1000.0;
+            hFil.postDelayed(() -> signaler(t0, t1, vol, true), 1000);
+            debutBas = -1; return true;
+        }
+        return false;
+    }
+
+    private void signaler(long t0, long t1, double vol, boolean regleKite) {
+        double hi = hauteurIntegree(t0, t1); boolean vrai = hi >= (regleKite ? H_KITE : H_VRAI);
         if (vrai) nSauts++;
         JSObject o = new JSObject();
         o.put("vrai", vrai);
+        if (regleKite) o.put("regle", "kite");
         o.put("t", t1); o.put("vol", Math.round(vol * 100) / 100.0);
         o.put("h", Math.round(G * vol * vol / 8 * 10) / 10.0);
         // baromètre : altitude moyenne des 2 s avant le saut, puis maximum pendant le vol
@@ -169,7 +220,7 @@ public class SautPlugin extends Plugin implements SensorEventListener {
         if (nb > 0 && haut > -1e8) o.put("hBaro", Math.round((haut - base / nb) * 10) / 10.0);
         o.put("hInt", Math.round(hi * 10) / 10.0);
         ajouterCourbes(o, t0 - 2000, t1 + 1000, 2);
-        o.put("avant", 2.0); o.put("hz", HZ / 2); o.put("vertical", gravite);
+        o.put("avant", 2.0); o.put("hz", HZ / 2); o.put("vertical", gravite); o.put("repere", rotation ? "terrestre" : "gravite");
         ajouterBaro(o, t0, t0 - 2000, t1 + 1000);
         notifyListeners("saut", o);
     }

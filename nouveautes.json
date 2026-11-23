@@ -2,6 +2,15 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 61,
+      "date": "2026-11-24",
+      "titre": "Sauts de kite",
+      "points": [
+        "Sauts : verticale mesurée par l'orientation du téléphone (gyroscope), qui ne se laisse plus tromper par la traction de l'aile.",
+        "Profil Kite : règles de détection propres au kite (l'aile porte pendant le saut), saut compté à partir de 1 m. Réglage encore en essai : quelques faux sauts possibles."
+      ]
+    },
+    {
       "id": 60,
       "date": "2026-11-24",
       "titre": "Rejeu : fiche des sauts",
