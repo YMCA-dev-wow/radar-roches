@@ -166,6 +166,9 @@
   .tuiles b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; line-height: 1.15; }
   .tuiles b small { font-size: 13px; font-weight: 500; color: var(--muted); margin-left: 2px; }
   .tuiles span { font-size: 11px; color: var(--muted); }
+  .tuiles div[data-k] { cursor: pointer; position: relative; }
+  .tuiles div[data-k]::after { content: '›'; position: absolute; top: 5px; right: 8px; color: var(--muted); font-size: 15px; }
+  .tuiles div[data-k].on { border-color: var(--accent, #5ee6d6); }
   #sautsCorps canvas { width: 100%; display: block; border-radius: 8px; background: #0b1a1f; touch-action: manipulation; cursor: pointer; }
   #cTraj { height: 230px; } #cFil { height: 120px; } .fiche canvas.acc { height: 130px; margin-top: 8px; }
   #ficheVue { position: relative; overflow-x: clip; }
@@ -833,10 +836,11 @@ function dessinerSauts() {
   // meilleure série : le plus de sauts en 10 minutes
   let serie = 0, sT = 0; for (let i = 0, j = 0; i < n; i++) { while (sauts[i].t - sauts[j].t > 600e3) j++; if (i - j + 1 > serie) { serie = i - j + 1; sT = sauts[j].t; } }
   $('sautsSous').textContent = `${new Date(pts[0].t).toLocaleDateString('fr-FR')} · ${sauts[0].natif ? 'sauts Garmin' : sauts[0].courbe ? 'téléphone' : 'appli montre'}`;
-  const tuile = (v, u, l) => `<div><b>${v}<small>${u}</small></b><span>${l}</span></div>`;
+  // record (plus haut, plus long vol, plus loin) : un toucher choisit ce saut (trajectoire en blanc et sa fiche)
+  const tuile = (v, u, l, k) => `<div${k ? ` data-k="${k}" title="Voir ce saut"${sautSel === best(k) ? ' class="on"' : ''}` : ''}><b>${v}<small>${u}</small></b><span>${l}</span></div>`;
   $('sautsTuiles').innerHTML = tuile(n, '', 'sauts' + (dur > 0.2 ? ` · ${fr(n / dur, 0)}/h` : ''))
-    + tuile(fr(best('hc').hc), 'm', 'plus haut') + tuile(fr(best('vol').vol, 2), 's', 'plus long vol')
-    + tuile(Math.round(best('d').d), 'm', 'plus loin') + tuile(fr(tAir, 0), 's', 'en l\'air au total')
+    + tuile(fr(best('hc').hc), 'm', 'plus haut', 'hc') + tuile(fr(best('vol').vol, 2), 's', 'plus long vol', 'vol')
+    + tuile(Math.round(best('d').d), 'm', 'plus loin', 'd') + tuile(fr(tAir, 0), 's', 'en l\'air au total')
     + tuile(serie, '', serie > 1 ? `en 10 min dès ${new Date(sT).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : 'meilleure série');
   dessinerTraj(); detailSaut(); dessinerFil(); repartition(); classement(); dessinerMed();
 }
@@ -927,6 +931,15 @@ function sautTouche(c, e) {
   }
   return mieux && dm < 30 * k ? mieux : null;
 }
+$('sautsTuiles').onclick = e => {
+  const el = e.target.closest('[data-k]'); if (!el || !sauts.length) return;
+  const k = el.dataset.k; sautSel = sauts.reduce((a, b) => b[k] > a[k] ? b : a);
+  // plus long vol : axe en temps ; plus loin : axe en distance (le record se lit alors sur le graphique)
+  const ax = k === 'vol' ? 't' : k === 'd' ? 'd' : axeT;
+  if (ax !== axeT) { axeT = ax; try { localStorage.setItem('radar.sauts.axe', axeT); } catch {} majAxeT(); }
+  dessinerSauts(); dessinerMed();
+  $('cTraj').previousElementSibling.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
 $('cTraj').onclick = e => { const s = sautTouche($('cTraj'), e); if (s) { sautSel = s; dessinerSauts(); } };
 // vue « sauts » en grand : toucher une courbe affiche ses chiffres (en médaillon, le toucher garde son rôle)
 $('cMed').addEventListener('click', e => {

@@ -2,6 +2,14 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 62,
+      "date": "2026-11-24",
+      "titre": "Records des sauts",
+      "points": [
+        "Bilan des sauts : toucher « plus haut », « plus long vol » ou « plus loin » affiche ce saut, sa trajectoire et sa fiche (axe en temps pour le plus long vol, en distance pour le plus loin)."
+      ]
+    },
+    {
       "id": 61,
       "date": "2026-11-24",
       "titre": "Sauts de kite",
