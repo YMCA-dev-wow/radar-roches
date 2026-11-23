@@ -759,7 +759,7 @@ function ptA(t) { // position et vitesse interpolées à l'instant t (recherche 
 }
 function preparerSauts() {
   sautsLayer.clearLayers(); sautSel = null; sautsTous = false;
-  sauts = sautsJournal.filter(s => s.vol > 0 && s.h > 0).sort((a, b) => a.t - b.t).map((s, i) => {
+  sauts = sautsJournal.filter(s => s.vol > 0 && s.h > 0).sort((a, b) => a.t - b.t).map(rognerKite).map((s, i) => {
     const t0 = s.t - s.vol * 1000, p = ptA(t0 - 500);
     const v = s.vNat ?? Math.max(ptA(t0 - 1500).v, p.v); // vitesse d'approche (la trace ralentit souvent pendant le vol)
     const r = { ...s, n: i + 1, t0, v, d: s.dNat ?? v * s.vol, lat: p.lat, lon: p.lon };
@@ -803,6 +803,21 @@ function courbesMontre(s) {
 //    et à la réception ; a = composante verticale si connue, sinon norme (qui compte toute force comme portante : hauteur basse) ;
 //  - sinon, avec l'accélération moyenne en vol (montre) : h = (1 − a_moy)·g·t²/8 ;
 //  - sinon : chute libre g·t²/8.
+// Règles kite (24/11/2026) : le décollage retenu est la plus forte traction des 4 s d'avant, parfois une rafale ou un choc
+// 1 à 2 s avant le vrai départ. On le recule au début de la montée (dernier instant à moins de 10 % de la hauteur avant le
+// sommet du profil intégré) ; l'appli le fait elle-même depuis la construction 111 (champ « montee »).
+function rognerKite(s) {
+  const c = s.courbeV; if (s.regle !== 'kite' || s.montee || !c || c.length < 10) return s;
+  const hz = s.hz || 50, av = s.avant ?? 2, i0 = Math.round(av * hz), i1 = Math.min(c.length - 1, i0 + Math.round(s.vol * hz)), dt = 1 / hz;
+  if (i1 - i0 < 5) return s;
+  const z = [0]; let vz = 0, zz = 0;
+  for (let i = i0 + 1; i <= i1; i++) { vz += 9.81 * (c[i] - 1) * dt; zz += vz * dt; z.push(zz); }
+  const v0 = -z[z.length - 1] / ((i1 - i0) * dt), p = z.map((v, k) => v + v0 * k * dt), h = Math.max(...p);
+  let k = p.indexOf(h); while (k > 0 && p[k] > 0.1 * h) k--;
+  if (h <= 0 || k <= 0) return s;
+  const vol = s.vol - k * dt;
+  return { ...s, avant: av + k * dt, vol, h: Math.round(9.81 * vol * vol / 8 * 10) / 10 };
+}
 function hauteurCorrigee(s) {
   s.hLibre = s.h; s.hc = s.h; s.calc = 'chute libre';
   const c = s.courbeV || s.courbe;

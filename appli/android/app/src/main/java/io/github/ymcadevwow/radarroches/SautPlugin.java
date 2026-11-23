@@ -59,6 +59,9 @@ import java.util.zip.GZIPOutputStream;
  *    pas sous 0,6 g. Phase allégée = verticale moyenne sur 0,25 s sous 0,7 g pendant au moins 0,3 s, réception au-dessus de
  *    1,6 g moins de 0,6 s après ; décollage = traction la plus forte (moyenne 0,1 s de |a|, au moins 1,4 g) dans les 4 s
  *    avant la phase allégée ; vrai saut si hauteur intégrée >= 1,0 m (Woo 22/11 : 9 sauts sur 14 retrouvés, 6 faux).
+ *    Ce pic n'est pas toujours l'impulsion du saut (rafale, carre, clapot) : le décollage est ensuite reculé au début de la
+ *    montée (dernier instant à moins de 10 % de la hauteur avant le sommet), sinon temps de vol et distance comptent 1 à 2 s
+ *    passées sur l'eau.
  */
 @CapacitorPlugin(name = "Saut")
 public class SautPlugin extends Plugin implements SensorEventListener {
@@ -203,11 +206,12 @@ public class SautPlugin extends Plugin implements SensorEventListener {
     }
 
     private void signaler(long t0, long t1, double vol, boolean regleKite) {
+        if (regleKite) { t0 = debutMontee(t0, t1); vol = (t1 - t0) / 1000.0; }
         double hi = hauteurIntegree(t0, t1); boolean vrai = hi >= (regleKite ? H_KITE : H_VRAI);
         if (vrai) nSauts++;
         JSObject o = new JSObject();
         o.put("vrai", vrai);
-        if (regleKite) o.put("regle", "kite");
+        if (regleKite) { o.put("regle", "kite"); o.put("montee", true); }
         o.put("t", t1); o.put("vol", Math.round(vol * 100) / 100.0);
         o.put("h", Math.round(G * vol * vol / 8 * 10) / 10.0);
         // baromètre : altitude moyenne des 2 s avant le saut, puis maximum pendant le vol
@@ -263,6 +267,24 @@ public class SautPlugin extends Plugin implements SensorEventListener {
             b.put((Object) q);
         }
         o.put("baro", b);
+    }
+
+    // Début de la montée : dernier instant avant le sommet où le profil intégré est sous 10 % de la hauteur (règles kite)
+    private long debutMontee(long t0, long t1) {
+        int n0 = Math.min(nAcc, N); double[] zs = new double[n0]; long[] ts = new long[n0]; int n = 0;
+        double vz = 0, z = 0; long tp = -1;
+        for (int i = n0 - 1; i >= 0; i--) {
+            int k = (nAcc - 1 - i) % N;
+            if (tAcc[k] < t0 || tAcc[k] > t1) continue;
+            if (tp >= 0) { double dt = (tAcc[k] - tp) / 1000.0; vz += G * (accV[k] - 1) * dt; z += vz * dt; }
+            tp = tAcc[k]; zs[n] = z; ts[n] = tAcc[k]; n++;
+        }
+        if (n < 2 || ts[n - 1] <= ts[0]) return t0;
+        double v0 = -zs[n - 1] / ((ts[n - 1] - ts[0]) / 1000.0), h = -1; int ip = 0;
+        for (int i = 0; i < n; i++) { zs[i] += v0 * (ts[i] - ts[0]) / 1000.0; if (zs[i] > h) { h = zs[i]; ip = i; } }
+        if (h <= 0) return t0;
+        for (int i = ip; i >= 0; i--) if (zs[i] <= 0.1 * h) return ts[i];
+        return t0;
     }
 
     // Hauteur par double intégration de g·(a_vert − 1) sur le vol, vitesse de départ choisie pour que z(fin) = 0

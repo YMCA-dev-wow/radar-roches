@@ -2,6 +2,14 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 63,
+      "date": "2026-11-24",
+      "titre": "Sauts de kite : décollage",
+      "points": [
+        "Sauts de kite : le décollage est pris au début de la montée, et non plus sur une traction 1 à 2 s avant ; temps en l'air et distance ne comptent plus ce passage sur l'eau (journaux déjà enregistrés compris)."
+      ]
+    },
+    {
       "id": 62,
       "date": "2026-11-24",
       "titre": "Records des sauts",
