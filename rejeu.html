@@ -160,26 +160,27 @@
   #axeTraj { float: right; display: inline-flex; background: var(--p2); border-radius: 8px; padding: 2px; text-transform: none; letter-spacing: 0; margin-top: -3px; }
   #axeTraj button { border: 0; background: none; color: var(--muted); font-size: 12px; padding: 3px 9px; border-radius: 6px; }
   #axeTraj button.on { background: var(--bg); color: var(--accent); }
-  #sautsPan h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 16px 0 6px; font-weight: 600; }
+  #sautsCorps h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 16px 0 6px; font-weight: 600; }
   .tuiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
   .tuiles div { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 7px 8px; }
   .tuiles b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; line-height: 1.15; }
   .tuiles b small { font-size: 13px; font-weight: 500; color: var(--muted); margin-left: 2px; }
   .tuiles span { font-size: 11px; color: var(--muted); }
-  #sautsPan canvas { width: 100%; display: block; border-radius: 8px; background: #0b1a1f; touch-action: manipulation; cursor: pointer; }
-  #cTraj { height: 230px; } #cFil { height: 120px; } #cAcc { height: 130px; margin-top: 8px; }
-  #sautDetail { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-top: 10px; }
-  #sautDetail .titre { display: flex; align-items: baseline; gap: 8px; } #sautDetail .titre b { font-size: 15px; }
-  #sautDetail .titre button { margin-left: auto; padding: 4px 10px; font-size: 13px; }
-  #sautDetail .vals { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 6px; }
-  #sautDetail .vals b { font-size: 20px; font-variant-numeric: tabular-nums; } #sautDetail .vals small { display: block; color: var(--muted); font-size: 11px; }
+  #sautsCorps canvas { width: 100%; display: block; border-radius: 8px; background: #0b1a1f; touch-action: manipulation; cursor: pointer; }
+  #cTraj { height: 230px; } #cFil { height: 120px; } .fiche canvas.acc { height: 130px; margin-top: 8px; }
+  #ficheVue { position: relative; overflow-x: clip; }
+  .fiche { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-top: 10px; }
+  .fiche .titre { display: flex; align-items: baseline; gap: 8px; } .fiche .titre b { font-size: 15px; }
+  .fiche .titre button { margin-left: auto; padding: 4px 10px; font-size: 13px; }
+  .fiche .vals { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 6px; }
+  .fiche .vals b { font-size: 20px; font-variant-numeric: tabular-nums; } .fiche .vals small { display: block; color: var(--muted); font-size: 11px; }
   #sautsListe { list-style: none; margin: 0; padding: 0; }
   #sautsListe li { display: grid; grid-template-columns: 30px 1fr auto; gap: 8px; align-items: center; padding: 6px 4px; border-bottom: 1px solid var(--line); cursor: pointer; font-variant-numeric: tabular-nums; }
   #sautsListe li.sel { background: #12333a; } #sautsListe li .rang { text-align: center; color: var(--muted); }
   #sautsListe li .barre { height: 6px; border-radius: 3px; background: var(--accent); margin-top: 3px; }
   #sautsListe li small { color: var(--muted); }
-  #sautsPan .note { color: var(--muted); font-size: 12px; margin-top: 14px; }
-  #sautsPan .plus { width: 100%; margin-top: 6px; }
+  #sautsCorps .note { color: var(--muted); font-size: 12px; margin-top: 14px; }
+  #sautsCorps .plus { width: 100%; margin-top: 6px; }
   .repart { display: grid; grid-template-columns: 70px 1fr 26px; gap: 4px 8px; align-items: center; font-size: 12px; color: var(--muted); }
   .repart i { display: block; height: 10px; border-radius: 0 4px 4px 0; background: var(--accent); min-width: 2px; }
   .repart b { color: var(--text); text-align: right; font-weight: 500; }
@@ -315,7 +316,7 @@
   <div class="tuiles" id="sautsTuiles"></div>
   <h3>Trajectoires superposées<span id="axeTraj"><button data-a="d">distance</button><button data-a="t">temps</button></span></h3>
   <canvas id="cTraj" title="Touche une trajectoire pour la choisir"></canvas>
-  <div id="sautDetail"></div>
+  <div id="ficheVue"><div id="sautDetail" class="fiche"></div></div>
   <h3>Au fil de la séance</h3>
   <canvas id="cFil" title="Touche un saut pour le choisir"></canvas>
   <h3>Répartition des hauteurs</h3>
@@ -935,14 +936,17 @@ $('cMed').addEventListener('click', e => {
 });
 
 // Détail du saut choisi (+ courbe d'accélération pour le téléphone)
+function ficheHTML(s) {
+  const rang = [...sauts].sort((a, b) => b.hc - a.hc).indexOf(s) + 1;
+  return `<div class="titre"><b>Saut ${s.n}</b><span class="sub">${heure(s.t0)} · ${rang === 1 ? 'le plus haut' : rang + 'e plus haut'}</span><button id="sautVoir">▶ Revoir</button></div>
+    <div class="vals"><span><b>${fr(s.hc)} m</b><small>hauteur</small></span><span><b>${fr(s.vol, 2)} s</b><small>en l'air</small></span><span><b>${Math.round(s.d)} m</b><small>distance</small></span>
+    <span><b>${fr(s.v * 1.944)} nd</b><small>${Math.round(s.v * 3.6)} km/h au décollage</small></span>${s.rot ? `<span><b>${s.rot}</b><small>rotation(s)</small></span>` : ''}</div>
+    ${s.courbe ? `<canvas class="acc"></canvas><div class="sub">Accélération ressentie par ${s.montre ? 'la montre' : 'le téléphone'} (g) : blanc = norme${s.courbeV ? ', turquoise = verticale' + (s.vertical === 'estimée' ? ' (estimée)' : '') : ''}. En l'air, elle tombe vers 0 si rien ne porte ; ce qui reste au-dessus de 0 est la portance de l'aile. Pic à la réception.</div>` : ''}`;
+}
 function detailSaut() {
   const s = sautSel, el = $('sautDetail'); if (!s) { el.hidden = true; return; }
   el.hidden = false;
-  const rang = [...sauts].sort((a, b) => b.hc - a.hc).indexOf(s) + 1;
-  el.innerHTML = `<div class="titre"><b>Saut ${s.n}</b><span class="sub">${heure(s.t0)} · ${rang === 1 ? 'le plus haut' : rang + 'e plus haut'}</span><button id="sautVoir">▶ Revoir</button></div>
-    <div class="vals"><span><b>${fr(s.hc)} m</b><small>hauteur</small></span><span><b>${fr(s.vol, 2)} s</b><small>en l'air</small></span><span><b>${Math.round(s.d)} m</b><small>distance</small></span>
-    <span><b>${fr(s.v * 1.944)} nd</b><small>${Math.round(s.v * 3.6)} km/h au décollage</small></span>${s.rot ? `<span><b>${s.rot}</b><small>rotation(s)</small></span>` : ''}</div>
-    ${s.courbe ? `<canvas id="cAcc"></canvas><div class="sub">Accélération ressentie par ${s.montre ? 'la montre' : 'le téléphone'} (g) : blanc = norme${s.courbeV ? ', turquoise = verticale' + (s.vertical === 'estimée' ? ' (estimée)' : '') : ''}. En l'air, elle tombe vers 0 si rien ne porte ; ce qui reste au-dessus de 0 est la portance de l'aile. Pic à la réception.</div>` : ''}`;
+  el.innerHTML = ficheHTML(s);
   $('sautVoir').onclick = () => {
     if ($('sautsCorps').parentNode === $('sautsPan')) $('sautsPan').hidden = innerWidth < 800; // sur téléphone on referme pour voir la carte
     if (innerWidth < 800) $('fResume').hidden = true;
@@ -951,32 +955,57 @@ function detailSaut() {
     seek(s.t0 - 5000); map.setView([s.lat, s.lon], Math.max(map.getZoom(), 17));
     if (!playing) { $('speed').value = '1'; togglePlay(true); }
   };
-  if (s.courbe) dessinerAcc(s);
+  if (s.courbe) dessinerAcc(s, el.querySelector('canvas.acc'));
 }
-// fiche du saut : glisser à gauche = saut suivant, à droite = précédent (dans l'ordre de la séance)
+// fiche du saut : glisser à gauche = saut suivant, à droite = précédent (dans l'ordre de la séance) ;
+// pendant le geste, les fiches voisines sont posées de part et d'autre et suivent le doigt
 {
-  const el = $('sautDetail'); let x0 = null, y0 = null, axe = null, dx = 0;
+  const el = $('sautDetail'), vue = $('ficheVue'), ECART = 12, DUREE = 220;
+  let x0 = null, y0 = null, axe = null, dx = 0, voisins = [], anime = false;
+  const pas = () => el.offsetWidth + ECART;
+  const poser = (d, doux) => {
+    const tr = doux ? `transform ${DUREE}ms ease-out` : 'none';
+    el.style.transition = tr; el.style.transform = `translateX(${d}px)`;
+    voisins.forEach(v => { v.el.style.transition = tr; v.el.style.transform = `translateX(${d + v.sens * pas()}px)`; });
+  };
+  const creerVoisins = () => {
+    const i = sauts.indexOf(sautSel), w = el.offsetWidth;
+    voisins = [[-1, i - 1], [1, i + 1]].filter(([, j]) => j >= 0 && j < sauts.length).map(([sens, j]) => {
+      const v = document.createElement('div'); v.className = 'fiche';
+      v.style.cssText = `position:absolute;left:0;top:0;width:${w}px;box-sizing:border-box;pointer-events:none;transform:translateX(${sens * pas()}px)`;
+      v.innerHTML = ficheHTML(sauts[j]); vue.append(v);
+      const c = v.querySelector('canvas.acc'); if (c) dessinerAcc(sauts[j], c);
+      v.querySelectorAll('[id]').forEach(x => x.removeAttribute('id'));
+      return { el: v, sens };
+    });
+  };
+  const oter = () => { voisins.forEach(v => v.el.remove()); voisins = []; el.style.transition = 'none'; el.style.transform = ''; };
   el.style.touchAction = 'pan-y';
-  el.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; axe = null; dx = 0; }, { passive: true });
+  el.addEventListener('touchstart', e => { if (anime) return; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; axe = null; dx = 0; }, { passive: true });
   el.addEventListener('touchmove', e => {
     if (x0 == null) return;
     const ddx = e.touches[0].clientX - x0, ddy = e.touches[0].clientY - y0;
-    if (!axe && Math.hypot(ddx, ddy) > 8) axe = Math.abs(ddx) > Math.abs(ddy) && sauts.length > 1 ? 'lat' : 'autre';
+    if (!axe && Math.hypot(ddx, ddy) > 8) { axe = Math.abs(ddx) > Math.abs(ddy) && sauts.length > 1 ? 'lat' : 'autre'; if (axe === 'lat') creerVoisins(); }
     if (axe !== 'lat') return;
-    e.preventDefault(); dx = ddx; el.style.transition = 'none'; el.style.transform = `translateX(${dx}px)`; el.style.opacity = 1 - Math.min(0.6, Math.abs(dx) / 400);
+    e.preventDefault();
+    const i = sauts.indexOf(sautSel), bout = (ddx > 0 && i === 0) || (ddx < 0 && i === sauts.length - 1);
+    dx = bout ? ddx * 0.3 : ddx; poser(dx, false);   // résistance au premier / dernier saut
   }, { passive: false });
   const fin = () => {
     if (axe === 'lat') {
       const i = sauts.indexOf(sautSel), j = i + (dx < -50 ? 1 : dx > 50 ? -1 : 0);
-      el.style.transition = 'transform .2s, opacity .2s'; el.style.transform = ''; el.style.opacity = '';
-      if (j !== i && j >= 0 && j < sauts.length) { sautSel = sauts[j]; dessinerSauts(); }
+      anime = true;
+      if (j !== i && j >= 0 && j < sauts.length) {
+        poser((i - j) * pas(), true);
+        setTimeout(() => { sautSel = sauts[j]; oter(); dessinerSauts(); anime = false; }, DUREE);
+      } else { poser(0, true); setTimeout(() => { oter(); anime = false; }, DUREE); }
     }
     x0 = null; axe = null;
   };
   el.addEventListener('touchend', fin); el.addEventListener('touchcancel', fin);
 }
-function dessinerAcc(s) {
-  const { g, k, W, H } = toile($('cAcc')), c = s.courbe, dt = 1 / (s.hz || 25), av = s.avant ?? 2; // depuis « avant » s avant le décollage
+function dessinerAcc(s, cv) {
+  const { g, k, W, H } = toile(cv), c = s.courbe, dt = 1 / (s.hz || 25), av = s.avant ?? 2; // depuis « avant » s avant le décollage
   const tmin = -av, tmax = c.length * dt - av, amax = Math.min(6, Math.max(2.5, ...c) * 1.05);
   const L0 = 28 * k, R0 = W - 6 * k, B0 = H - 18 * k, T0 = 6 * k;
   const X = t => L0 + (t - tmin) / (tmax - tmin) * (R0 - L0), Y = a => B0 - a / amax * (B0 - T0);

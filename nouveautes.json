@@ -2,6 +2,15 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 60,
+      "date": "2026-11-24",
+      "titre": "Rejeu : fiche des sauts",
+      "points": [
+        "Bilan des sauts dans le bandeau du bas : les trajectoires tiennent de nouveau dans la largeur du graphique.",
+        "Fiche d'un saut : en glissant, la fiche du saut voisin apparaît à côté et suit le doigt."
+      ]
+    },
+    {
       "id": 59,
       "date": "2026-11-23",
       "titre": "Sauts en fonction du temps, rafale max",
