@@ -372,20 +372,20 @@ const DangerLayer = L.GridLayer.extend({
     Promise.all(srcs.map(([x, y]) => loadTile(x, y))).then(() => {
       const g = tile.getContext('2d'), img = g.createImageData(256, 256), o = img.data;
       const lvlOf = (d, i) => {
-        const Rc = d[i]; if (Rc === 0 || Rc === 255) return 0;
-        if (!(Rc === 254 || d[i + 1] * meta.pas_relief >= 0.30) && !smooth) return 0;
-        const eau = Wmap - (Rc === 254 ? 99 : meta.cote_min + (Rc - 1) * meta.pas_cote);
+        const Rc = d[i]; if (Rc === 0 || Rc === 255 || Rc === 254) return 0;   // terre (au-dessus de 20 m) : déjà sur le fond de carte
+        if (d[i + 1] * meta.pas_relief < 0.30 && !smooth) return 0;
+        const eau = Wmap - (meta.cote_min + (Rc - 1) * meta.pas_cote);
         return eau < 0 ? 3 : eau < seuil ? 2 : eau < seuil + 1 ? 1 : 0;
       };
       const RGB = [null, [255, 159, 10], [255, 59, 48], [0, 0, 0]]; // émergé : noir
       for (let v = 0; v < 256; v++) for (let u = 0; u < 256; u++) {
         let lvl = 0;
         if (z >= Z) {
-          const d = tiles.get(srcs[0][0] + '/' + srcs[0][1]); if (!d) continue;
+          const d = tiles.get(srcs[0][0] + '/' + srcs[0][1]); if (!d || d instanceof Promise) continue;
           const ox = (coords.x % f) * 256 / f, oy = (coords.y % f) * 256 / f;
           lvl = lvlOf(d, (Math.floor(oy + v / f) * 256 + Math.floor(ox + u / f)) * 4);
         } else {
-          const k = (v >> 7) * 2 + (u >> 7), d = tiles.get(srcs[k][0] + '/' + srcs[k][1]); if (!d) continue;
+          const k = (v >> 7) * 2 + (u >> 7), d = tiles.get(srcs[k][0] + '/' + srcs[k][1]); if (!d || d instanceof Promise) continue;
           const su = (u % 128) * 2, sv = (v % 128) * 2;
           for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) lvl = Math.max(lvl, lvlOf(d, ((sv + a) * 256 + su + b) * 4));
         }
@@ -405,7 +405,7 @@ const boat = L.circleMarker([0, 0], { radius: 7, color: '#fff', weight: 2, fillC
 // Trace
 // =====================================================================
 let pts = [], dernierGPX = null, notifs = [];       // { t, lat, lon, v (m/s), cap (°), W, lvl, best }
-let tMeasured = null; // fonction (marégraphe g, t) -> hauteur mesurée, si disponible
+let mesZ = {}, infoZ = {}; // par zone traversée : fonction (marégraphe g, t) -> hauteur mesurée (null sans mesure), résumé
 
 let sansHeure = false;
 // Lecture des fichiers : traces.js (commun avec la liste des séances)
@@ -423,22 +423,38 @@ function appliquerReglagesJournal() {
 function hauteurAt(p) {
   const mode = $('tideMode').value;
   if (mode === 'forcee') return +$('forceH').value;
-  if (mode === 'mesure' && tMeasured) return niveauEau(p.lon, p.t, tMeasured, p.lat);
+  const tm = zone && mesZ[zone.id];
+  if (mode === 'mesure' && tm) return niveauEau(p.lon, p.t, tm, p.lat);
   return niveauEau(p.lon, p.t, undefined, p.lat);
 }
 
-async function chargerMaree() {
-  tMeasured = null;
-  if (!pts.length) return;
-  activerZone(zonePour(pts[0].lat, pts[0].lon)); // zone de la trace : marée, ports et tuiles
-  const a = pts[0].t - 3600e3, b = pts[pts.length - 1].t + 3600e3;
-  const mode = $('tideMode').value;
-  $('forceRow').hidden = mode !== 'forcee';
-  if (mode === 'mesure') {
+// Zones traversées par la trace, en tronçons [{ z, i0, i1 }] : la zone en cours est gardée tant que son relief couvre le
+// point (à 2 tuiles près, pas d'aller-retour à la frontière) ; on ne change que pour une zone dont le relief le couvre.
+// Une traversée (Saint-Malo → Saint-Quay) passe ainsi d'une zone à l'autre ; au spot, un seul tronçon.
+function zonesTrace() {
+  const couvre = (z, x, y) => { const T = tuilesZone(z); if (!T) return false; for (let dx = -2; dx <= 2; dx++) for (let dy = -2; dy <= 2; dy++) if (T.has((x + dx) + '/' + (y + dy))) return true; return false; };
+  const seg = []; let zc = null;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    if (!zc || i % 10 === 0) {
+      const [px, py] = toPx(p.lat, p.lon), x = Math.floor(px / 256), y = Math.floor(py / 256);
+      if (!zc) zc = zonePour(p.lat, p.lon);
+      else if (!couvre(zc, x, y)) { const z = zonePour(p.lat, p.lon); if (z && couvre(z, x, y)) zc = z; }
+    }
+    if (!seg.length || seg[seg.length - 1].z !== zc) seg.push({ z: zc, i0: i, i1: i }); else seg[seg.length - 1].i1 = i;
+  }
+  return seg;
+}
+// Active une zone de la trace (marée, ports, relief) et, en mode « mesurée », lit une fois ses marégraphes
+async function mareeZone(z, a, b) {
+  activerZone(z);
+  if ($('tideMode').value !== 'mesure' || z.id in mesZ) return;
+  mesZ[z.id] = null;
+  {
     // mesures de chaque marégraphe de la zone ; un marégraphe sans mesure reprend sa prédiction corrigée de l'écart des autres
     const series = await Promise.all(zone.jauges.map((j, g) => lireMaregraphe(a, b, 10, g).catch(() => [])));
     const ok = series.map(m => m.length >= 6);
-    if (!ok.some(Boolean)) { $('tideInfo').textContent = 'Marégraphe injoignable : prédiction utilisée.'; return; }
+    if (!ok.some(Boolean)) { infoZ[z.id] = `${z.nom} : marégraphe injoignable, prédiction utilisée`; return; }
     const ecarts = series.map((m, g) => ok[g] ? m.reduce((s, x) => s + x.h - hJauge(g, x.t), 0) / m.length : null);
     const vus = ecarts.filter(e => e != null), ecartMoyen = vus.reduce((s, e) => s + e, 0) / vus.length;
     const interp = (m, t) => { // interpolation linéaire
@@ -447,12 +463,31 @@ async function chargerMaree() {
       while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (m[mid].t <= t) lo = mid; else hi = mid; }
       return m[lo].h + (t - m[lo].t) / (m[hi].t - m[lo].t) * (m[hi].h - m[lo].h);
     };
-    tMeasured = (g, t) => ok[g] ? interp(series[g], t) : hJauge(g, t) + ecartMoyen;
-    $('tideInfo').textContent = 'Hauteurs mesurées (zone ' + zone.nom + ') : ' + zone.jauges.map((j, g) => ok[g]
+    mesZ[z.id] = (g, t) => ok[g] ? interp(series[g], t) : hJauge(g, t) + ecartMoyen;
+    infoZ[z.id] = 'Hauteurs mesurées (zone ' + z.nom + ') : ' + z.jauges.map((j, g) => ok[g]
       ? `${j.nom} ${series[g].length} mesures, écart moyen avec la prédiction ${ecarts[g] >= 0 ? '+' : ''}${ecarts[g].toFixed(2)} m`
-      : `${j.nom} sans mesure (prédiction corrigée)`).join(' ; ') + '.';
-  } else $('tideInfo').textContent = mode === 'prevue' ? `Prédiction du modèle (zone ${zone.nom}, sans effet météo).` : '';
+      : `${j.nom} sans mesure (prédiction corrigée)`).join(' ; ');
+  }
 }
+function majInfoMaree(segs) {
+  const mode = $('tideMode').value, zs = [...new Set(segs.map(s => s.z))];
+  $('tideInfo').textContent = mode === 'mesure' ? zs.map(z => infoZ[z.id]).filter(Boolean).join('. ') + '.'
+    : mode === 'prevue' ? `Prédiction du modèle (zone${zs.length > 1 ? 's' : ''} ${zs.map(z => z.nom).join(', ')}, sans effet météo).` : '';
+}
+// Zone affichée sur la carte : celle du centre (comme le repérage) ; marée, ports et relief la suivent.
+// Pas pendant le calcul, qui active lui-même les zones de la trace l'une après l'autre.
+let calcEnCours = false;
+function zoneCarte() {
+  if (calcEnCours || !ZONES.length || !pts.length) return false;
+  const c = map.getCenter(); return activerZone(zonePour(c.lat, c.lng));
+}
+// hauteur d'eau du calque des roches : au centre de la carte, dans la zone affichée
+function majWmap() {
+  if (!pts.length || !zone || pts[0].W == null) return;
+  const c = map.getCenter(), W = hauteurAt({ lat: c.lat, lon: c.lng, t: cur });
+  if (Wmap == null || Math.abs(W - Wmap) > 0.1) { Wmap = W; danger.redraw(); }
+}
+map.on('moveend', () => { if (!pts.length || pts[0].W == null) return; if (zoneCarte()) { Wmap = null; rendre(); } else majWmap(); });
 
 function opts(affichage) {
   return { seuil: +$('seuil').value, smooth: $('smooth').checked, antic: +$('antic').value, roches: mesRoches, affichage, preAlerte: $('preAlerte').checked, veille: $('veille').checked,
@@ -464,24 +499,32 @@ async function calculer() {
   if (!pts.length) return;
   const token = ++calcToken;
   busy('Préparation…');
-  await chargerMaree();
-  // tuiles nécessaires (trace + 300 m)
-  const need = new Set();
-  for (const p of pts) {
-    const [px, py] = toPx(p.lat, p.lon), r = 300 / mPerPx(p.lat);
-    for (const dx of [-r, 0, r]) for (const dy of [-r, 0, r]) need.add(Math.floor((px + dx) / 256) + '/' + Math.floor((py + dy) / 256));
-  }
-  busy(`Chargement du relevé (${need.size} tuiles)…`);
-  await Promise.all([...need].map(k => { const [x, y] = k.split('/').map(Number); return loadTile(x, y); }));
+  calcEnCours = true; mesZ = {}; infoZ = {};
+  $('forceRow').hidden = $('tideMode').value !== 'forcee';
+  const segs = zonesTrace(), ta = pts[0].t - 3600e3, tb = pts[pts.length - 1].t + 3600e3;
   const vmin = +$('vmin').value / 3.6, o = opts(false), etatVeille = {};
   notifs = [];
   const etatR = { actif: true }, envoi = (titre, texte, t) => notifs.push({ t, titre, texte });
   // marée des messages : prédiction (comme sur l'eau), les mesures ne couvrant que la durée de la session
   const niv = p => $('tideMode').value === 'forcee' ? () => +$('forceH').value : tt => niveauEau(p.lon, tt, undefined, p.lat);
-  relaisDemarrer(pts[0].t, niv(pts[0]), $('seuil').value, '', etatR, envoi);
-  for (let i = 0; i < pts.length; i++) {
+  // une zone à la fois (une seule zone active : marée, ports, relief), dans l'ordre de la trace
+  for (const [s, S] of segs.entries()) {
+  await mareeZone(S.z, ta, tb);
+  if (token !== calcToken) return;
+  // tuiles nécessaires (tronçon + 300 m)
+  const need = new Set();
+  for (let i = S.i0; i <= S.i1; i++) {
+    const p = pts[i], [px, py] = toPx(p.lat, p.lon), r = 300 / mPerPx(p.lat);
+    for (const dx of [-r, 0, r]) for (const dy of [-r, 0, r]) need.add(Math.floor((px + dx) / 256) + '/' + Math.floor((py + dy) / 256));
+  }
+  busy(segs.length > 1 ? `Zone ${S.z.nom} : chargement du relevé (${need.size} tuiles)…` : `Chargement du relevé (${need.size} tuiles)…`);
+  await Promise.all([...need].map(k => { const [x, y] = k.split('/').map(Number); return loadTile(x, y); }));
+  if (token !== calcToken) return;
+  if (s === 0) relaisDemarrer(pts[0].t, niv(pts[0]), $('seuil').value, '', etatR, envoi);
+  for (let i = S.i0; i <= S.i1; i++) {
     if (token !== calcToken) return;
     const p = pts[i];
+    p._z = S.z;
     p.W = hauteurAt(p);
     const f = fondA(p.lat, p.lon); p.nature = f && f.nature;
     p.prof = !f ? null : f.cote === -Infinity ? Infinity : p.W - f.cote; // Infinity : plus profond que le relevé
@@ -495,7 +538,10 @@ async function calculer() {
     p.veille = nouvelleVeille(etatVeille, an, p.v >= vmin, p.t);
     if (i % 1500 === 0) { busy(`Analyse ${Math.round(100 * i / pts.length)} %…`); await new Promise(r => setTimeout(r, 0)); }
   }
+  }
+  majInfoMaree(segs);
   busy(null);
+  calcEnCours = false; if (zoneCarte()) Wmap = null;
   dessinerTrace(); listerEvenements(); dessinerFrise(); seek(cur);
 }
 function busy(txt) { $('busy').hidden = !txt; if (txt) $('busy').textContent = txt; }
@@ -1115,10 +1161,12 @@ function seek(t) {
 }
 function rendre(sonner = false) {
   fix = etatA(cur);
-  const W = hauteurAt(fix);
-  if (Wmap == null || Math.abs(W - Wmap) > 0.1) { Wmap = W; danger.redraw(); }
+  // rider hors de la zone affichée (carte déplacée vers une autre zone) : hauteur et menace calculées pour sa zone
+  const pz = pts[fix.i]._z, ici = !pz || pz === zone;
+  const W = ici || pts[fix.i].W == null ? hauteurAt(fix) : pts[fix.i].W;
+  majWmap();
   analysis = analyser(fix, fix.course, fix.speed, W, opts(true));
-  const armed = fix.speed >= +$('vmin').value / 3.6, b = analysis.best;
+  const armed = fix.speed >= +$('vmin').value / 3.6, b = analysis.best || (ici ? null : pts[fix.i].best);
   const pr = analysis.pre;
   $('msg').textContent = b ? texteMenace(b) + (armed ? '' : ' (sous la vitesse d\'alerte)') : pr ? textePre(pr) : analysis.lat ? texteVeille(analysis.lat) : '';
   $('msg').classList.toggle('alert', !!(b && armed));
@@ -1505,8 +1553,8 @@ async function chargerVent() {
   idVent = seanceCourante ? seanceCourante.id : (contenusCourants.length === 1 ? contenusCourants[0].src : null);
   ventCourant = idVent ? Vent.courant(idVent) : null; majVent();
   if (!idVent || !pts.length) return;
-  let la = 0, lo = 0; for (const p of pts) { la += p.lat; lo += p.lon; } la /= pts.length; lo /= pts.length;
-  try { await Vent.arome(idVent, la, lo, pts[0].t, pts[pts.length - 1].t); ventCourant = Vent.courant(idVent); majVent(); }
+  // au spot : milieu de la trace ; traversée : repères le long de la trace (vent à la position du rider) — vent.js
+  try { await Vent.arome(idVent, pts.map(p => ({ lat: p.lat, lon: p.lon, t: p.t })), pts[0].t, pts[pts.length - 1].t); ventCourant = Vent.courant(idVent); majVent(); }
   catch (e) { if (!ventCourant) $('ventP').hidden = true; }
 }
 // après chaque changement de vent : allures de chaque point, pastille, trace, résumé
@@ -1558,7 +1606,7 @@ function remplirVent() {
   $('vArome').hidden = ventCourant.source !== 'saisi' || !Vent.lire(idVent).arome;
   $('vNote').textContent = ventCourant.source === 'saisi'
     ? 'Valeurs saisies à la main' + (ventCourant.src ? ' (' + ventCourant.src + ')' : '') + '. Allures : près sous 70° du vent, travers de 70 à 110°, portant au-delà.'
-    : 'Prévision du modèle AROME HD (Météo-France, via Open-Meteo) au milieu de la trace : vent moyen à 2–3 nd près, direction à une trentaine de degrés près. Pour une VMG fiable, saisis les relevés d’un anémomètre (Holfuy, WindsUp…). Allures : près sous 70° du vent, travers de 70 à 110°, portant au-delà.';
+    : 'Prévision du modèle AROME HD (Météo-France, via Open-Meteo) ' + (ventCourant.tr ? `le long de la trace (${ventCourant.tr.locs.length} positions) : vent à la position du rider à chaque instant, ` : 'au milieu de la trace : ') + 'vent moyen à 2–3 nd près, direction à une trentaine de degrés près. Pour une VMG fiable, saisis les relevés d’un anémomètre (Holfuy, WindsUp…). Allures : près sous 70° du vent, travers de 70 à 110°, portant au-delà.';
 }
 $('vModif').onclick = () => { $('fResume').hidden = true; ouvrirVentModif(); };
 $('vArome').onclick = () => { Vent.revenirArome(idVent); ventCourant = Vent.courant(idVent); majVent(); remplirVent(); };

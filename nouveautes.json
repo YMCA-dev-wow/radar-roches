@@ -2,6 +2,16 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 67,
+      "date": "2026-11-28",
+      "titre": "Traversées",
+      "points": [
+        "Fiche de séance : une traversée qui passe d'une zone à l'autre (Saint-Malo → Saint-Quay) est calculée zone par zone ; marée, roches et alertes sont justes jusqu'à l'arrivée.",
+        "Le calque des roches suit la zone du centre de la carte, comme le repérage ; la terre n'est plus noircie.",
+        "Vent d'une traversée : prévision AROME prise le long de la trace, à la position du rider à chaque instant (au spot, toujours au milieu de la trace)."
+      ]
+    },
+    {
       "id": 66,
       "date": "2026-11-28",
       "titre": "Repérage : boutons",

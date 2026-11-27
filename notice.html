@@ -360,9 +360,11 @@ redémarrage du radar) ou <b>Supprimer</b> (définitif : le journal est effacé 
 <p>Le <b>sport</b> d'une nouvelle séance vient du profil du radar (Foil → Wingfoil, Planche → Windsurf, Kite → Kitesurf) ou du fichier FIT ; la liste des sports, leurs
 couleurs (triés par ordre alphabétique, Parawing compris) et les unités (nœuds, km/h ou m/s ; km ou milles nautiques) se règlent dans <b>Plus → Réglages généraux</b>. Après une séance de plus de 3 minutes, le radar propose
 de la revoir ; <b>Plus → Journaux de session</b> garde l'envoi des journaux pour analyser un problème.</p>
+<p>Une séance qui passe d'une zone à l'autre (traversée) est calculée zone par zone : marée, relief et alertes de chaque zone. Sur la carte, le calque des roches suit la zone du centre de la carte, comme le repérage.</p>
 <h3>Vent et VMG</h3>
 <p>Dans la fiche d'une séance, la <b>pastille vent</b> (en haut à gauche de la carte) donne le vent à l'instant du curseur : flèche (où va le vent), vent moyen,
 direction (d'où il vient), rafales. Par défaut c'est la <b>prévision AROME HD</b> de Météo-France (via Open-Meteo, au quart d'heure, au milieu de la trace ;
+sur une traversée, dont la trace s'éloigne de plus de 5 km de son milieu, le vent est pris le long de la trace, à la position du rider à chaque instant ;
 réseau nécessaire une fois) : vent moyen à 2–3 nd près, direction à une trentaine de degrés près. Pour des valeurs justes, touche la pastille puis
 <b>✎ Modifier le vent</b> (ou menu ⋮ → Vent) et saisis tes relevés (Holfuy, WindsUp, anémo perso…) : valeur unique ou heure par heure ; la pastille affiche alors
 <b>Saisi</b>. <b>Revenir à AROME</b> reprend la prévision.</p>

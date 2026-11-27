@@ -1,8 +1,10 @@
 // Vent d'une séance : prévision AROME HD (Météo-France, via Open-Meteo, au quart d'heure) ou valeurs saisies à la main
 // (relevés Holfuy, WindsUp, anémo perso…), et ce qu'on en tire : vent à l'instant, VMG, allures, virements et empannages.
 // Stockage par séance dans localStorage « radar.vent.<id> » :
-//   { arome: { lat, lon, t0, t1, pts: [[t, v, raf, dir]] }, saisi: { type: 'unique'|'heures', pts: [[t, v, raf, dir]], source }, mode: 'arome'|'saisi' }
+//   { arome: { lat, lon, t0, t1, pts: [[t, v, raf, dir]], tr? }, saisi: { type: 'unique'|'heures', pts: [[t, v, raf, dir]], source }, mode: 'arome'|'saisi' }
 // v, raf en m/s ; dir en degrés, d'où vient le vent ; t en ms.
+// Traversées (trace qui s'éloigne de plus de 5 km de son milieu) : arome.tr = { ancres: [[t, k]], locs: [[lat, lon]],
+// series: [pts par position] } ; le vent à l'instant t est pris aux repères de la trace qui encadrent t (position du rider).
 'use strict';
 const Vent = (() => {
   const lire = id => { try { return JSON.parse(localStorage.getItem('radar.vent.' + id)) || {}; } catch { return {}; } };
@@ -22,30 +24,74 @@ const Vent = (() => {
 
   // ---------- AROME HD par Open-Meteo ----------
   // Prévisions des 3 derniers mois : API de prévision ; plus anciennes (depuis 2022) : archive des prévisions
-  async function telechargerArome(lat, lon, t0, t1) {
+  // Une seule requête pour toutes les positions (Open-Meteo accepte des listes de coordonnées et répond par un tableau)
+  async function telechargerSeries(locs, t0, t1) {
     const j = t => new Date(t).toISOString().slice(0, 10);
     const base = Date.now() - t0 < 80 * 864e5 ? 'https://api.open-meteo.com/v1/forecast' : 'https://historical-forecast-api.open-meteo.com/v1/forecast';
     for (const modele of ['meteofrance_arome_france_hd', 'meteofrance_arome_france', 'meteofrance_seamless']) {
-      const u = `${base}?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}&start_date=${j(t0 - 3600e3)}&end_date=${j(t1 + 3600e3)}` +
+      const u = `${base}?latitude=${locs.map(l => l[0].toFixed(3)).join(',')}&longitude=${locs.map(l => l[1].toFixed(3)).join(',')}` +
+        `&start_date=${j(t0 - 3600e3)}&end_date=${j(t1 + 3600e3)}` +
         `&minutely_15=wind_speed_10m,wind_direction_10m,wind_gusts_10m&models=${modele}&wind_speed_unit=ms&timezone=GMT`;
-      const r = await fetch(u, { signal: AbortSignal.timeout(15000) });
+      const r = await fetch(u, { signal: AbortSignal.timeout(20000) });
       if (!r.ok) continue;
-      const d = await r.json(), m = d.minutely_15;
-      if (!m || !m.time) continue;
-      const pts = [];
-      m.time.forEach((t, i) => {
-        const tt = Date.parse(t + 'Z'), v = m.wind_speed_10m[i], dir = m.wind_direction_10m[i];
-        if (tt >= t0 - 3600e3 && tt <= t1 + 3600e3 && v != null && dir != null) pts.push([tt, v, m.wind_gusts_10m[i], dir]);
+      let d = await r.json(); if (!Array.isArray(d)) d = [d];
+      const series = d.map(x => {
+        const m = x.minutely_15, pts = []; if (!m || !m.time) return pts;
+        m.time.forEach((t, i) => {
+          const tt = Date.parse(t + 'Z'), v = m.wind_speed_10m[i], dir = m.wind_direction_10m[i];
+          if (tt >= t0 - 3600e3 && tt <= t1 + 3600e3 && v != null && dir != null) pts.push([tt, v, m.wind_gusts_10m[i], dir]);
+        });
+        return pts;
       });
-      if (pts.length >= 2) return { lat, lon, t0, t1, modele, pts };
+      if (series.length === locs.length && series.every(s => s.length >= 2)) return { modele, series };
     }
     throw new Error('prévision indisponible');
   }
-  // prévision de la séance (gardée ; retéléchargée seulement si la séance ou sa position changent)
-  async function arome(id, lat, lon, t0, t1) {
-    const o = lire(id), a = o.arome;
-    if (a && a.pts && a.pts.length && Math.abs(a.lat - lat) < 0.02 && Math.abs(a.lon - lon) < 0.02 && a.t0 <= t0 + 60e3 && a.t1 >= t1 - 60e3) return a;
-    const n = await telechargerArome(lat, lon, t0, t1);
+  async function telechargerArome(lat, lon, t0, t1) {
+    const r = await telechargerSeries([[lat, lon]], t0, t1);
+    return { lat, lon, t0, t1, modele: r.modele, pts: r.series[0] };
+  }
+  // Au spot (trace à moins de 5 km de son milieu), un seul point : le milieu de la trace. Au-delà (traversée), des repères
+  // le long de la trace, tous les 5 km ou toutes les 30 min (40 de chaque au plus), chacun avec sa série AROME ; les repères
+  // à moins de 1,5 km l'un de l'autre partagent la même position interrogée (arrêt, aller-retour).
+  const RAYON_SPOT = 5000;
+  const distM = (a, b) => Math.hypot(b.lat - a.lat, (b.lon - a.lon) * Math.cos(rad((a.lat + b.lat) / 2))) * 111195;
+  function reperes(P) {
+    let la = 0, lo = 0; for (const p of P) { la += p.lat; lo += p.lon; }
+    const c = { lat: la / P.length, lon: lo / P.length };
+    if (P.length < 2 || !P.every(p => p.t != null) || !P.some(p => distM(c, p) > RAYON_SPOT)) return { c, ancres: null };
+    let tot = 0; for (let i = 1; i < P.length; i++) tot += distM(P[i - 1], P[i]);
+    const pas = Math.max(5000, tot / 40), pasT = Math.max(1800e3, (P[P.length - 1].t - P[0].t) / 40), A = [P[0]];
+    for (let i = 1, acc = 0; i < P.length; i++) {
+      acc += distM(P[i - 1], P[i]);
+      if (acc >= pas || P[i].t - A[A.length - 1].t >= pasT || i === P.length - 1) { A.push(P[i]); acc = 0; }
+    }
+    const locs = [], ancres = [];
+    for (const p of A) {
+      let k = locs.findIndex(l => distM({ lat: l[0], lon: l[1] }, p) < 1500);
+      if (k < 0) { locs.push([+p.lat.toFixed(3), +p.lon.toFixed(3)]); k = locs.length - 1; }
+      ancres.push([p.t, k]);
+    }
+    return { c, ancres, locs };
+  }
+  // Prévision de la séance (gardée ; retéléchargée seulement si la séance ou sa position changent).
+  // arome(id, lat, lon, t0, t1) : un point ; arome(id, trace [{ lat, lon, t }], t0, t1) : un point ou des repères selon
+  // l'étendue de la trace.
+  async function arome(id, a1, a2, a3, a4) {
+    const [P, t0, t1] = typeof a1 === 'number' ? [[{ lat: a1, lon: a2 }], a3, a4] : [a1, a2, a3];
+    const R = reperes(P), a = lire(id).arome;
+    const couvre = a && a.pts && a.pts.length && a.t0 <= t0 + 60e3 && a.t1 >= t1 - 60e3;
+    let n;
+    if (!R.ancres) {
+      if (couvre && !a.tr && Math.abs(a.lat - R.c.lat) < 0.02 && Math.abs(a.lon - R.c.lon) < 0.02) return a;
+      n = await telechargerArome(R.c.lat, R.c.lon, t0, t1);
+    } else {
+      const T = couvre && a.tr;
+      if (T && T.ancres.length === R.ancres.length && T.locs.length === R.locs.length && R.locs.every((l, k) => distM({ lat: l[0], lon: l[1] }, { lat: T.locs[k][0], lon: T.locs[k][1] }) < 1500)) return a;
+      const r = await telechargerSeries(R.locs, t0, t1);
+      n = { lat: R.c.lat, lon: R.c.lon, t0, t1, modele: r.modele, pts: r.series[R.ancres[R.ancres.length >> 1][1]],
+        tr: { ancres: R.ancres, locs: R.locs, series: r.series } };
+    }
     const o2 = lire(id); o2.arome = n; if (!o2.mode) o2.mode = 'arome'; ecrire(id, o2);
     return n;
   }
@@ -53,20 +99,36 @@ const Vent = (() => {
   function courant(id) {
     const o = lire(id);
     if (o.mode === 'saisi' && o.saisi && o.saisi.pts && o.saisi.pts.length) return { source: 'saisi', pts: o.saisi.pts, type: o.saisi.type, src: o.saisi.source || '' };
-    if (o.arome && o.arome.pts && o.arome.pts.length) return { source: 'arome', pts: o.arome.pts };
+    if (o.arome && o.arome.pts && o.arome.pts.length) return { source: 'arome', pts: o.arome.pts, tr: o.arome.tr || null };
     return null;
   }
   function saisir(id, type, pts, source) { const o = lire(id); o.saisi = { type, pts, source: source || '' }; o.mode = 'saisi'; ecrire(id, o); }
   function revenirArome(id) { const o = lire(id); o.mode = 'arome'; ecrire(id, o); }
 
-  // vent à l'instant t : interpolation linéaire (direction par le plus court chemin) ; constant si un seul point
-  function a(W, t) {
-    const p = W.pts; if (!p.length) return null;
+  // vent d'une série à l'instant t : interpolation linéaire (direction par le plus court chemin) ; constant si un seul point
+  function aSerie(p, t) {
+    if (!p || !p.length) return null;
     if (p.length === 1 || t <= p[0][0]) return { v: p[0][1], raf: p[0][2], dir: p[0][3] };
     if (t >= p[p.length - 1][0]) { const q = p[p.length - 1]; return { v: q[1], raf: q[2], dir: q[3] }; }
     let i = 0; while (i < p.length - 2 && p[i + 1][0] <= t) i++;
     const A = p[i], B = p[i + 1], f = (t - A[0]) / (B[0] - A[0]), dd = ((B[3] - A[3] + 540) % 360) - 180;
     return { v: A[1] + f * (B[1] - A[1]), raf: A[2] != null && B[2] != null ? A[2] + f * (B[2] - A[2]) : (A[2] ?? B[2]), dir: (A[3] + f * dd + 360) % 360 };
+  }
+  // mélange de deux vents (f = 0 : u, f = 1 : w)
+  function melange(u, w, f) {
+    if (!u || !w) return u || w;
+    const dd = ((w.dir - u.dir + 540) % 360) - 180;
+    return { v: u.v + f * (w.v - u.v), raf: u.raf != null && w.raf != null ? u.raf + f * (w.raf - u.raf) : (u.raf ?? w.raf), dir: (u.dir + f * dd + 360) % 360 };
+  }
+  // vent à l'instant t ; traversée : séries des deux repères qui encadrent t, mélangées selon le temps (la position du
+  // rider entre ces repères)
+  function a(W, t) {
+    const T = W.tr; if (!T) return aSerie(W.pts, t);
+    const A = T.ancres, S = k => aSerie(T.series[A[k][1]], t);
+    if (t <= A[0][0]) return S(0);
+    if (t >= A[A.length - 1][0]) return S(A.length - 1);
+    let i = 0; while (i < A.length - 2 && A[i + 1][0] <= t) i++;
+    return melange(S(i), S(i + 1), (t - A[i][0]) / (A[i + 1][0] - A[i][0]) || 0);
   }
   // résumé du vent sur [t0, t1] : moyenne, début, fin, direction moyenne
   function resume(W, t0, t1) {
