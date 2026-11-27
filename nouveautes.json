@@ -2,6 +2,12 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 66,
+      "date": "2026-11-28",
+      "titre": "Repérage : boutons",
+      "points": ["Carte, onglets et choix de la hauteur d'eau : textes centrés dans les boutons."]
+    },
+    {
       "id": 65,
       "date": "2026-11-27",
       "titre": "Repérage d'un spot",
