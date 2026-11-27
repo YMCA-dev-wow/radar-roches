@@ -2,6 +2,16 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 65,
+      "date": "2026-11-27",
+      "titre": "Repérage d'un spot",
+      "points": [
+        "Carte et téléchargements : deux onglets, Télécharger et Repérage.",
+        "Repérage : roches et hauts-fonds à la hauteur d'eau choisie (maintenant, date et heure, ou forcée), seuils de couleur réglables sans toucher aux profils, fond de carte et opacité, calques au choix ; toucher la carte donne le fond et l'eau à cet endroit.",
+        "Appli montre Saint-Malo : baie de Lancieux ajoutée."
+      ]
+    },
+    {
       "id": 64,
       "date": "2026-11-27",
       "titre": "Baie de Lancieux",

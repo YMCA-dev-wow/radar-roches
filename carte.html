@@ -65,11 +65,43 @@
   .petit .lbl.tel, .petit .lbl.montre, .grand .lbl.pin { display: none; }
   .legendeCarte { background: rgba(7, 19, 24, .85); color: var(--tx); border: 1px solid var(--ln); border-radius: 10px; padding: 6px 9px; font-size: 12px; line-height: 1.7; }
   .legendeCarte i { display: inline-block; width: 16px; height: 0; border-top: 3px dashed; margin-right: 6px; vertical-align: middle; }
+  /* deux vues : Télécharger (zones, applis montre, jeux partagés) et Repérage (roches à une hauteur d'eau choisie) */
+  .vues { display: flex; margin: 0 16px 10px; background: var(--p1); border: 1px solid var(--ln); border-radius: 12px; padding: 3px; }
+  .vues button { flex: 1; font: inherit; font-size: 14px; color: var(--mu); background: none; border: 0; border-radius: 9px; padding: 8px 0; cursor: pointer; }
+  .vues button.on { background: var(--ac); color: var(--ac-on); font-weight: 650; }
+  body.rep .couches, body.rep main, body.rep #astuce, body.rep .legendeCarte { display: none; }
+  body:not(.rep) #reperage, body:not(.rep) .pillH, body:not(.rep) .msgRep { display: none; }
+  #reperage { padding: 10px 16px 96px; max-width: 760px; margin: 0 auto; }
+  .bloc { background: var(--p1); border: 1px solid var(--ln); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }
+  .bloc h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--mu); display: flex; align-items: center; gap: 8px; }
+  .bloc h4 button { margin-left: auto; font-size: 12px; text-transform: none; letter-spacing: 0; padding: 3px 9px; }
+  .seg { display: flex; gap: 4px; margin-bottom: 10px; }
+  .seg button { flex: 1; font: inherit; font-size: 13px; color: var(--mu); background: none; border: 1px solid var(--ln2); border-radius: 9px; padding: 6px 0; cursor: pointer; }
+  .seg button.on { border-color: var(--ac); color: var(--ac); background: rgba(94, 230, 214, .08); }
+  .rl { display: flex; align-items: center; gap: 10px; font-size: 14px; margin: 6px 0; }
+  .rl > span { flex: 1; } .rl small { color: var(--mu); }
+  .rl input[type=date] { width: auto; flex: 1; }
+  .rl input[type=checkbox] { width: auto; }
+  .rl b { font-variant-numeric: tabular-nums; min-width: 58px; text-align: right; }
+  #reperage input[type=range] { accent-color: var(--ac); }
+  .pillH { position: absolute; right: 10px; top: 10px; z-index: 500; background: rgba(7, 19, 24, .92); border: 1px solid var(--ln2); border-radius: 12px;
+    padding: 5px 10px; font-size: 12px; line-height: 1.3; pointer-events: none; }
+  .pillH small { display: block; color: var(--mu); font-size: 11px; }
+  .pillH b { font-size: 17px; color: #5ac8fa; }
+  .pillH.force b { color: var(--warn); }
+  .msgRep { position: absolute; left: 50%; bottom: 34px; transform: translateX(-50%); z-index: 500; pointer-events: none; background: rgba(7, 19, 24, .88);
+    border: 1px solid var(--ln); border-radius: 999px; padding: 5px 12px; font-size: 13px; white-space: nowrap; }
+  .msgRep:empty { display: none; }
+  .legRep { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--mu); margin-top: 6px; }
+  .legRep i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
 </style>
 </head>
 <body data-onglet="plus">
 <header><a class="retour" href="index.html" id="retour">‹</a><h1>Carte et téléchargements</h1></header>
-<div class="carteBloc"><div id="map"></div><div class="astuce" id="astuce">Touche une zone pour la télécharger</div></div>
+<div class="vues" id="vues"><button data-v="tel" class="on">Télécharger</button><button data-v="rep">Repérage</button></div>
+<div class="carteBloc"><div id="map"></div><div class="astuce" id="astuce">Touche une zone pour la télécharger</div>
+  <div class="pillH" id="pillH"><small id="pillHt">hauteur d'eau</small><b id="pillHv">–</b> <small id="pillHs" style="display:inline"></small></div>
+  <div class="msgRep" id="msgRep"></div></div>
 <div class="couches">
   <label><input type="checkbox" id="cCouv" checked><span class="pastille" style="border:2px dashed #30d158"></span>Zones téléphone</label>
   <label><input type="checkbox" id="cMontre"><span class="pastille" style="border:2px solid var(--montre)"></span>Limites des applis montre</label>
@@ -115,13 +147,50 @@
       </div>
     </div>
   </details>
-  <details class="section" id="secFonds">
-    <summary><span class="pastille" style="background:var(--p2);border:1px solid var(--ln)"></span>Fond de carte<small></small></summary>
-    <div class="corps" id="fonds"></div>
-  </details>
   <p class="sub">Relevé Litto3D® Shom – IGN 2024 (Licence Ouverte 2.0). Les jeux partagés sont saisis par des utilisateurs et
     vérifiés avant publication, sans garantie : ils complètent la vigilance, ils ne la remplacent pas.</p>
 </main>
+
+<!-- Repérage : préparer une session sur un spot (roches à la hauteur d'eau choisie) -->
+<section id="reperage">
+  <div class="bloc">
+    <h4>Hauteur d'eau</h4>
+    <div class="seg" id="modeEau"><button data-m="now">Maintenant</button><button data-m="date">Date et heure</button><button data-m="force">Forcée</button></div>
+    <div id="eauDate">
+      <div class="rl"><input type="date" id="rDate"><b id="rHeureTxt">12:00</b></div>
+      <input type="range" id="rHeure" min="0" max="1430" step="10" value="720" aria-label="Heure">
+      <div class="rl"><small id="rMaree" style="flex:1"></small></div>
+    </div>
+    <div id="eauForce">
+      <div class="rl"><span>Au-dessus du zéro des cartes</span><b id="rForceTxt">5,0 m</b></div>
+      <input type="range" id="rForce" min="0" max="14" step="0.1" value="5" aria-label="Hauteur d'eau forcée">
+      <div class="rl"><small>Basse mer de vives-eaux ≈ 1 m · pleine mer de vives-eaux ≈ 12 m (Saint-Malo)</small></div>
+    </div>
+    <div class="rl" id="eauNow"><small id="rNow"></small></div>
+  </div>
+  <div class="bloc">
+    <h4>Couleurs des roches<button type="button" id="rProfil">Valeurs du profil</button></h4>
+    <div class="rl"><span>Rouge sous</span><b id="rRougeTxt">2,0 m</b></div>
+    <input type="range" id="rRouge" min="0.5" max="5" step="0.1" value="2" aria-label="Eau minimale (rouge)">
+    <div class="rl"><span>Orange jusqu'à</span><b id="rOrangeTxt">3,0 m</b></div>
+    <input type="range" id="rOrange" min="0.6" max="8" step="0.1" value="3" aria-label="Eau (orange)">
+    <div class="rl"><span>Fonds lisses aussi (sable, vase)</span><input type="checkbox" id="rLisse"></div>
+    <div class="legRep"><span><i style="background:#000"></i>émergé</span><span><i style="background:#ff3b30"></i>moins de <span id="lgR">2</span> m d'eau</span><span><i style="background:#ff9f0a"></i>moins de <span id="lgO">3</span> m</span></div>
+    <div class="rl"><small id="rProfilInfo"></small></div>
+  </div>
+  <div class="bloc">
+    <h4>Fond de carte</h4>
+    <div id="fonds"></div>
+  </div>
+  <div class="bloc">
+    <h4>Calques</h4>
+    <div class="rl"><span>Roches et hauts-fonds</span><input type="checkbox" id="rRoches" checked></div>
+    <div class="rl"><span>Mes roches et jeux partagés</span><input type="checkbox" id="rMes" checked></div>
+    <div class="rl"><span>Limites des zones (téléphone, montre)</span><input type="checkbox" id="rLimites"></div>
+  </div>
+  <p class="sub">Relief Litto3D® Shom – IGN : celui des zones téléchargées, sinon lu en ligne. Marée prédite, sans l'effet de la météo.
+    Outil de préparation : il ne remplace ni les cartes marines ni la vigilance sur l'eau.</p>
+</section>
 
 <dialog id="dlgPartage">
   <form method="dialog" id="formPartage">
@@ -162,6 +231,8 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="fonds.js"></script>
 <script src="zones.js"></script>
+<script src="relief.js"></script>
+<script src="noyau.js"></script>
 <script>
 'use strict';
 // Dépôt partagé (Supabase) : adresse du projet et clé publique « anon » (faites pour être publiques ; les règles de la base
@@ -198,7 +269,7 @@ const relief = L.layerGroup();   // détail de la couverture (tuiles Litto3D) : 
 const visible = k => map.hasLayer(couches[k]);
 function majRelief() { visible('couv') && map.getZoom() >= ZOOM_RELIEF ? relief.addTo(map) : map.removeLayer(relief); }
 [['cCouv', 'couv'], ['cMontre', 'montre'], ['cMes', 'mes'], ['cPartage', 'partage']].forEach(([c, k]) =>
-  $(c).onchange = e => { e.target.checked ? couches[k].addTo(map) : map.removeLayer(couches[k]); majRelief(); });
+  $(c).onchange = e => { if (vueRep) return; e.target.checked ? couches[k].addTo(map) : map.removeLayer(couches[k]); majRelief(); });
 // légende flottante
 const legende = L.control({ position: 'bottomleft' });
 legende.onAdd = () => Object.assign(L.DomUtil.create('div', 'legendeCarte'), { innerHTML: (ZonesLocales.appli ?
@@ -228,7 +299,7 @@ function voir(b, opts) {
   map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: [20, 20], ...(opts || {}) });
 }
 // sections repliables : état mémorisé
-const SECTIONS = ['secTel', 'secMontre', 'secPartage', 'secFonds'];
+const SECTIONS = ['secTel', 'secMontre', 'secPartage'];
 let ouvertes = [];
 try { ouvertes = JSON.parse(localStorage.getItem('carte.sections')) || []; } catch {}
 SECTIONS.forEach(id => {
@@ -584,7 +655,7 @@ function fermerFeuille() {
   feuille.el.remove(); feuille = null;
   if (repere) { map.removeLayer(repere); repere = null; }
 }
-map.on('click', e => ouvrirIci(e.latlng));
+map.on('click', e => vueRep ? sonderIci(e.latlng) : ouvrirIci(e.latlng));
 // seule : la zone touchée par son étiquette ou sa pastille (sinon tout ce qui couvre l'endroit)
 function ouvrirIci(ll, seule) {
   const zt = seule ? [seule] : visible('couv') ? zones.filter(z => couvre(z, ll)) : [];
@@ -667,6 +738,172 @@ $('pEnvoyer').onclick = async () => {
   $('pEnvoyer').disabled = false;
 };
 
+// ---------- Repérage : roches à la hauteur d'eau choisie (marée d'un jour, maintenant, ou forcée) ----------
+// Même calcul et mêmes couleurs que le radar et le rejeu (noyau.js) : relief de la zone téléchargée, sinon lu en ligne.
+// Seuils : par défaut ceux du dernier profil actif du radar (radar.seuil = eau minimale), réglables ici sans toucher aux profils.
+let vueRep = false, donneesRep = null, Wrep = null;
+const lireLS = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } };
+const RP = Object.assign({ mode: 'date', date: null, minutes: null, force: 5, roches: true, mes: true, limites: false }, lireLS('carte.reperage', {}));
+const garderR = () => { try { localStorage.setItem('carte.reperage', JSON.stringify(RP)); } catch {} };
+const seuilProfil = () => { const v = +lireLS('radar.seuil', 2); return isFinite(v) && v > 0 ? v : 2; };
+const SEUILS = { rouge: seuilProfil(), orange: seuilProfil() + 1, lisse: !!lireLS('radar.smooth', false) };
+const fr1 = v => v.toFixed(1).replace('.', ',');
+const hmRep = m => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+const jourLocal = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+if (!RP.date) { const d = new Date(); RP.date = jourLocal(d); RP.minutes = Math.round((d.getHours() * 60 + d.getMinutes()) / 10) * 10; }
+function instantRep() {
+  if (RP.mode === 'now') return Date.now();
+  const [a, m, j] = RP.date.split('-').map(Number);
+  return new Date(a, m - 1, j, 0, RP.minutes || 0).getTime();
+}
+const DangerRep = L.GridLayer.extend({
+  createTile(coords, done) {
+    const tile = document.createElement('canvas'); tile.width = tile.height = 256;
+    const Z = 16, z = coords.z;
+    if (z < 15 || Wrep == null || !meta) { setTimeout(() => done(null, tile), 0); return tile; }
+    const f = 2 ** (z - Z), W = Wrep, rouge = SEUILS.rouge, orange = Math.max(SEUILS.orange, rouge), lisse = SEUILS.lisse;
+    const srcs = z >= Z ? [[Math.floor(coords.x / f), Math.floor(coords.y / f)]] : [[coords.x * 2, coords.y * 2], [coords.x * 2 + 1, coords.y * 2], [coords.x * 2, coords.y * 2 + 1], [coords.x * 2 + 1, coords.y * 2 + 1]];
+    Promise.all(srcs.map(([x, y]) => loadTile(x, y))).then(() => {
+      const g = tile.getContext('2d'), img = g.createImageData(256, 256), o = img.data;
+      const lvlOf = (d, i) => {
+        const Rc = d[i]; if (Rc === 0 || Rc === 255 || Rc === 254) return 0;   // terre (au-dessus de 20 m) : déjà sur le fond de carte
+        if (d[i + 1] * meta.pas_relief < 0.30 && !lisse) return 0;
+        const eau = W - (meta.cote_min + (Rc - 1) * meta.pas_cote);
+        return eau < 0 ? 3 : eau < rouge ? 2 : eau < orange ? 1 : 0;
+      };
+      const RGB = [null, [255, 159, 10], [255, 59, 48], [0, 0, 0]];
+      for (let v = 0; v < 256; v++) for (let u = 0; u < 256; u++) {
+        let lvl = 0;
+        if (z >= Z) {
+          const d = tiles.get(srcs[0][0] + '/' + srcs[0][1]); if (!d || d instanceof Promise) continue;
+          const ox = (coords.x % f) * 256 / f, oy = (coords.y % f) * 256 / f;
+          lvl = lvlOf(d, (Math.floor(oy + v / f) * 256 + Math.floor(ox + u / f)) * 4);
+        } else {
+          const k = (v >> 7) * 2 + (u >> 7), d = tiles.get(srcs[k][0] + '/' + srcs[k][1]); if (!d || d instanceof Promise) continue;
+          const su = (u % 128) * 2, sv = (v % 128) * 2;
+          for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) lvl = Math.max(lvl, lvlOf(d, ((sv + a) * 256 + su + b) * 4));
+        }
+        if (!lvl) continue;
+        const q = (v * 256 + u) * 4; [o[q], o[q + 1], o[q + 2]] = RGB[lvl]; o[q + 3] = 170;
+      }
+      g.putImageData(img, 0, 0); done(null, tile);
+    });
+    return tile;
+  },
+});
+const dangerRep = new DangerRep({ zIndex: 8, minZoom: 15 });
+// zone du centre de la carte : marée, ports et relief (une zone active à la fois, comme le rejeu)
+function zoneRep() {
+  if (!ZONES.length) return false;
+  const c = map.getCenter(); return activerZone(zonePour(c.lat, c.lng));
+}
+function calculerRep() {
+  const pill = $('pillH');
+  if (!zone) { $('pillHv').textContent = '–'; return; }
+  const c = map.getCenter(), t = instantRep();
+  let W, sens = '';
+  if (RP.mode === 'force') { W = RP.force; pill.classList.add('force'); $('pillHt').textContent = 'hauteur d\'eau forcée'; }
+  else {
+    W = niveauEau(c.lng, t, undefined, c.lat); pill.classList.remove('force');
+    sens = niveauEau(c.lng, t + 15 * 60000, undefined, c.lat) > W ? 'montante' : 'descendante';
+    const d = new Date(t);
+    $('pillHt').textContent = 'hauteur d\'eau · ' + (RP.mode === 'now' ? 'maintenant' : d.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit' }) + ' ' + hmRep(d.getHours() * 60 + d.getMinutes()));
+  }
+  $('pillHv').textContent = fr1(W) + ' m'; $('pillHs').textContent = sens ? 'marée ' + sens : '';
+  if (RP.mode === 'date') $('rMaree').textContent = extremesJour(c);
+  if (RP.mode === 'now') $('rNow').textContent = `${zone.nom} : ${fr1(W)} m au-dessus du zéro des cartes, marée ${sens}. Mise à jour chaque minute.`;
+  if (Wrep == null || Math.abs(W - Wrep) > 0.05) { Wrep = W; dangerRep.redraw(); }
+}
+// pleines et basses mers du jour choisi au centre de la carte (pas de 10 min)
+function extremesJour(c) {
+  const [a, m, j] = RP.date.split('-').map(Number), t0 = new Date(a, m - 1, j).getTime(), h = [];
+  for (let k = -1; k <= 145; k++) h.push(niveauEau(c.lng, t0 + k * 600000, undefined, c.lat));
+  const out = [];
+  for (let k = 1; k < h.length - 1; k++) {
+    const pm = h[k] >= h[k - 1] && h[k] > h[k + 1], bm = h[k] <= h[k - 1] && h[k] < h[k + 1];
+    if ((pm || bm) && k - 1 >= 0 && k - 1 < 144) out.push(`${pm ? 'PM' : 'BM'} ${hmRep((k - 1) * 10)} ${fr1(h[k])} m`);
+  }
+  return out.join(' · ');
+}
+function majMsgRep() {
+  let m = '';
+  if (!donneesRep) m = 'Chargement des zones…';
+  else if (!zone) m = 'Données des zones indisponibles';
+  else if (RP.roches && map.getZoom() < 15) m = 'Zoome pour voir les roches';
+  $('msgRep').textContent = m;
+}
+// calques selon la vue : en repérage, ceux du bloc Calques ; sinon les cases sous la carte
+function appliquerCalques() {
+  const v = k => map.hasLayer(couches[k]);
+  const set = (k, on) => on ? (v(k) || couches[k].addTo(map)) : map.removeLayer(couches[k]);
+  if (vueRep) {
+    set('couv', RP.limites); set('montre', RP.limites); set('mes', RP.mes); set('partage', RP.mes);
+    RP.roches ? dangerRep.addTo(map) : map.removeLayer(dangerRep);
+  } else {
+    [['cCouv', 'couv'], ['cMontre', 'montre'], ['cMes', 'mes'], ['cPartage', 'partage']].forEach(([c, k]) => set(k, $(c).checked));
+    map.removeLayer(dangerRep);
+  }
+  majRelief();
+}
+async function choisirVue(v) {
+  vueRep = v === 'rep';
+  document.body.classList.toggle('rep', vueRep);
+  [...$('vues').children].forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  try { localStorage.setItem('carte.vue2', v); } catch {}
+  fermerFeuille(); map.closePopup();
+  appliquerCalques(); map.invalidateSize();
+  if (!vueRep) return;
+  majMsgRep();
+  if (!donneesRep) donneesRep = chargerDonnees().catch(e => { console.error(e); });
+  await donneesRep;
+  if (!ZONES.length) { majMsgRep(); return; }
+  zoneRep(); calculerRep(); majMsgRep();
+}
+[...$('vues').children].forEach(b => b.onclick = () => choisirVue(b.dataset.v));
+window.addEventListener('zone', () => { if (vueRep) { Wrep = null; calculerRep(); dangerRep.redraw(); } });
+map.on('moveend', () => { if (vueRep && ZONES.length) { if (!zoneRep()) calculerRep(); majMsgRep(); } });
+setInterval(() => { if (vueRep && RP.mode === 'now' && zone) calculerRep(); }, 60000);
+// toucher la carte en repérage : fond et hauteur d'eau à cet endroit
+function sonderIci(ll) {
+  if (!zone) return;
+  const f = fondA(ll.lat, ll.lng), W = Wrep;
+  let t;
+  if (!f) t = map.getZoom() < 15 ? 'Zoome pour lire le fond ici.' : 'Pas de relevé ici.';
+  else if (f.nature === 'terre') t = 'Terre';
+  else if (f.nature === 'profond') t = `Fond plus profond que ${fr1(-meta.cote_min)} m sous le zéro des cartes`;
+  else {
+    const eau = W - f.cote;
+    t = `${f.nature === 'roche' ? 'Roche' : 'Fond lisse'} à ${fr1(Math.abs(f.cote))} m ${f.cote >= 0 ? 'au-dessus du' : 'sous le'} zéro des cartes<br>` +
+      (eau < 0 ? `<b>émergé</b> (${fr1(-eau)} m hors de l'eau)` : `<b>${fr1(eau)} m d'eau</b> à ${fr1(W)} m de hauteur d'eau`);
+  }
+  L.popup({ className: 'etiquette', closeButton: false, autoClose: true }).setLatLng(ll).setContent(t).openOn(map);
+}
+// réglages
+function majRepUI() {
+  [...$('modeEau').children].forEach(b => b.classList.toggle('on', b.dataset.m === RP.mode));
+  $('eauDate').hidden = RP.mode !== 'date'; $('eauForce').hidden = RP.mode !== 'force'; $('eauNow').hidden = RP.mode !== 'now';
+  $('rDate').value = RP.date; $('rHeure').value = RP.minutes; $('rHeureTxt').textContent = hmRep(RP.minutes);
+  $('rForce').value = RP.force; $('rForceTxt').textContent = fr1(RP.force) + ' m';
+  $('rRouge').value = SEUILS.rouge; $('rOrange').value = SEUILS.orange; $('rLisse').checked = SEUILS.lisse;
+  $('rRougeTxt').textContent = $('lgR').textContent = fr1(SEUILS.rouge); $('rRougeTxt').textContent += ' m';
+  $('rOrangeTxt').textContent = $('lgO').textContent = fr1(SEUILS.orange); $('rOrangeTxt').textContent += ' m';
+  const p = seuilProfil(), duProfil = Math.abs(SEUILS.rouge - p) < 1e-6 && Math.abs(SEUILS.orange - p - 1) < 1e-6 && SEUILS.lisse === !!lireLS('radar.smooth', false);
+  $('rProfilInfo').textContent = duProfil ? `Valeurs du dernier profil actif du radar (eau minimale ${fr1(p)} m).` : 'Réglage propre au repérage : les profils du radar ne changent pas.';
+  $('rProfil').hidden = duProfil;
+  $('rRoches').checked = RP.roches; $('rMes').checked = RP.mes; $('rLimites').checked = RP.limites;
+}
+[...$('modeEau').children].forEach(b => b.onclick = () => { RP.mode = b.dataset.m; garderR(); majRepUI(); calculerRep(); });
+$('rDate').onchange = e => { if (e.target.value) { RP.date = e.target.value; garderR(); calculerRep(); } };
+$('rHeure').oninput = e => { RP.minutes = +e.target.value; $('rHeureTxt').textContent = hmRep(RP.minutes); garderR(); calculerRep(); };
+$('rForce').oninput = e => { RP.force = +e.target.value; $('rForceTxt').textContent = fr1(RP.force) + ' m'; garderR(); calculerRep(); };
+const majSeuils = () => { majRepUI(); dangerRep.redraw(); };
+$('rRouge').oninput = e => { SEUILS.rouge = +e.target.value; if (SEUILS.orange < SEUILS.rouge) SEUILS.orange = SEUILS.rouge; majSeuils(); };
+$('rOrange').oninput = e => { SEUILS.orange = Math.max(+e.target.value, SEUILS.rouge); majSeuils(); };
+$('rLisse').onchange = e => { SEUILS.lisse = e.target.checked; majSeuils(); };
+$('rProfil').onclick = () => { SEUILS.rouge = seuilProfil(); SEUILS.orange = SEUILS.rouge + 1; SEUILS.lisse = !!lireLS('radar.smooth', false); majSeuils(); };
+[['rRoches', 'roches'], ['rMes', 'mes'], ['rLimites', 'limites']].forEach(([id, k]) => $(id).onchange = e => { RP[k] = e.target.checked; garderR(); appliquerCalques(); majMsgRep(); });
+majRepUI();
+
 // ---------- Démarrage ----------
 (async () => {
   chargerMes();
@@ -681,6 +918,9 @@ $('pEnvoyer').onclick = async () => {
   if (location.hash === '#moderation') $('modCarte').scrollIntoView({ block: 'center' });
   // retour sur la page (téléchargement poursuivi en arrière-plan, zone supprimée ailleurs…)
   document.addEventListener('visibilitychange', async () => { if (!document.hidden && zones.length) { await ZonesLocales.lire(); majTel(); } });
+  // vue mémorisée (les liens #zones, #partager, #moderation ouvrent Télécharger)
+  let v2 = null; try { v2 = localStorage.getItem('carte.vue2'); } catch {}
+  if (!location.hash && v2 === 'rep') choisirVue('rep');
 })();
 </script>
 </body>
