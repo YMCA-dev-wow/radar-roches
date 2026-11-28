@@ -2,6 +2,14 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 70,
+      "date": "2026-11-28",
+      "titre": "Radar : GPS réparé",
+      "points": [
+        "Correction importante : depuis le 23/11, chaque position GPS était rejetée (erreur dans le calcul de la vitesse des sauts) ; le radar restait sans position et la séance n'était pas enregistrée."
+      ]
+    },
+    {
       "id": 69,
       "date": "2026-11-28",
       "titre": "GPS de secours",

@@ -376,7 +376,6 @@ SIM_STARTS.forEach((s, i) => $('simStart').add(new Option(s.nom, i)));
 let fix = null, lastFixes = [], watchId = null, sim = null, vitesses = [];   // vitesses : km/h des 6 dernières secondes (sauts)
 function onFix(lat, lon, acc, speedGps, headingGps, t) {
   lastFixes.push({ lat, lon, t }); while (lastFixes.length > 6) lastFixes.shift();
-  vitesses.push({ t, v: (speed || 0) * 3.6 }); while (vitesses.length && t - vitesses[0].t > 6000) vitesses.shift();
   let speed = speedGps, course = headingGps;
   const a = lastFixes[0], b = lastFixes[lastFixes.length - 1];
   if (b.t - a.t > 1500) { // cap et vitesse sur les dernières secondes si le GPS ne les donne pas
@@ -387,6 +386,9 @@ function onFix(lat, lon, acc, speedGps, headingGps, t) {
   // vitesse aberrante (saut de position GPS après une coupure : 199 km/h le 01/11, fausse alerte) : on garde la précédente
   if (speed > 25) speed = fix ? fix.speed : 0;
   fix = { lat, lon, acc, speed: speed || 0, course: course ?? (fix ? fix.course : 0), t };
+  // après le calcul de la vitesse : le 28/11, lue avant d'être définie, elle faisait échouer chaque position (erreur avalée
+  // par le service GPS Android : radar sans position, aucune trace enregistrée)
+  vitesses.push({ t, v: fix.speed * 3.6 }); while (vitesses.length && t - vitesses[0].t > 6000) vitesses.shift();
 }
 // GPS. Deux pièges constatés en mer (Firefox Android) :
 //  - l'heure fournie avec la position peut être décalée (horloge GPS) : on date chaque position à sa réception ;
