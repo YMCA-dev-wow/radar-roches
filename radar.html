@@ -424,9 +424,21 @@ function startGps() {
         }
         recevoir({ coords: { latitude: loc.latitude, longitude: loc.longitude, accuracy: loc.accuracy, speed: loc.speed, heading: loc.bearing }, timestamp: loc.time }, 'suivi');
         tick(); // le calcul suit chaque position, même si les minuteries ralentissent écran éteint
-      }).then(id => { idNatif = id; });
+      }).then(id => { idNatif = id; }, e => { gpsStats.erreur = 'service GPS : ' + e.message; JournalSession.ev('gps', { erreur: gpsStats.erreur }); });
+    // Secours : le 28/11, le service GPS Android n'a envoyé aucune position en 52 min (sans erreur), alors que le GPS du
+    // navigateur était bon à l'accueil. Sans position au bout de 15 s, on lance aussi le GPS du navigateur.
+    clearTimeout(gpsSecours);
+    gpsSecours = setTimeout(() => {
+      if (!running || sim || gpsStats.n) return;
+      JournalSession.ev('gps', { secours: 'navigateur', erreur: gpsStats.erreur || null });
+      suiviNavigateur();
+    }, 15000);
     return;
   }
+  suiviNavigateur();
+}
+let gpsSecours = null;
+function suiviNavigateur() {
   lancerSuivi();
   clearInterval(gpsRelance);
   let enCours = false;
@@ -437,6 +449,7 @@ function startGps() {
   }, 1000);
 }
 function stopGps() {
+  clearTimeout(gpsSecours);
   if (idNatif != null) { Natif.geo.removeWatcher({ id: idNatif }); idNatif = null; }
   if (watchId != null) navigator.geolocation.clearWatch(watchId);
   watchId = null; clearInterval(gpsRelance); gpsRelance = null;
@@ -533,6 +546,11 @@ function tick() {
     continu(false); if (SON_NATIF) cadenceNatif(null);
     message = fix ? 'GPS perdu depuis ' + Math.round(gpsAge) + ' s' : 'Recherche GPS…';
     if (fix && !muted && at > nextBeep) { gpsPerdu(at); nextBeep = at + 10; }
+    // jamais de position depuis 30 s : même signal, toutes les 30 s, et une annonce (trace et radar inopérants)
+    if (!fix && !sim && t - debutSeance > 30000 && !muted && at > nextBeep) {
+      gpsPerdu(at); nextBeep = at + 30;
+      if (voixActive && !gpsMuetAnnonce) { gpsMuetAnnonce = true; parler('Pas de position GPS : radar et trace inactifs'); }
+    }
   } else if (analysis) {
     const b = analysis.best, armed = fix.speed >= vmin;
     const p = analysis.pre, coupe = armed ? '' : ' (alertes coupées sous ' + $('vmin').value + ' km/h)';
@@ -552,7 +570,7 @@ function tick() {
 }
 // Une ligne par position : lieu, précision, vitesse (km/h), cap, eau, alertes armées, danger [d, gisement, niveau],
 // pré-alerte [d, gisement], veille [d, gisement]
-let fixJournal = null, gpsPerduJournal = false, gpsMuetJournal = false, erreurCalcul = null, dernierPrechargement = null;
+let gpsMuetAnnonce = false, fixJournal = null, gpsPerduJournal = false, gpsMuetJournal = false, erreurCalcul = null, dernierPrechargement = null;
 function journalPosition(f, an, armed) {
   if (!JournalSession.ouvert) return;
   const r = (x, k = 0) => x == null || isNaN(x) ? null : +x.toFixed(k);
@@ -641,7 +659,7 @@ $('start').onclick = async () => {
   $('setup').hidden = true; $('avance').hidden = true; $('fProfils').classList.remove('on');
   document.body.classList.add('navigation'); $('run').hidden = false; resize();
   fix = null; lastFixes = []; vitesses = []; analysis = null; last = null; running = true; window.radarEnCours = true; dernierPrechargement = null; debutSeance = Date.now();
-  gpsMuetJournal = false; erreurCalcul = null; fixJournal = null;
+  gpsMuetJournal = false; gpsMuetAnnonce = false; erreurCalcul = null; fixJournal = null;
   if ($('simMode').checked) startSim(); else startGps();
   clearInterval(tickTimer); tickTimer = setInterval(tick, 100);
   requestAnimationFrame(frame);

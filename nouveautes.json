@@ -2,6 +2,15 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 69,
+      "date": "2026-11-28",
+      "titre": "GPS de secours",
+      "points": [
+        "Radar : si le service GPS d'Android n'envoie aucune position dans les 15 s, le GPS du navigateur (celui du voyant de l'accueil) prend le relais.",
+        "Aucune position depuis 30 s : signal sonore toutes les 30 s et annonce « Pas de position GPS » (avant, le radar restait silencieux)."
+      ]
+    },
+    {
       "id": 68,
       "date": "2026-11-28",
       "titre": "Trace toujours enregistrée",
