@@ -62,12 +62,24 @@ import java.util.zip.GZIPOutputStream;
  *    Ce pic n'est pas toujours l'impulsion du saut (rafale, carre, clapot) : le décollage est ensuite reculé au début de la
  *    montée (dernier instant à moins de 10 % de la hauteur avant le sommet), sinon temps de vol et distance comptent 1 à 2 s
  *    passées sur l'eau.
+ * 28/11/2026 (séances wing du 22/11 et du 28/11 avec données brutes, 8 vrais sauts dont 6 comptés par Surfr) : règle wing
+ *  « pop → réception » à la place de « phase allégée sous 0,6 g » (le dernier saut du 28/11, porté par l'aile entre 0,62 et
+ *  0,73 g, n'avait que 0,65 s comptées) :
+ *  - moyennes de |a| par cases de 0,125 s ; pop = case d'au moins 1,8 g, puis phase allégée (cases sous 1,2 g) de 1 à 3,5 s,
+ *    en moyenne sous 0,8 g, terminée par la réception (première case d'au moins 1,2 g) ;
+ *  - temps de vol = du début du pop à la réception ;
+ *  - hauteur = double intégration de g·(a_vert − 1) de 0,5 s avant le pop à 0,4 s après la réception, avec vitesse et hauteur
+ *    nulles aux deux bouts (biais linéaire corrigé) ; vrai saut si au moins 1,3 m (vrais : 1,4 à 2,3 m ; faux : 1,2 m au plus).
+ *  Rejoué hors ligne par scratchpad sim_pop.py : 8/8 vrais sauts, 5 candidats écartés.
  */
 @CapacitorPlugin(name = "Saut")
 public class SautPlugin extends Plugin implements SensorEventListener {
     private static final int HZ = 100, N = HZ * 20;                // 20 s d'historique à 100 Hz (au moins 10 s si le capteur va plus vite)
-    private static final double H_VRAI = 1.2, POP = 1.3;            // m : hauteur intégrée d'un vrai saut ; g : fin du pop (décollage)
-    private static final double G = 9.81, BAS = 0.6, PIC = 2.2, CHOC = 3.0;   // seuils en g
+    private static final double G = 9.81, CHOC = 3.0;   // g
+    // règle wing « pop → réception » (g, g, g, m ; cases de 0,125 s)
+    private static final double W_POP = 1.8, W_FIN = 1.2, W_LEGER = 0.8, H_WING = 1.3; private static final long CASE = 125;
+    private long caseDeb = -1; private double caseSom = 0; private int caseN = 0;
+    private int etatW = 0; private long wPop = -1, wLeger = -1; private double wSom = 0; private int wN = 0;
     private static final double K_BAS = 0.7, K_PIC = 1.6, K_POP = 1.4, H_KITE = 1.0;   // règles kite (g, g, g, m)
     private boolean kite = false, rotation = false;
     private float qx = 0, qy = 0, qz = 0, qw = 1;   // orientation fusionnée (vecteur de rotation « jeu »)
@@ -78,7 +90,7 @@ public class SautPlugin extends Plugin implements SensorEventListener {
     private float gx = 0, gy = 0, gz = 0;   // gravité estimée par Android (repère du téléphone)
     private long dernierChoc = 0;
     private final float[] alt = new float[N]; private final long[] tAlt = new long[N]; private int nAlt = 0;
-    private long debutBas = -1, finBas = -1, dernierSaut = 0;
+    private long dernierSaut = 0;
     private int nSauts = 0;
     private static final int GARDER_BRUTS = 10;          // ~10-15 Mo par heure : on ne garde que les derniers
     private final Object verrou = new Object();
@@ -105,7 +117,7 @@ public class SautPlugin extends Plugin implements SensorEventListener {
                 if (gy != null) sm.registerListener(this, gy, 1000000 / HZ, 0, h);
             }
             kite = Boolean.TRUE.equals(call.getBoolean("kite", false));
-            actif = true; gravite = gr != null || rv != null; rotation = false; nAcc = 0; nAlt = 0; debutBas = -1; finBas = -1;
+            actif = true; gravite = gr != null || rv != null; rotation = false; nAcc = 0; nAlt = 0; caseDeb = -1; caseSom = 0; caseN = 0; etatW = 0;
             debK = -1; finK = -1; nSauts = 0; dernierChoc = 0;
         }
         JSObject r = new JSObject(); r.put("barometre", p != null); r.put("gravite", gr != null); r.put("hz", HZ);
@@ -150,35 +162,63 @@ public class SautPlugin extends Plugin implements SensorEventListener {
                 + (1 - 2 * (qx * qx + qy * qy)) * e.values[2]) / G);
         else v = ng > 1 ? (float) ((e.values[0] * gx + e.values[1] * gy + e.values[2] * gz) / ng / G) : g;
         int k = nAcc++ % N; tAcc[k] = t; acc[k] = g; accV[k] = v;
-        // phase allégée : moyenne glissante sur 0,1 s sous BAS
+        // moyenne glissante de |a| sur 0,1 s (décollage des règles kite)
         double m = 0; int n = Math.min(HZ / 10, nAcc);
         for (int i = 0; i < n; i++) m += acc[(nAcc - 1 - i) % N];
         m /= n; acc10[k] = (float) m;
         if (kite && detecterKite(t, g)) return;
-        if (m < BAS) { if (debutBas < 0) debutBas = t - 100; finBas = t; }
-        else if (debutBas >= 0 && t - finBas > 400) debutBas = -1; // la phase allégée s'est terminée sans réception
-        if (g > PIC && debutBas >= 0 && finBas - debutBas >= 300 && t - finBas < 400 && t - dernierSaut > 500) {
-            final long t0 = decollage(debutBas), t1 = t; final double vol = (t1 - t0) / 1000.0;
-            if (vol < 4) hFil.postDelayed(() -> signaler(t0, t1, vol, false), 1000); // les rejetés partent aussi au journal
-            debutBas = -1; dernierSaut = t;
-        } else if (g > CHOC && t - dernierChoc > 3000 && t - dernierSaut > 2000) { // choc sans phase allégée : candidat saut de kite
+        caseWing(t, g);
+        if (g > CHOC && t - dernierChoc > 3000 && t - dernierSaut > 2000) { // choc sans phase allégée : candidat saut de kite
             dernierChoc = t; final long tc = t; final float pic = g;
             hFil.postDelayed(() -> signalerChoc(tc, pic), 1000);
         }
     }
 
-    // Décollage : fin du pop, dernière moyenne sur 0,1 s d'au moins POP g dans la seconde avant la phase allégée
-    // (l'aile porte encore au début du vol, |a| y reste parfois au-dessus de BAS) ; à défaut, début de la phase allégée
-    private long decollage(long debut) {
-        int n0 = Math.min(nAcc, N), w = HZ / 10;
-        for (int i = 0; i + w <= n0; i++) {
-            int k = (nAcc - 1 - i) % N; long tk = tAcc[k];
-            if (tk > debut) continue;
-            if (tk < debut - 1000) break;
-            double m = 0; for (int j = 0; j < w; j++) m += acc[(nAcc - 1 - i - j) % N];
-            if (m / w >= POP) return tk;
+    // Règle wing : moyenne de |a| par cases de 0,125 s (un trou de plus de 1,25 s dans les mesures remet tout à zéro)
+    private void caseWing(long t, float g) {
+        if (caseDeb < 0) caseDeb = t;
+        if (t >= caseDeb + 10 * CASE) { caseDeb = t; caseSom = 0; caseN = 0; etatW = 0; }
+        while (t >= caseDeb + CASE) {
+            if (caseN > 0) etapeWing(caseDeb, caseSom / caseN);
+            caseDeb += CASE; caseSom = 0; caseN = 0;
         }
-        return debut;
+        caseSom += g; caseN++;
+    }
+
+    // pop (case >= W_POP) -> phase allégée (cases < W_FIN, 1 à 3,5 s, moyenne < W_LEGER) -> réception (case >= W_FIN)
+    private void etapeWing(long tc, double m) {
+        if (etatW == 0) { if (m >= W_POP) { wPop = tc; etatW = 1; } return; }
+        if (etatW == 1) { if (m < W_FIN) { wLeger = tc; wSom = m; wN = 1; etatW = 2; } return; }
+        if (m < W_FIN) { wSom += m; wN++; return; }
+        long l = tc - wLeger;
+        if (l >= 1000 && l <= 3500 && wSom / wN < W_LEGER && tc - dernierSaut > 500) {
+            final long t0 = wPop, t1 = tc; final double vol = (t1 - t0) / 1000.0; dernierSaut = tc;
+            hFil.postDelayed(() -> signaler(t0, t1, vol, false), 1000);   // les rejetés (hauteur) partent aussi au journal
+        }
+        etatW = 0;
+        if (m >= W_POP) { wPop = tc; etatW = 1; }   // la réception peut être le pop du saut suivant
+    }
+
+    // Hauteur (règle wing) : double intégration de g·(a_vert − 1) de ta à tb, biais c0 + c1·t retiré pour que vitesse et
+    // hauteur soient nulles à tb comme à ta (sur l'eau avant le pop et après la réception)
+    private double hauteurPop(long ta, long tb) {
+        int n0 = Math.min(nAcc, N); double[] z0 = new double[n0], z1 = new double[n0], z2 = new double[n0]; int n = 0;
+        double v0 = 0, v1 = 0, v2 = 0, y0 = 0, y1 = 0, y2 = 0; long tp = -1, tDeb = -1;
+        for (int i = n0 - 1; i >= 0; i--) {
+            int k = (nAcc - 1 - i) % N;
+            if (tAcc[k] < ta || tAcc[k] > tb) continue;
+            if (tp >= 0) {
+                double dt = (tAcc[k] - tp) / 1000.0, tt = (tAcc[k] - tDeb) / 1000.0;
+                v0 += G * (accV[k] - 1) * dt; v1 += dt; v2 += tt * dt;
+                y0 += v0 * dt; y1 += v1 * dt; y2 += v2 * dt;
+            } else tDeb = tAcc[k];
+            tp = tAcc[k]; z0[n] = y0; z1[n] = y1; z2[n] = y2; n++;
+        }
+        double det = v1 * y2 - v2 * y1;
+        if (n < 10 || Math.abs(det) < 1e-12) return 0;
+        double c0 = (v0 * y2 - v2 * y0) / det, c1 = (v1 * y0 - v0 * y1) / det, h = 0;
+        for (int i = 0; i < n; i++) h = Math.max(h, z0[i] - c0 * z1[i] - c1 * z2[i]);
+        return h;
     }
 
     // Règles kite : phase allégée sur la verticale (l'aile porte, |a| reste vers 1 g), réception plus douce, décollage = traction
@@ -200,18 +240,19 @@ public class SautPlugin extends Plugin implements SensorEventListener {
             if (tPop < 0 || pop < K_POP) return false;
             final long t0 = tPop, t1 = t; final double vol = (t1 - t0) / 1000.0;
             hFil.postDelayed(() -> signaler(t0, t1, vol, true), 1000);
-            debutBas = -1; return true;
+            etatW = 0; return true;
         }
         return false;
     }
 
     private void signaler(long t0, long t1, double vol, boolean regleKite) {
         if (regleKite) { t0 = debutMontee(t0, t1); vol = (t1 - t0) / 1000.0; }
-        double hi = hauteurIntegree(t0, t1); boolean vrai = hi >= (regleKite ? H_KITE : H_VRAI);
+        double hi = regleKite ? hauteurIntegree(t0, t1) : hauteurPop(t0 - 500, t1 + 400);
+        boolean vrai = hi >= (regleKite ? H_KITE : H_WING);
         if (vrai) nSauts++;
         JSObject o = new JSObject();
         o.put("vrai", vrai);
-        if (regleKite) { o.put("regle", "kite"); o.put("montee", true); }
+        if (regleKite) { o.put("regle", "kite"); o.put("montee", true); } else o.put("regle", "pop");
         o.put("t", t1); o.put("vol", Math.round(vol * 100) / 100.0);
         o.put("h", Math.round(G * vol * vol / 8 * 10) / 10.0);
         // baromètre : altitude moyenne des 2 s avant le saut, puis maximum pendant le vol

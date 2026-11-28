@@ -2,6 +2,15 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 72,
+      "date": "2026-11-28",
+      "titre": "Sauts wing : nouvelle détection",
+      "points": [
+        "Sauts en wing comptés du pop à la réception : les sauts où l'aile porte beaucoup ne sont plus manqués (séance du 28/11 : 6 sauts sur 6 comptés par Surfr, contre 2 avant).",
+        "Hauteur calculée sur tout le saut, en partant de la surface de l'eau avant et après ; un saut compte à partir de 1,3 m (chutes et clapot écartés)."
+      ]
+    },
+    {
       "id": 71,
       "date": "2026-11-28",
       "titre": "Cancale : baie du Mont-Saint-Michel",

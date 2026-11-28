@@ -684,7 +684,7 @@ document.addEventListener('visibilitychange', async () => {
 window.journalTuile = (k, msg) => JournalSession.ev('tuile', { k, erreur: msg });
 // Sauts (version d'essai) : détectés par Android (SautPlugin), notés dans le journal avec la courbe d'accélération,
 // annoncés à la voix : « Saut, 1,2 mètre, 1 seconde ». Hauteur intégrée (hInt, tient compte de la portance de l'aile) ;
-// vrai saut si hInt ≥ 1,2 m (décidé par le plugin, 23/11/2026).
+// vrai saut décidé par le plugin : wing, règle « pop → réception » et hInt ≥ 1,3 m (28/11/2026) ; kite, hInt ≥ 1 m.
 let ecouteSauts = null, ecouteChocs = null, dernierSautAnnonce = 0;
 const fr1v = v => String(v).replace('.', ',');
 async function demarrerSauts() {
@@ -700,7 +700,7 @@ async function demarrerSauts() {
       // vitesse d'approche : la plus forte des 6 dernières secondes (on ralentit au décollage, surtout en strapless)
       const v = Math.max(fix ? fix.speed * 3.6 : 0, ...vitesses.map(x => x.v));
       s.v = Math.round(v);
-      if (!s.vrai) { JournalSession.ev('saut', { ...s, ecarte: 'hauteur' }); return; } // hauteur intégrée sous 1,2 m (kite : 1 m) : pompage, clapot
+      if (!s.vrai) { JournalSession.ev('saut', { ...s, ecarte: 'hauteur' }); return; } // hauteur intégrée sous 1,3 m (kite : 1 m) : pompage, clapot, chute
       if (v < 12) { JournalSession.ev('saut', { ...s, ecarte: 'vitesse' }); return; } // chute, marche, manipulation
       JournalSession.ev('saut', s);
       // annonce seulement au-dessus du seuil du profil, et jamais deux sauts à moins de 3 s (fausses détections en rafale)
