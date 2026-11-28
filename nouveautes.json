@@ -2,6 +2,15 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 71,
+      "date": "2026-11-28",
+      "titre": "Cancale : baie du Mont-Saint-Michel",
+      "points": [
+        "Zone Saint-Malo : relief ajouté au sud de Cancale (La Houle, Château-Richeux, Saint-Méloir), roches, profondeur et alertes comprises. Retélécharge le relief de Saint-Malo dans Plus → Carte et téléchargements.",
+        "Appli montre Saint-Malo reconstruite avec ce secteur."
+      ]
+    },
+    {
       "id": 70,
       "date": "2026-11-28",
       "titre": "Radar : GPS réparé",
