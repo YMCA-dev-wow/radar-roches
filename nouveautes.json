@@ -2,6 +2,15 @@
   "_lisezmoi": "Journal des nouveautés, le plus récent en premier. À chaque publication : ajouter une entrée en tête avec id = précédent + 1. L'appli montre une seule fois les entrées qu'elle n'a pas encore montrées.",
   "entrees": [
     {
+      "id": 68,
+      "date": "2026-11-28",
+      "titre": "Trace toujours enregistrée",
+      "points": [
+        "Radar : la trace (et donc les sauts, la vitesse, le rejeu) est enregistrée à chaque position, même si le calcul des roches échoue ou si le relief manque (spot hors zone).",
+        "Journal de séance : erreurs du GPS Android et absence de position 20 s après le départ notées, pour comprendre une séance vide."
+      ]
+    },
+    {
       "id": 67,
       "date": "2026-11-28",
       "titre": "Traversées",

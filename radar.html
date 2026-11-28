@@ -417,7 +417,11 @@ function startGps() {
   if (APPLI) { // service GPS Android : continue écran éteint (notification permanente « Radar actif »)
     Natif.geo.addWatcher({ backgroundTitle: 'Radar roches actif', backgroundMessage: 'Surveillance des roches en cours', requestPermissions: true, stale: false, distanceFilter: 0 },
       (loc, err) => {
-        if (err) { gpsStats.erreur = err.code === 'NOT_AUTHORIZED' ? 'accès refusé (réglages Android)' : err.message; return; }
+        if (err) {
+          const m = err.code === 'NOT_AUTHORIZED' ? 'accès refusé (réglages Android)' : err.message;
+          if (m !== gpsStats.erreur) JournalSession.ev('gps', { erreur: m, code: err.code || null });
+          gpsStats.erreur = m; return;
+        }
         recevoir({ coords: { latitude: loc.latitude, longitude: loc.longitude, accuracy: loc.accuracy, speed: loc.speed, heading: loc.bearing }, timestamp: loc.time }, 'suivi');
         tick(); // le calcul suit chaque position, même si les minuteries ralentissent écran éteint
       }).then(id => { idNatif = id; });
@@ -499,7 +503,9 @@ function tick() {
   if (sim) simStep(dt);
   const t = Date.now();
   const gpsAge = fix ? (t - fix.t) / 1000 : Infinity;
-  if (fix && (!analysis || now - analysis.at > 500)) {
+  // Le calcul du radar ne doit jamais empêcher d'enregistrer la trace (hors des zones couvertes, relief absent…) :
+  // une erreur est notée au journal et la position est enregistrée quand même (plus bas).
+  if (fix && (!analysis || now - analysis.at > 500)) try {
     activerZone(zonePour(fix.lat, fix.lon)); // changement de zone : évènement « zone » (marée, ports, tuiles)
     if (!dernierPrechargement || Math.hypot((fix.lon - dernierPrechargement.lon) * 111320 * Math.cos(fix.lat * Math.PI / 180), (fix.lat - dernierPrechargement.lat) * 110540) > 500 || dernierPrechargement.zone !== zone) {
       dernierPrechargement = { lat: fix.lat, lon: fix.lon, zone }; prechargerTuiles(fix.lat, fix.lon);
@@ -514,6 +520,9 @@ function tick() {
     const fd = fondA(fix.lat, fix.lon); analysis.fond = fd; // fond sous la planche : eau au-dessus du fond
     $('sFond').textContent = !fd || isNaN(W) ? 'fond –' : fd.cote === -Infinity ? 'fond > ' + (W - meta.cote_min).toFixed(0) + ' m'
       : fd.nature === 'terre' ? 'à terre' : 'fond ' + (W - fd.cote).toFixed(1).replace('.', ',') + ' m' + (fd.nature === 'roche' ? ' · roche' : '');
+  } catch (e) {
+    analysis = null;
+    if (e.message !== erreurCalcul) { erreurCalcul = e.message; JournalSession.ev('erreur', { msg: e.message, ou: 'calcul du radar', pile: String(e.stack || '').slice(0, 300) }); }
   }
   // ----- son -----
   const at = horlogeSon(), vmin = +$('vmin').value / 3.6;
@@ -532,15 +541,18 @@ function tick() {
     annoncer(b, p, armed, Date.now(), analysis.horizon, fix.speed);
     annoncerVeille(nouvelleVeille(veilleEtat, analysis, armed, t));
     relaisPas(t, analysis, fix.course, armed, tt => niveauCourant(fix.lon, tt, fix.lat), true);
-    if (fix.t !== fixJournal) { fixJournal = fix.t; journalPosition(fix, analysis, armed); }
   }
+  // trace : chaque nouvelle position, avec ou sans calcul du radar
+  if (fix && gpsAge <= 5 && fix.t !== fixJournal) { fixJournal = fix.t; journalPosition(fix, analysis || {}, fix.speed >= vmin); }
+  // aucune position 20 s après le départ : noté au journal avec l'erreur du GPS (diagnostic)
+  if (!fix && !sim && !gpsMuetJournal && t - debutSeance > 20000) { gpsMuetJournal = true; JournalSession.ev('gps', { aucunePosition: true, positions: gpsStats.n, erreur: gpsStats.erreur || null }); }
   if (gpsAge > 5 && fix) relaisPas(t, analysis, 0, false, tt => niveauCourant(fix.lon, tt, fix.lat), false);
   $('msg').textContent = message;
   $('msg').className = gpsAge > 5 || !analysis ? '' : analysis.best ? 'alerte' : analysis.pre ? 'pre' : analysis.lat ? 'veille' : '';
 }
 // Une ligne par position : lieu, précision, vitesse (km/h), cap, eau, alertes armées, danger [d, gisement, niveau],
 // pré-alerte [d, gisement], veille [d, gisement]
-let fixJournal = null, gpsPerduJournal = false, dernierPrechargement = null;
+let fixJournal = null, gpsPerduJournal = false, gpsMuetJournal = false, erreurCalcul = null, dernierPrechargement = null;
 function journalPosition(f, an, armed) {
   if (!JournalSession.ouvert) return;
   const r = (x, k = 0) => x == null || isNaN(x) ? null : +x.toFixed(k);
@@ -629,6 +641,7 @@ $('start').onclick = async () => {
   $('setup').hidden = true; $('avance').hidden = true; $('fProfils').classList.remove('on');
   document.body.classList.add('navigation'); $('run').hidden = false; resize();
   fix = null; lastFixes = []; vitesses = []; analysis = null; last = null; running = true; window.radarEnCours = true; dernierPrechargement = null; debutSeance = Date.now();
+  gpsMuetJournal = false; erreurCalcul = null; fixJournal = null;
   if ($('simMode').checked) startSim(); else startGps();
   clearInterval(tickTimer); tickTimer = setInterval(tick, 100);
   requestAnimationFrame(frame);
